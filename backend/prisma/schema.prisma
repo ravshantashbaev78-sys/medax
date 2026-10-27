@@ -154,6 +154,7 @@ model OrderItem {
   product     Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
   productName String
   quantity    Int
+  price       Decimal? @db.Decimal(14, 2)
 }
 
 model OtpCode {

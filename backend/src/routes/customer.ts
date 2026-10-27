@@ -265,10 +265,7 @@ customerRouter.post("/auth/telegram-widget", authLimiter, async (req, res) => {
 
   let customer = await prisma.customer.findFirst({
     where: {
-      OR: [
-        { phone: `tg:${tgId}` },
-        { name: { contains: tgId } },
-      ],
+      phone: `tg:${tgId}`,
     },
   });
 
@@ -510,7 +507,10 @@ customerRouter.put("/auth/password", requireCustomerAuth, async (req, res) => {
   const customer = await prisma.customer.findUnique({ where: { id: req.customer!.id } });
   if (!customer) throw new HttpError(404, "Mijoz topilmadi");
 
-  if (customer.passwordHash && currentPassword) {
+  if (customer.passwordHash) {
+    if (!currentPassword) {
+      throw new HttpError(400, "Joriy parolingizni kiriting.");
+    }
     const match = await bcrypt.compare(currentPassword, customer.passwordHash);
     if (!match) throw new HttpError(400, "Joriy parol noto'g'ri.");
   }

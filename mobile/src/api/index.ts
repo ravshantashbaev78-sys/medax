@@ -45,11 +45,16 @@ export async function fetchCategories(): Promise<Category[]> {
   }
 }
 
-export async function fetchProducts(params: { categoryId?: number; search?: string } = {}): Promise<Product[]> {
+export async function fetchProducts(params: { categoryId?: number; category?: string; search?: string; q?: string } = {}): Promise<Product[]> {
   try {
     const query = new URLSearchParams();
     if (params.categoryId) query.append("categoryId", String(params.categoryId));
-    if (params.search) query.append("search", params.search);
+    if (params.category) query.append("category", params.category);
+    const searchVal = params.search || params.q;
+    if (searchVal) {
+      query.append("q", searchVal);
+      query.append("search", searchVal);
+    }
 
     const res = await fetch(`${API_BASE}/products?${query.toString()}`);
     const data = await res.json();
@@ -166,6 +171,24 @@ export async function updateCustomerProfile(payload: { name?: string; organizati
   }
 }
 
+export async function sendOrderOtp(phone: string): Promise<{ ok: boolean; resendIn?: number; error?: string }> {
+  try {
+    const cleanPhone = phone.replace(/[^\d+]/g, "");
+    const res = await fetch(`${API_BASE}/orders/otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: cleanPhone }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      return { ok: false, error: data.error || "SMS tasdiqlash kodini yuborishda xatolik" };
+    }
+    return { ok: true, resendIn: data.resendIn || 60 };
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Tarmoqda xatolik yuz berdi" };
+  }
+}
+
 export async function submitOrder(orderData: {
   customerName: string;
   phone: string;
@@ -173,6 +196,7 @@ export async function submitOrder(orderData: {
   organization?: string;
   paymentMethod?: "inpay" | "cash" | string;
   comment?: string;
+  code?: string;
   items: { productId: number; quantity: number }[];
 }): Promise<{ ok: boolean; orderId?: number; code?: string; payUrl?: string; error?: string }> {
   try {
@@ -182,7 +206,7 @@ export async function submitOrder(orderData: {
 
     const cleanPhone = orderData.phone.replace(/[^\d+]/g, "");
 
-    const payload = {
+    const payload: Record<string, any> = {
       name: orderData.customerName,
       phone: cleanPhone,
       deliveryAddress: orderData.deliveryAddress || "Yetkazib berish (Mobil ilova)",
@@ -192,6 +216,9 @@ export async function submitOrder(orderData: {
       items: orderData.items,
       elapsedMs: 3000,
     };
+    if (orderData.code) {
+      payload.code = orderData.code;
+    }
 
     const res = await fetch(`${API_BASE}/orders`, {
       method: "POST",

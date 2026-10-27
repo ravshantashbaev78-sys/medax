@@ -53,7 +53,9 @@ publicRouter.get("/home", async (_req, res) => {
 
 const listQuery = z.object({
   q: z.string().trim().max(100).optional(),
+  search: z.string().trim().max(100).optional(),
   category: z.string().optional(),
+  categoryId: z.coerce.number().optional(),
   brand: z.string().optional(),
   flag: z.enum(["hit", "new", "discount"]).optional(),
   minPrice: z.coerce.number().optional(),
@@ -67,6 +69,7 @@ publicRouter.get("/products", async (req, res) => {
   const q = listQuery.parse(req.query);
   const where: Prisma.ProductWhereInput = { isActive: true };
   if (q.category) where.category = { slug: q.category };
+  if (q.categoryId) where.categoryId = q.categoryId;
   if (q.brand) where.brand = { slug: q.brand };
   if (q.flag === "hit") where.isHit = true;
   if (q.flag === "new") where.isNew = true;
@@ -78,11 +81,12 @@ publicRouter.get("/products", async (req, res) => {
     if (q.maxPrice !== undefined && q.maxPrice > 0) where.priceFrom.lte = new Prisma.Decimal(q.maxPrice);
   }
 
-  if (q.q) {
+  const searchText = q.q || q.search;
+  if (searchText) {
     where.OR = [
-      { name: { contains: q.q, mode: "insensitive" } },
-      { sku: { contains: q.q, mode: "insensitive" } },
-      { brand: { name: { contains: q.q, mode: "insensitive" } } },
+      { name: { contains: searchText, mode: "insensitive" } },
+      { sku: { contains: searchText, mode: "insensitive" } },
+      { brand: { name: { contains: searchText, mode: "insensitive" } } },
     ];
   }
   const orderBy: Prisma.ProductOrderByWithRelationInput =

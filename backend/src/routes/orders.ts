@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { Prisma } from "@prisma/client";
 import rateLimit from "express-rate-limit";
 import crypto from "crypto";
 import { z } from "zod";
@@ -240,6 +241,7 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
             productId: i.productId,
             quantity: i.quantity,
             productName: names.get(i.productId)!,
+            price: prices.get(i.productId) ? new Prisma.Decimal(prices.get(i.productId)!) : null,
           })),
         },
       },

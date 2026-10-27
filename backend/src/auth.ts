@@ -80,26 +80,7 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
     .object({ email: z.string().email(), password: z.string().min(1) })
     .parse(req.body);
   const normalizedEmail = email.toLowerCase().trim();
-  let user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
-
-  // Favqulodda kirish va parolni avtomatik tiklash (Self-healing bootstrap):
-  const isAdminEmail =
-    normalizedEmail === "admin@medax.uz" ||
-    normalizedEmail === "admin@medtex.uz" ||
-    (process.env.ADMIN_EMAIL && normalizedEmail === process.env.ADMIN_EMAIL.toLowerCase());
-
-  const isBootstrapPassword =
-    password === "ChangeMe123!" ||
-    (process.env.ADMIN_PASSWORD && password === process.env.ADMIN_PASSWORD);
-
-  if (isAdminEmail && isBootstrapPassword) {
-    const newHash = await bcrypt.hash(password, 10);
-    user = await prisma.user.upsert({
-      where: { email: normalizedEmail },
-      create: { email: normalizedEmail, name: "Administrator", role: "ADMIN", passwordHash: newHash },
-      update: { passwordHash: newHash, role: "ADMIN" },
-    });
-  }
+  const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
   if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
     throw new HttpError(401, "Email yoki parol notoʻgʻri");

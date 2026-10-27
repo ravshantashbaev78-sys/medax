@@ -40,9 +40,13 @@ services:
       - key: ESKIZ_FROM
         value: "4546"
       - key: INPAY_MERCHANT_ID
-        value: "63710"
+        sync: false
       - key: INPAY_MERCHANT_TOKEN
-        value: "1842423423412086fc280ffd3517e34a"
+        sync: false
       - key: INPAY_CALLBACK_URL
         value: "https://medax.uz/api/orders/inpay/callback"
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_BOT_USERNAME
+        value: "MedaxAuthbot"
 

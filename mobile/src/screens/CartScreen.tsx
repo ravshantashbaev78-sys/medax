@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
-import { submitOrder, getImageUrl, formatPrice } from "../api";
+import { submitOrder, sendOrderOtp, getImageUrl, formatPrice } from "../api";
 import { CartIcon, CloseIcon, ShieldIcon, BoltIcon, TelegramIcon } from "../components/Icons";
 
 export function CartScreen({ navigation }: any) {
@@ -28,6 +28,17 @@ export function CartScreen({ navigation }: any) {
   const [comment, setComment] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<"inpay" | "cash">("inpay");
   const [loading, setLoading] = useState(false);
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpCode, setOtpCode] = useState("");
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    let t: any;
+    if (resendTimer > 0) {
+      t = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+    }
+    return () => clearTimeout(t);
+  }, [resendTimer]);
 
   const hasUnpriced = items.some((i) => !i.product.priceFrom || Number(i.product.priceFrom) <= 0);
 
@@ -46,6 +57,27 @@ export function CartScreen({ navigation }: any) {
       return;
     }
 
+    // Agar mijoz tizimga kirmagan bo'lsa va hali SMS kod yuborilmagan bo'lsa
+    if (!token && !otpSent) {
+      setLoading(true);
+      const otpRes = await sendOrderOtp(phone.trim());
+      setLoading(false);
+      if (!otpRes.ok) {
+        Alert.alert("Xatolik", otpRes.error || "SMS tasdiqlash kodini yuborishda xatolik yuz berdi.");
+        return;
+      }
+      setOtpSent(true);
+      setResendTimer(otpRes.resendIn || 60);
+      Alert.alert("SMS yuborildi 📩", "Telefoningizga 6 xonali tasdiqlash kodi yuborildi. Kodni kiriting.");
+      return;
+    }
+
+    // Agar tizimga kirmagan bo'lsa va kod kiritilmagan bo'lsa
+    if (!token && otpSent && otpCode.trim().length !== 6) {
+      Alert.alert("Diqqat", "SMS orqali kelgan 6 xonali tasdiqlash kodini kiriting.");
+      return;
+    }
+
     const selectedMethod = hasUnpriced ? "cash" : paymentMethod;
 
     setLoading(true);
@@ -61,12 +93,15 @@ export function CartScreen({ navigation }: any) {
       comment: comment.trim(),
       paymentMethod: selectedMethod,
       items: orderItems,
+      code: !token ? otpCode.trim() : undefined,
     });
 
     setLoading(false);
 
     if (res.ok) {
       clearCart();
+      setOtpSent(false);
+      setOtpCode("");
 
       if (res.payUrl) {
         Alert.alert(
@@ -324,6 +359,44 @@ export function CartScreen({ navigation }: any) {
             </Text>
           </View>
 
+          {/* Mehmonlar uchun OTP Kod kiritish maydoni */}
+          {!token && otpSent && (
+            <View style={styles.otpCard}>
+              <Text style={styles.otpTitle}>SMS tasdiqlash kodi *</Text>
+              <Text style={styles.otpSubtitle}>
+                {phone} raqamiga yuborilgan 6 xonali kodni kiriting
+              </Text>
+              <TextInput
+                style={styles.otpInput}
+                placeholder="123456"
+                value={otpCode}
+                onChangeText={setOtpCode}
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholderTextColor="#94a3b8"
+              />
+              <TouchableOpacity
+                disabled={resendTimer > 0 || loading}
+                onPress={async () => {
+                  setLoading(true);
+                  const r = await sendOrderOtp(phone.trim());
+                  setLoading(false);
+                  if (r.ok) {
+                    setResendTimer(r.resendIn || 60);
+                    Alert.alert("SMS qayta yuborildi", "Yangi tasdiqlash kodi yuborildi.");
+                  } else {
+                    Alert.alert("Xatolik", r.error || "SMS yuborilmadi.");
+                  }
+                }}
+                style={styles.resendBtn}
+              >
+                <Text style={[styles.resendText, resendTimer > 0 && { color: "#94a3b8" }]}>
+                  {resendTimer > 0 ? `Kodni qayta yuborish (${resendTimer}s)` : "Kodni qayta yuborish"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           <TouchableOpacity
             style={[styles.orderBtn, loading && { opacity: 0.7 }]}
             onPress={handleCheckout}
@@ -335,7 +408,11 @@ export function CartScreen({ navigation }: any) {
             ) : (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <Text style={styles.orderBtnText}>
-                  {paymentMethod === "inpay" && !hasUnpriced ? "inPAY orqali to'lash →" : "Buyurtmani tasdiqlash →"}
+                  {!token && !otpSent
+                    ? "SMS kod olish va buyurtma berish →"
+                    : paymentMethod === "inpay" && !hasUnpriced
+                    ? "inPAY orqali to'lash →"
+                    : "Buyurtmani tasdiqlash →"}
                 </Text>
               </View>
             )}
@@ -505,6 +582,34 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   orderBtnText: { color: "#ffffff", fontSize: 14.5, fontWeight: "800" },
+
+  otpCard: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#bfdbfe",
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  otpTitle: { fontSize: 14, fontWeight: "800", color: "#1e3a8a", marginBottom: 4 },
+  otpSubtitle: { fontSize: 12, color: "#3b82f6", textAlign: "center", marginBottom: 12 },
+  otpInput: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1.5,
+    borderColor: "#0284c7",
+    borderRadius: 12,
+    fontSize: 22,
+    fontWeight: "900",
+    letterSpacing: 6,
+    textAlign: "center",
+    width: "70%",
+    paddingVertical: 8,
+    color: "#0f172a",
+    marginBottom: 10,
+  },
+  resendBtn: { paddingVertical: 4 },
+  resendText: { fontSize: 12, color: "#0284c7", fontWeight: "700" },
 
   emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 30, backgroundColor: "#ffffff" },
   emptyIconCircle: {

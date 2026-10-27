@@ -66,15 +66,15 @@ export const config = {
 
   // inPAY to'lov tizimi sozlamalari
   inpay: {
-    merchantId: process.env.INPAY_MERCHANT_ID || "63710",
-    merchantToken: process.env.INPAY_MERCHANT_TOKEN || "1842423423412086fc280ffd3517e34a",
+    merchantId: process.env.INPAY_MERCHANT_ID || "",
+    merchantToken: process.env.INPAY_MERCHANT_TOKEN || "",
     baseUrl: process.env.INPAY_BASE_URL || "https://inpay.uz/api/v1",
     callbackUrl: process.env.INPAY_CALLBACK_URL || "https://medax.uz/api/orders/inpay/callback",
   },
 
   // Telegram Bot sozlamalari
   telegram: {
-    botToken: process.env.TELEGRAM_BOT_TOKEN || "8439993196:AAHH06kgRE_lMZmfIhfsNrOfSbDnjBcSnMo",
+    botToken: process.env.TELEGRAM_BOT_TOKEN || "",
     botUsername: process.env.TELEGRAM_BOT_USERNAME || "MedaxAuthbot",
   },
 };
