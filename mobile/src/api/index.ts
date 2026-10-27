@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-export const API_BASE = "https://medax-backend-c803.onrender.com/api";
+export const API_BASE = "https://medax.uz/api";
 export const TOKEN_KEY = "@medax_customer_token";
 
 export interface Category {
