@@ -45,23 +45,7 @@ app.use(
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      if (
-        config.corsOrigin.includes("*") ||
-        config.corsOrigin.includes(origin) ||
-        origin === "https://medax.uz" ||
-        origin === "https://www.medax.uz" ||
-        origin.endsWith(".vercel.app") ||
-        origin.endsWith(".medax.uz") ||
-        origin.includes("localhost") ||
-        origin.includes("127.0.0.1")
-      ) {
-        return callback(null, true);
-      }
-      return callback(new HttpError(403, "CORS ruxsat berilmadi"));
-
-    },
+    origin: true,
     credentials: true,
   })
 );
