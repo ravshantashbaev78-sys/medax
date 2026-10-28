@@ -412,8 +412,13 @@ adminRouter.post("/users", requireAdmin, async (req, res) => {
     email: z.string().email(),
     name: z.string().trim().min(2).max(80),
     password: z.string().min(8, "Parol kamida 8 belgi"),
-    role: z.enum(["ADMIN", "MANAGER"]).default("MANAGER"),
+    role: z.enum(["OWNER", "ADMIN", "MANAGER"]).default("MANAGER"),
   }).parse(req.body);
+
+  if ((d.role === "ADMIN" || d.role === "OWNER") && req.user!.role !== "OWNER") {
+    throw new HttpError(403, "Faqat tizim Egasi (Owner) yangi Admin yoki Ega qo'sha oladi");
+  }
+
   const exists = await prisma.user.findUnique({ where: { email: d.email.toLowerCase() } });
   if (exists) throw new HttpError(409, "Bu email band");
   const u = await prisma.user.create({
@@ -425,6 +430,14 @@ adminRouter.post("/users", requireAdmin, async (req, res) => {
 adminRouter.delete("/users/:id", requireAdmin, async (req, res) => {
   const uid = id(req.params.id);
   if (uid === req.user!.id) throw new HttpError(400, "O'zingizni o'chira olmaysiz");
+
+  const target = await prisma.user.findUnique({ where: { id: uid } });
+  if (!target) throw new HttpError(404, "Xodim topilmadi");
+  if (target.role === "OWNER") throw new HttpError(403, "Tizim Egasini (Owner) o'chirib bo'lmaydi");
+  if (target.role === "ADMIN" && req.user!.role !== "OWNER") {
+    throw new HttpError(403, "Faqat tizim Egasi Adminlarni o'chira oladi");
+  }
+
   await prisma.user.delete({ where: { id: uid } });
   res.json({ ok: true });
 });

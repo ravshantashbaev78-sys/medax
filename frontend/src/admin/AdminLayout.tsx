@@ -11,7 +11,7 @@ export interface Me {
   id: number;
   name: string;
   email: string;
-  role: "ADMIN" | "MANAGER";
+  role: "OWNER" | "ADMIN" | "MANAGER";
 }
 
 function AdminLayoutInner() {
@@ -193,7 +193,9 @@ function AdminLayoutInner() {
               <span className="user-avatar-dot">{me.name.charAt(0).toUpperCase()}</span>
               <div className="user-meta">
                 <span className="user-name">{me.name}</span>
-                <span className="user-role-badge">{me.role === "ADMIN" ? t("role_admin") : t("role_manager")}</span>
+                <span className="user-role-badge">
+                  {me.role === "OWNER" ? "👑 Ega (Owner)" : me.role === "ADMIN" ? t("role_admin") : t("role_manager")}
+                </span>
               </div>
             </div>
           </div>

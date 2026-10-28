@@ -10,7 +10,7 @@ import { getClientIp } from "./ip";
 
 export interface AuthUser {
   id: number;
-  role: "ADMIN" | "MANAGER";
+  role: "OWNER" | "ADMIN" | "MANAGER";
   email: string;
   name: string;
 }
@@ -38,7 +38,8 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 
   try {
     const decoded = jwt.verify(token, config.jwtSecret) as AuthUser;
-    if (!decoded || !decoded.id || (decoded.role !== "ADMIN" && decoded.role !== "MANAGER")) {
+    const validRoles = ["OWNER", "ADMIN", "MANAGER"];
+    if (!decoded || !decoded.id || !validRoles.includes(decoded.role)) {
       return next(new HttpError(401, "Noto'g'ri yoki ruxsatsiz token"));
     }
 
@@ -48,7 +49,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
       select: { id: true, role: true, email: true, name: true },
     });
 
-    if (!user || (user.role !== "ADMIN" && user.role !== "MANAGER")) {
+    if (!user || !validRoles.includes(user.role)) {
       return next(new HttpError(401, "Xodim hisobi o'chirilgan yoki huquqlari bekor qilingan"));
     }
 
@@ -60,7 +61,16 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
 }
 
 export function requireAdmin(req: Request, _res: Response, next: NextFunction) {
-  if (req.user?.role !== "ADMIN") return next(new HttpError(403, "Ruxsat yoʻq"));
+  if (req.user?.role !== "ADMIN" && req.user?.role !== "OWNER") {
+    return next(new HttpError(403, "Ruxsat yoʻq"));
+  }
+  next();
+}
+
+export function requireOwner(req: Request, _res: Response, next: NextFunction) {
+  if (req.user?.role !== "OWNER") {
+    return next(new HttpError(403, "Faqat tizim Egasi (Owner) bajara oladi"));
+  }
   next();
 }
 

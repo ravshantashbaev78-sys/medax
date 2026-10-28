@@ -141,7 +141,7 @@ customerRouter.post("/auth/send-otp", authLimiter, async (req, res) => {
 
   // SMS jo'natish (agar Eskiz sozlangan bo'lsa yuboradi)
   try {
-    await sendSms(phone, `Medax: kirish kodi ${code}. Kodni hech kimga bermang.`);
+    await sendSms(phone, `Medax: tasdiqlash kodi ${code}. Kodni hech kimga bermang.`);
   } catch (err: any) {
     console.error("SMS jo'natishda xatolik:", err);
     if (config.smsProvider === "eskiz") {

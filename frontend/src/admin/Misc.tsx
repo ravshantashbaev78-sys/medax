@@ -105,7 +105,7 @@ export function ImportPage() {
 
 /* --------------------------------- Users ------------------------------- */
 
-interface U { id: number; email: string; name: string; role: "ADMIN" | "MANAGER" }
+interface U { id: number; email: string; name: string; role: "OWNER" | "ADMIN" | "MANAGER" }
 
 export function Users() {
   const [rows, setRows] = useState<U[]>([]);
@@ -122,13 +122,20 @@ export function Users() {
 
   return (
     <>
-      <h1>Xodimlar</h1>
+      <h1>Xodimlar va Ega</h1>
+      <p className="muted" style={{ margin: "-8px 0 16px" }}>
+        Loyiha Egasi (Owner) barcha adminlar va menejerlarni boshqaradi.
+      </p>
       {error && <p className="err">{error}</p>}
       <form className="row" onSubmit={add}>
         <input type="text" placeholder="Ism" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required aria-label="Ism" />
         <input type="email" placeholder="Email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required aria-label="Email" />
         <input type="password" placeholder="Parol (8+ belgi)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required minLength={8} aria-label="Parol" autoComplete="new-password" />
-        <select style={{ width: 140 }} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })} aria-label="Rol"><option value="MANAGER">Menejer</option><option value="ADMIN">Admin</option></select>
+        <select style={{ width: 160 }} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as any })} aria-label="Rol">
+          <option value="MANAGER">Menejer</option>
+          <option value="ADMIN">Administrator</option>
+          <option value="OWNER">👑 Ega (Owner)</option>
+        </select>
         <button className="btn">Qo'shish</button>
       </form>
       <div className="tbl-wrap">
@@ -136,8 +143,37 @@ export function Users() {
           <thead><tr><th>Ism</th><th>Email</th><th>Rol</th><th></th></tr></thead>
           <tbody>
             {rows.map((u) => (
-              <tr key={u.id}><td style={{ fontWeight: 600 }}>{u.name}</td><td>{u.email}</td><td>{u.role === "ADMIN" ? "Admin" : "Menejer"}</td>
-                <td><button className="btn ghost sm" onClick={async () => { if (!confirm("O'chirilsinmi?")) return; try { await api(`/admin/users/${u.id}`, { method: "DELETE", admin: true }); load(); } catch (e) { setError((e as ApiError).message); } }}>O'chirish</button></td></tr>
+              <tr key={u.id}>
+                <td style={{ fontWeight: 600 }}>
+                  {u.name} {u.role === "OWNER" && "👑"}
+                </td>
+                <td>{u.email}</td>
+                <td>
+                  <span style={{
+                    padding: "3px 10px",
+                    borderRadius: 6,
+                    fontWeight: 700,
+                    fontSize: 12.5,
+                    background: u.role === "OWNER" ? "#fef3c7" : u.role === "ADMIN" ? "#e0f2fe" : "#f1f5f9",
+                    color: u.role === "OWNER" ? "#b45309" : u.role === "ADMIN" ? "#0284c7" : "#475569",
+                  }}>
+                    {u.role === "OWNER" ? "👑 Ega (Owner)" : u.role === "ADMIN" ? "Administrator" : "Menejer"}
+                  </span>
+                </td>
+                <td>
+                  {u.role !== "OWNER" ? (
+                    <button className="btn ghost sm" onClick={async () => {
+                      if (!confirm("Ushbu xodim o'chirilsinmi?")) return;
+                      try { await api(`/admin/users/${u.id}`, { method: "DELETE", admin: true }); load(); }
+                      catch (e) { setError((e as ApiError).message); }
+                    }}>
+                      O'chirish
+                    </button>
+                  ) : (
+                    <span style={{ fontSize: 12, color: "var(--ink2)", fontStyle: "italic" }}>Asosiy Ega</span>
+                  )}
+                </td>
+              </tr>
             ))}
           </tbody>
         </table>

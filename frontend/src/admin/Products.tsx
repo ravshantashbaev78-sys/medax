@@ -5,7 +5,7 @@ import { Pager } from "../components/Shell";
 import { useAdminI18n } from "./i18n";
 
 export function ProductList() {
-  const { t } = useAdminI18n();
+  const { aT, t, lang } = useAdminI18n();
   const [data, setData] = useState<Paged<Product> | null>(null);
   const [q, setQ] = useState("");
   const [query, setQuery] = useState("");
@@ -35,14 +35,14 @@ export function ProductList() {
 
   return (
     <>
-      <h1>{t("products")}</h1>
+      <h1>{aT("products")}</h1>
       <div className="row">
         <form className="search" style={{ flex: 1, maxWidth: 420 }} onSubmit={(e: FormEvent) => { e.preventDefault(); setPage(1); setQuery(q.trim()); }}>
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Nom yoki artikul" aria-label="Qidirish" />
-          <button className="btn sm">Qidirish</button>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={aT("search")} aria-label="Qidirish" />
+          <button className="btn sm">{aT("search")}</button>
         </form>
         <span className="grow" />
-        <Link className="btn" to="/admin/products/new">➕ {t("action_add_product")}</Link>
+        <Link className="btn" to="/admin/products/new">➕ {aT("add_product")}</Link>
       </div>
       {error && <p className="err">{error}</p>}
       <div className="tbl-wrap">
@@ -50,11 +50,11 @@ export function ProductList() {
           <thead>
             <tr>
               <th></th>
-              <th>Nomi</th>
-              <th>{t("taxonomy")}</th>
-              <th>Narx</th>
-              <th>{t("status")}</th>
-              <th>{t("actions")}</th>
+              <th>{aT("name")}</th>
+              <th>{aT("category")}</th>
+              <th>{aT("price")}</th>
+              <th>{aT("status")}</th>
+              <th>{aT("actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -76,16 +76,16 @@ export function ProductList() {
                     onClick={() => toggle(p)}
                     title={p.isActive ? "Bosib yashirish" : "Bosib saytda ko'rsatish"}
                   >
-                    {p.isActive ? "🟢 Saytda" : "🔴 Yashirin"}
+                    {p.isActive ? aT("badge_active") : aT("badge_hidden")}
                   </button>
                 </td>
                 <td style={{ whiteSpace: "nowrap" }}>
-                  <Link className="btn ghost sm" to={`/admin/products/${p.id}`}>Tahrirlash</Link>{" "}
-                  <button className="btn ghost sm" onClick={() => remove(p)}>O'chirish</button>
+                  <Link className="btn ghost sm" to={`/admin/products/${p.id}`}>{aT("edit")}</Link>{" "}
+                  <button className="btn ghost sm" onClick={() => remove(p)}>{aT("delete")}</button>
                 </td>
               </tr>
             ))}
-            {data && data.items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 32 }}>Mahsulot topilmadi.</td></tr>}
+            {data && data.items.length === 0 && <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 32 }}>{aT("not_found")}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -104,6 +104,7 @@ const empty = {
 };
 
 export function ProductForm() {
+  const { aT, lang } = useAdminI18n();
   const { id } = useParams();
   const nav = useNavigate();
   const isNew = !id || id === "new";
@@ -112,6 +113,7 @@ export function ProductForm() {
   const [cats, setCats] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [images, setImages] = useState<Product["images"]>([]);
+  const [newFiles, setNewFiles] = useState<{ file: File; preview: string }[]>([]);
   const [docs, setDocs] = useState<NonNullable<Product["documents"]>>([]);
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -171,13 +173,37 @@ export function ProductForm() {
     try {
       if (isNew) {
         const p = await api<Product>("/admin/products", { json: body, admin: true });
-        nav(`/admin/products/${p.id}`, { replace: true });
+        if (newFiles.length > 0) {
+          const fd = new FormData();
+          newFiles.forEach((x) => fd.append("files", x.file));
+          await api(`/admin/products/${p.id}/images`, { form: fd, admin: true });
+        }
+        nav("/admin/products");
       } else {
         await api(`/admin/products/${id}`, { method: "PUT", json: body, admin: true });
         setMsg("Saqlandi.");
       }
     } catch (err) { setError((err as ApiError).message); }
     finally { setBusy(false); }
+  };
+
+  const onPickNewFiles = (e: ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files?.length) return;
+    const added = Array.from(files).map((file) => ({
+      file,
+      preview: URL.createObjectURL(file),
+    }));
+    setNewFiles((cur) => [...cur, ...added]);
+    e.target.value = "";
+  };
+
+  const removeNewFile = (idx: number) => {
+    setNewFiles((cur) => {
+      const target = cur[idx];
+      if (target) URL.revokeObjectURL(target.preview);
+      return cur.filter((_, i) => i !== idx);
+    });
   };
 
   const upload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -207,7 +233,11 @@ export function ProductForm() {
 
   return (
     <>
-      <h1>{isNew ? "Yangi mahsulot" : "Mahsulotni tahrirlash"}</h1>
+      <h1>
+        {isNew
+          ? (lang === "ru" ? "Новый товар" : lang === "en" ? "New Product" : "Yangi mahsulot")
+          : (lang === "ru" ? "Редактирование товара" : lang === "en" ? "Edit Product" : "Mahsulotni tahrirlash")}
+      </h1>
       {error && <p className="err" role="alert">{error}</p>}
       {msg && <p className="ok">{msg}</p>}
       <form onSubmit={save} style={{ maxWidth: 860 }}>
@@ -243,16 +273,16 @@ export function ProductForm() {
 
           {/* O'lchov birligi va Pachkadagi dona soni (Maska, perchatkalar uchun) */}
           <div className="field">
-            <label htmlFor="unit">O'lchov birligi</label>
+            <label htmlFor="unit">{aT("unit")}</label>
             <select id="unit" value={f.unit} onChange={(e) => set("unit", e.target.value)}>
-              <option value="dona">dona (1 dona)</option>
-              <option value="quti">quti (blok)</option>
-              <option value="pachka">pachka</option>
-              <option value="o'ram">o'ram (rulon)</option>
-              <option value="komplekt">komplekt / to'plam</option>
-              <option value="juft">juft (qo'lqop uchun)</option>
-              <option value="flakon">flakon / ampula</option>
-              <option value="metr">metr</option>
+              <option value="dona">{aT("unit_dona")}</option>
+              <option value="quti">{aT("unit_quti")}</option>
+              <option value="pachka">{aT("unit_pachka")}</option>
+              <option value="o'ram">{aT("unit_oram")}</option>
+              <option value="komplekt">{aT("unit_komplekt")}</option>
+              <option value="juft">{aT("unit_juft")}</option>
+              <option value="flakon">{aT("unit_flakon")}</option>
+              <option value="metr">{aT("unit_metr")}</option>
             </select>
           </div>
           <div className="field">
@@ -297,40 +327,129 @@ export function ProductForm() {
         ))}
         <button type="button" className="btn ghost sm" onClick={() => set("specs", [...f.specs, { name: "", value: "" }])}>+ Xususiyat qo'shish</button>
 
-        <div className="row" style={{ marginTop: 22 }}>
-          <button className="btn" disabled={busy}>{busy ? "Saqlanmoqda…" : "Saqlash"}</button>
-          <Link className="btn ghost" to="/admin/products">Ro'yxatga qaytish</Link>
-        </div>
-      </form>
+        {/* Rasmlar bo'limi - mahsulot yaratishda ham, tahrirlashda ham to'g'ridan-to'g'ri ishlaydi */}
+        <div style={{ maxWidth: 860, marginTop: 26, borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+          <h3 style={{ margin: "0 0 6px", fontSize: 16 }}>Mahsulot rasmlari</h3>
+          <p className="note" style={{ margin: "0 0 12px", color: "var(--ink2)" }}>
+            Rasmlarni hoziroq tanlang — "Saqlash" bosilganda barchasi birgalikda avtomatik yuklanadi va WebP ga o'tkaziladi.
+          </p>
 
-      {isNew ? (
-        <p className="muted">Rasm va hujjatlarni mahsulot saqlangandan keyin yuklash mumkin.</p>
-      ) : (
-        <div style={{ maxWidth: 860, marginTop: 14 }}>
-          <h3>Rasmlar</h3>
-          <div className="imgs">
+          <div className="imgs" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 12 }}>
+            {/* Yangi tanlangan rasmlar (preview) */}
+            {newFiles.map((nf, i) => (
+              <div
+                className="it"
+                key={`new-${i}`}
+                style={{
+                  position: "relative",
+                  width: 90,
+                  height: 90,
+                  borderRadius: 10,
+                  overflow: "hidden",
+                  border: "2px solid var(--teal, #0d9488)",
+                  boxShadow: "0 2px 8px rgba(0,0,0,0.08)",
+                }}
+              >
+                <img src={nf.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                <button
+                  type="button"
+                  aria-label="O'chirish"
+                  onClick={() => removeNewFile(i)}
+                  style={{
+                    position: "absolute",
+                    top: 3,
+                    right: 3,
+                    background: "rgba(0,0,0,0.65)",
+                    color: "#fff",
+                    border: "none",
+                    borderRadius: "50%",
+                    width: 22,
+                    height: 22,
+                    cursor: "pointer",
+                    display: "grid",
+                    placeItems: "center",
+                    fontSize: 13,
+                    fontWeight: 700,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+
+            {/* Avvaldan saqlangan rasmlar */}
             {images.map((im) => (
               <div className="it" key={im.id}>
                 <img src={im.thumbUrl} alt="" />
-                <button aria-label="Rasmni o'chirish" onClick={async () => { await api(`/admin/images/${im.id}`, { method: "DELETE", admin: true }); setImages((c) => c.filter((x) => x.id !== im.id)); }}>×</button>
+                <button
+                  type="button"
+                  aria-label="Rasmni o'chirish"
+                  onClick={async () => {
+                    await api(`/admin/images/${im.id}`, { method: "DELETE", admin: true });
+                    setImages((c) => c.filter((x) => x.id !== im.id));
+                  }}
+                >
+                  ✕
+                </button>
               </div>
             ))}
           </div>
-          <input type="file" accept="image/*" multiple onChange={upload} aria-label="Rasm yuklash" />
-          <p className="note">JPG, PNG yoki WebP. Rasmlar avtomatik kichraytiriladi va WebP ga o'tkaziladi. Birinchi rasm asosiy hisoblanadi.</p>
 
-          <h3 style={{ marginTop: 22 }}>Hujjatlar (PDF)</h3>
-          <div className="docs" style={{ margin: "10px 0" }}>
-            {docs.map((d) => (
-              <span key={d.id}>
-                <a href={d.url} target="_blank" rel="noopener">PDF · {d.title}</a>
-                <button className="btn ghost sm" onClick={async () => { await api(`/admin/documents/${d.id}`, { method: "DELETE", admin: true }); setDocs((c) => c.filter((x) => x.id !== d.id)); }}>O'chirish</button>{" "}
-              </span>
-            ))}
-          </div>
-          <input type="file" accept="application/pdf" onChange={uploadDoc} aria-label="PDF yuklash" />
+          <label
+            className="btn ghost sm"
+            style={{
+              cursor: "pointer",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "8px 14px",
+              fontWeight: 600,
+            }}
+          >
+            📷 {isNew || newFiles.length > 0 ? "Rasmlarni tanlash (bir nechta)" : "+ Rasm yuklash"}
+            <input
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={isNew ? onPickNewFiles : upload}
+              style={{ display: "none" }}
+            />
+          </label>
         </div>
-      )}
+
+        {!isNew && (
+          <div style={{ maxWidth: 860, marginTop: 22, borderTop: "1px solid var(--line)", paddingTop: 18 }}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 16 }}>Hujjatlar (PDF)</h3>
+            <div className="docs" style={{ margin: "10px 0" }}>
+              {docs.map((d) => (
+                <span key={d.id}>
+                  <a href={d.url} target="_blank" rel="noopener">PDF · {d.title}</a>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={async () => {
+                      await api(`/admin/documents/${d.id}`, { method: "DELETE", admin: true });
+                      setDocs((c) => c.filter((x) => x.id !== d.id));
+                    }}
+                  >
+                    O'chirish
+                  </button>{" "}
+                </span>
+              ))}
+            </div>
+            <input type="file" accept="application/pdf" onChange={uploadDoc} aria-label="PDF yuklash" />
+          </div>
+        )}
+
+        <div className="row" style={{ marginTop: 26 }}>
+          <button className="btn" disabled={busy}>
+            {busy ? aT("saving") : aT("save")}
+          </button>
+          <Link className="btn ghost" to="/admin/products">
+            {aT("back")}
+          </Link>
+        </div>
+      </form>
     </>
   );
 }

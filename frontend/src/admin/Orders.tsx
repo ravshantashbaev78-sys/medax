@@ -33,7 +33,7 @@ const FLAG_LABEL: Record<string, string> = {
 const fmt = (s: string) => new Date(s).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
 
 export default function Orders() {
-  const { t } = useAdminI18n();
+  const { lang, t, aT } = useAdminI18n();
   const [sp, setSp] = useSearchParams();
   const status = sp.get("status") || "";
   const [data, setData] = useState<Paged<Order> | null>(null);
@@ -104,7 +104,7 @@ export default function Orders() {
                 <td style={{ fontWeight: 600 }}>#{o.code}</td>
                 <td>{o.customerName}{o.organization && <div className="muted" style={{ fontSize: 13 }}>{o.organization}</div>}</td>
                 <td>{o.phone}</td>
-                <td>{o.items.length} ta ({o.items.reduce((s, i) => s + i.quantity, 0)} dona)</td>
+                <td>{o.items.length} {lang === "ru" ? "поз." : lang === "en" ? "items" : "ta"} ({o.items.reduce((s, i) => s + i.quantity, 0)} {lang === "ru" ? "шт" : lang === "en" ? "pcs" : "dona"})</td>
                 <td style={{ fontWeight: 600 }}>
                   {o.totalAmount && Number(o.totalAmount) > 0 ? Number(o.totalAmount).toLocaleString() + " so'm" : <span className="muted">Kelishuv</span>}
                 </td>
@@ -135,6 +135,7 @@ export default function Orders() {
 
 
 function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => void; onChanged: () => void }) {
+  const { lang, t, aT } = useAdminI18n();
   const [note, setNote] = useState(order.managerNote);
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -247,7 +248,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
         )}
 
         <table className="specs"><tbody>
-          {order.items.map((i) => <tr key={i.id}><td style={{ width: "auto", color: "var(--ink)" }}>{i.productName}</td><td style={{ width: 70, textAlign: "right" }}>{i.quantity} dona</td></tr>)}
+          {order.items.map((i) => <tr key={i.id}><td style={{ width: "auto", color: "var(--ink)" }}>{i.productName}</td><td style={{ width: 70, textAlign: "right" }}>{i.quantity} {lang === "ru" ? "шт" : lang === "en" ? "pcs" : "dona"}</td></tr>)}
         </tbody></table>
 
         {/* Jami summa va to'lov holati */}

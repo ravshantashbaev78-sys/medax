@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { useCustomerAuth, TelegramSessionResponse } from "../customerAuth";
+import React, { useState, useEffect } from "react";
+import { useCustomerAuth } from "../customerAuth";
 import { MedaxLogo } from "./MedaxLogo";
 import { useI18n } from "../context/I18nContext";
 
@@ -7,51 +7,123 @@ export function AuthModal() {
   const {
     isAuthModalOpen,
     closeAuthModal,
-    startTelegramSession,
-    pollTelegramSession,
+    sendOtp,
+    verifyOtp,
+    loginWithPassword,
   } = useCustomerAuth();
-  const { t, lang } = useI18n();
+  const { lang, t } = useI18n();
 
-  const [tgSession, setTgSession] = useState<TelegramSessionResponse | null>(null);
-  const [tgWaiting, setTgWaiting] = useState(false);
+  // Mode: "otp-phone" | "otp-code" | "password"
+  const [mode, setMode] = useState<"otp-phone" | "otp-code" | "password">("otp-phone");
+  const [phone, setPhone] = useState("+998 ");
+  const [code, setCode] = useState("");
+  const [name, setName] = useState("");
+  const [organization, setOrganization] = useState("");
+  const [password, setPassword] = useState("");
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [resendTimer, setResendTimer] = useState(0);
 
+  // Format phone number
+  const handlePhoneChange = (val: string) => {
+    let clean = val.replace(/[^\d+]/g, "");
+    if (!clean.startsWith("+998")) clean = "+998" + clean.replace(/\+/g, "");
+    let digits = clean.slice(4);
+    if (digits.length > 9) digits = digits.slice(0, 9);
+
+    let formatted = "+998";
+    if (digits.length > 0) formatted += " " + digits.slice(0, 2);
+    if (digits.length > 2) formatted += " " + digits.slice(2, 5);
+    if (digits.length > 5) formatted += " " + digits.slice(5, 7);
+    if (digits.length > 7) formatted += " " + digits.slice(7, 9);
+    setPhone(formatted);
+  };
+
+  // Resend timer countdown
   useEffect(() => {
-    let timer: any;
-    if (tgWaiting && tgSession) {
-      timer = setInterval(async () => {
-        try {
-          const res = await pollTelegramSession(tgSession.sessionId);
-          if (res.status === "confirmed") {
-            setTgWaiting(false);
-            setTgSession(null);
-          }
-        } catch {}
-      }, 2000);
-    }
-    return () => clearInterval(timer);
-  }, [tgWaiting, tgSession, pollTelegramSession]);
+    if (resendTimer <= 0) return;
+    const interval = setInterval(() => {
+      setResendTimer((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [resendTimer]);
 
   if (!isAuthModalOpen) return null;
 
   const handleClose = () => {
-    setTgWaiting(false);
-    setTgSession(null);
     setError("");
+    setLoading(false);
+    setMode("otp-phone");
     closeAuthModal();
   };
 
-  const handleTelegramLogin = async () => {
+  // Step 1: Send SMS OTP
+  const handleSendOtp = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const rawDigits = phone.replace(/[^\d]/g, "");
+    if (rawDigits.length !== 12) {
+      setError(
+        lang === "ru"
+          ? "Введите корректный номер телефона (9 цифр)"
+          : "Telefon raqamingizni to'liq kiriting (masalan: +998 90 123 45 67)"
+      );
+      return;
+    }
+
     setError("");
     setLoading(true);
     try {
-      const sess = await startTelegramSession();
-      setTgSession(sess);
-      setTgWaiting(true);
-      window.open(sess.startUrl, "_blank");
+      const res = await sendOtp(phone);
+      setMode("otp-code");
+      setResendTimer(res.resendIn || 60);
     } catch (err: any) {
-      setError(err.message || "Telegram sessiyasini ochishda xatolik yuz berdi");
+      setError(err.message || (lang === "ru" ? "Ошибка при отправке SMS" : "SMS yuborishda xatolik yuz berdi"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Step 2: Verify SMS OTP
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (code.trim().length !== 6) {
+      setError(lang === "ru" ? "Введите 6-значный код из SMS" : "SMS orqali kelgan 6 xonali kodni kiriting");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    try {
+      await verifyOtp({
+        phone,
+        code: code.trim(),
+        name: name.trim() || undefined,
+        organization: organization.trim() || undefined,
+      });
+      handleClose();
+    } catch (err: any) {
+      setError(err.message || (lang === "ru" ? "Неверный код подтверждения" : "Tasdiqlash kodi noto'g'ri"));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Password login
+  const handlePasswordLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) {
+      setError(lang === "ru" ? "Введите пароль" : "Parolni kiriting");
+      return;
+    }
+
+    setError("");
+    setLoading(true);
+    try {
+      await loginWithPassword(phone, password);
+      handleClose();
+    } catch (err: any) {
+      setError(err.message || (lang === "ru" ? "Неверный телефон или пароль" : "Telefon yoki parol noto'g'ri"));
     } finally {
       setLoading(false);
     }
@@ -59,202 +131,388 @@ export function AuthModal() {
 
   return (
     <div className="modal-backdrop" onClick={handleClose} role="dialog" aria-modal="true">
-      <div className="auth-modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="auth-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440, padding: "28px 24px" }}>
         {/* Yopish tugmasi */}
         <button className="modal-close-btn" onClick={handleClose} aria-label={t("auth_modal_close")}>
           ✕
         </button>
 
         {/* Modal Header */}
-        <div className="auth-header">
+        <div className="auth-header" style={{ textAlign: "center", marginBottom: 20 }}>
           <MedaxLogo size="sm" />
-          <h2>
+          <h2 style={{ fontSize: 20, margin: "12px 0 4px", fontWeight: 700, color: "var(--ink, #0f172a)" }}>
             {lang === "ru"
               ? "Вход в личный кабинет"
               : lang === "en"
               ? "Sign In to Account"
               : "Shaxsiy kabinetga kirish"}
           </h2>
-          <p className="auth-sub">
-            {lang === "ru"
-              ? "Быстрый и безопасный вход через Telegram в 1 клик"
-              : lang === "en"
-              ? "Fast and secure sign in via Telegram in 1 click"
-              : "Telegram orqali 1 soniyada xavfsiz va bepul kiring"}
+          <p className="auth-sub" style={{ fontSize: 13, color: "var(--ink2, #64748b)", margin: 0 }}>
+            {mode === "otp-code"
+              ? lang === "ru"
+                ? `Код отправлен на номер ${phone}`
+                : `Tasdiqlash kodi ${phone} raqamiga yuborildi`
+              : lang === "ru"
+              ? "Быстрый и безопасный вход по номеру телефона"
+              : "Telefon raqamingiz orqali tezkor va xavfsiz kiring"}
           </p>
         </div>
 
-        {error && <div className="err auth-alert">{error}</div>}
+        {error && (
+          <div
+            className="err auth-alert"
+            style={{
+              padding: "10px 14px",
+              background: "#fee2e2",
+              color: "#b91c1c",
+              borderRadius: 10,
+              fontSize: 13,
+              marginBottom: 16,
+              border: "1px solid #fca5a5",
+            }}
+          >
+            {error}
+          </div>
+        )}
 
-        <div className="auth-body">
-          {!tgWaiting ? (
+        {/* STEP 1: OTP PHONE INPUT */}
+        {mode === "otp-phone" && (
+          <form onSubmit={handleSendOtp} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              {/* Katta ko'k Telegram tugmasi */}
-              <button
-                type="button"
-                className="btn-telegram-primary"
-                onClick={handleTelegramLogin}
-                disabled={loading}
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: "var(--ink, #0f172a)",
+                  marginBottom: 6,
+                }}
+              >
+                {lang === "ru" ? "Номер телефона" : "Telefon raqamingiz"}
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="+998 90 123 45 67"
+                required
+                autoFocus
                 style={{
                   width: "100%",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: 12,
-                  background: "linear-gradient(135deg, #2AABEE 0%, #229ED9 100%)",
-                  color: "#ffffff",
-                  border: "none",
-                  borderRadius: 14,
-                  padding: "16px 20px",
+                  height: 46,
+                  padding: "0 14px",
                   fontSize: 16,
-                  fontWeight: 700,
-                  cursor: loading ? "wait" : "pointer",
-                  boxShadow: "0 6px 20px rgba(34, 158, 217, 0.35)",
-                  transition: "all 0.2s ease",
+                  fontWeight: 600,
+                  letterSpacing: 0.5,
+                  borderRadius: 10,
+                  border: "1.5px solid var(--line, #cbd5e1)",
+                  outline: "none",
+                  background: "var(--paper, #fff)",
+                  color: "var(--ink, #0f172a)",
+                  boxSizing: "border-box",
                 }}
-              >
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
-                </svg>
-                <span>
-                  {loading
-                    ? (lang === "ru" ? "Загрузка..." : "Yuklanmoqda...")
-                    : (lang === "ru"
-                    ? "Войти через Telegram"
-                    : lang === "en"
-                    ? "Sign in with Telegram"
-                    : "Telegram orqali 1-klikda kirish")}
-                </span>
-              </button>
-
-              {/* Afzalliklari ro'yxati */}
-              <div
-                style={{
-                  marginTop: 20,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  background: "var(--paper, rgba(0,0,0,0.02))",
-                  border: "1px solid var(--line, rgba(0,0,0,0.06))",
-                  borderRadius: 14,
-                  padding: "14px 16px",
-                  fontSize: 13,
-                  color: "var(--ink2, #64748b)",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: "#10b981", fontSize: 16 }}>✓</span>
-                  <span>
-                    {lang === "ru"
-                      ? "Без ожидания SMS и без паролей"
-                      : "SMS kod kutmasdan va parolsiz 1 soniyada"}
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: "#10b981", fontSize: 16 }}>✓</span>
-                  <span>
-                    {lang === "ru"
-                      ? "Безопасное подтверждение вашего номера"
-                      : "Telefon raqamingiz xavfsiz tasdiqlanadi"}
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ color: "#10b981", fontSize: 16 }}>✓</span>
-                  <span>
-                    {lang === "ru"
-                      ? "100% бесплатно и доступно для всех"
-                      : "100% bepul va har doim ochiq"}
-                  </span>
-                </div>
-              </div>
+              />
             </div>
-          ) : (
-            /* Bot ochilganda kutish oynasi */
-            <div
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn"
               style={{
-                textAlign: "center",
-                padding: "20px 10px 10px",
+                width: "100%",
+                height: 46,
+                fontSize: 15,
+                fontWeight: 600,
+                borderRadius: 10,
+                background: "var(--teal, #0d9488)",
+                color: "#fff",
+                border: "none",
+                cursor: loading ? "wait" : "pointer",
               }}
             >
-              <div
+              {loading
+                ? (lang === "ru" ? "Отправка SMS..." : "SMS yuborilmoqda...")
+                : (lang === "ru" ? "Получить SMS-код" : "SMS kod olish")}
+            </button>
+
+            <div style={{ textAlign: "center", marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setMode("password");
+                }}
                 style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: "50%",
-                  background: "rgba(34, 158, 217, 0.12)",
-                  color: "#229ED9",
-                  display: "grid",
-                  placeItems: "center",
-                  margin: "0 auto 14px",
-                  animation: "pulse 1.8s infinite",
+                  background: "none",
+                  border: "none",
+                  fontSize: 13,
+                  color: "var(--teal, #0d9488)",
+                  cursor: "pointer",
+                  textDecoration: "underline",
                 }}
               >
-                <svg width="30" height="30" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 0 0-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.52 2.77-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z" />
-                </svg>
-              </div>
+                {lang === "ru" ? "Войти с помощью пароля →" : "Parol orqali kirish →"}
+              </button>
+            </div>
+          </form>
+        )}
 
-              <h3 style={{ margin: "0 0 8px", fontSize: 17, color: "var(--ink, #0f172a)" }}>
-                {lang === "ru" ? "Telegram бот открыт!" : "Telegram bot ochildi!"}
-              </h3>
-              <p style={{ margin: "0 0 18px", fontSize: 13.5, color: "var(--ink2, #64748b)", lineHeight: 1.45 }}>
-                {lang === "ru" ? (
-                  <>
-                    В открывшемся боте нажмите кнопку <br />
-                    <b>«📱 Отправить номер телефона»</b>.
-                  </>
-                ) : (
-                  <>
-                    Ochilgan botda pastdagi <br />
-                    <b>«📱 Telefon raqamni yuborish»</b> tugmasini bosing.
-                  </>
-                )}
-              </p>
+        {/* STEP 2: OTP CODE VERIFICATION */}
+        {mode === "otp-code" && (
+          <form onSubmit={handleVerifyOtp} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: "var(--ink, #0f172a)",
+                  marginBottom: 6,
+                }}
+              >
+                {lang === "ru" ? "6-значный SMS-код" : "6 xonali SMS kod"}
+              </label>
+              <input
+                type="text"
+                maxLength={6}
+                value={code}
+                onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                placeholder="123456"
+                required
+                autoFocus
+                style={{
+                  width: "100%",
+                  height: 48,
+                  textAlign: "center",
+                  fontSize: 22,
+                  fontWeight: 700,
+                  letterSpacing: 6,
+                  borderRadius: 10,
+                  border: "1.5px solid var(--teal, #0d9488)",
+                  outline: "none",
+                  background: "var(--paper, #fff)",
+                  color: "var(--ink, #0f172a)",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
 
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {tgSession?.startUrl && (
-                  <button
-                    type="button"
-                    onClick={() => window.open(tgSession.startUrl, "_blank")}
-                    style={{
-                      width: "100%",
-                      padding: "10px",
-                      background: "rgba(34, 158, 217, 0.1)",
-                      color: "#229ED9",
-                      border: "1px solid rgba(34, 158, 217, 0.3)",
-                      borderRadius: 10,
-                      fontWeight: 600,
-                      fontSize: 13.5,
-                      cursor: "pointer",
-                    }}
-                  >
-                    ↗️ {lang === "ru" ? "Открыть бот повторно" : "Botni qayta ochish"}
-                  </button>
-                )}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: "var(--ink2, #64748b)",
+                  marginBottom: 4,
+                }}
+              >
+                {lang === "ru" ? "Ваше имя (необязательно)" : "Ismingiz (ixtiyoriy)"}
+              </label>
+              <input
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder={lang === "ru" ? "Например, Доктор Алишер" : "Masalan: Alisher"}
+                style={{
+                  width: "100%",
+                  height: 40,
+                  padding: "0 12px",
+                  fontSize: 14,
+                  borderRadius: 8,
+                  border: "1px solid var(--line, #cbd5e1)",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
 
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn"
+              style={{
+                width: "100%",
+                height: 46,
+                fontSize: 15,
+                fontWeight: 600,
+                borderRadius: 10,
+                background: "var(--teal, #0d9488)",
+                color: "#fff",
+                border: "none",
+                cursor: loading ? "wait" : "pointer",
+              }}
+            >
+              {loading
+                ? (lang === "ru" ? "Проверка..." : "Tekshirilmoqda...")
+                : (lang === "ru" ? "Подтвердить и войти" : "Tasdiqlash va kirish")}
+            </button>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12.5, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setCode("");
+                  setMode("otp-phone");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  color: "var(--ink2, #64748b)",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {lang === "ru" ? "← Другой номер" : "← Boshqa raqam"}
+              </button>
+
+              {resendTimer > 0 ? (
+                <span style={{ color: "var(--ink2, #94a3b8)" }}>
+                  {lang === "ru" ? `Повторить через ${resendTimer}с` : `Qayta yuborish (${resendTimer}s)`}
+                </span>
+              ) : (
                 <button
                   type="button"
-                  onClick={() => setTgWaiting(false)}
+                  onClick={() => handleSendOtp()}
                   style={{
-                    background: "transparent",
+                    background: "none",
                     border: "none",
-                    color: "var(--ink2, #94a3b8)",
-                    fontSize: 13,
+                    color: "var(--teal, #0d9488)",
+                    fontWeight: 600,
                     cursor: "pointer",
-                    padding: "6px",
+                    padding: 0,
                   }}
                 >
-                  {lang === "ru" ? "← Отмена" : "← Bekor qilish"}
+                  {lang === "ru" ? "Отправить код снова" : "Kodni qayta yuborish"}
                 </button>
-              </div>
+              )}
             </div>
-          )}
-        </div>
+          </form>
+        )}
 
-        <div className="auth-footer-note" style={{ textAlign: "center", marginTop: 22, fontSize: 12, color: "var(--ink2, #94a3b8)" }}>
+        {/* STEP 3: PASSWORD LOGIN */}
+        {mode === "password" && (
+          <form onSubmit={handlePasswordLogin} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: "var(--ink, #0f172a)",
+                  marginBottom: 6,
+                }}
+              >
+                {lang === "ru" ? "Номер телефона" : "Telefon raqamingiz"}
+              </label>
+              <input
+                type="tel"
+                value={phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                placeholder="+998 90 123 45 67"
+                required
+                style={{
+                  width: "100%",
+                  height: 44,
+                  padding: "0 14px",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  borderRadius: 10,
+                  border: "1.5px solid var(--line, #cbd5e1)",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: "var(--ink, #0f172a)",
+                  marginBottom: 6,
+                }}
+              >
+                {lang === "ru" ? "Пароль" : "Parolingiz"}
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                autoFocus
+                style={{
+                  width: "100%",
+                  height: 44,
+                  padding: "0 14px",
+                  fontSize: 15,
+                  borderRadius: 10,
+                  border: "1.5px solid var(--line, #cbd5e1)",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="btn"
+              style={{
+                width: "100%",
+                height: 46,
+                fontSize: 15,
+                fontWeight: 600,
+                borderRadius: 10,
+                background: "var(--teal, #0d9488)",
+                color: "#fff",
+                border: "none",
+                cursor: loading ? "wait" : "pointer",
+              }}
+            >
+              {loading
+                ? (lang === "ru" ? "Вход..." : "Kirilmoqda...")
+                : (lang === "ru" ? "Войти с паролем" : "Kirish")}
+            </button>
+
+            <div style={{ textAlign: "center", marginTop: 8 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setMode("otp-phone");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 13,
+                  color: "var(--teal, #0d9488)",
+                  cursor: "pointer",
+                  textDecoration: "underline",
+                }}
+              >
+                {lang === "ru" ? "← Войти через SMS-код" : "← SMS kod orqali kirish"}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div
+          className="auth-footer-note"
+          style={{
+            textAlign: "center",
+            marginTop: 20,
+            fontSize: 12,
+            color: "var(--ink2, #94a3b8)",
+          }}
+        >
           {lang === "ru"
-            ? "Безопасный доступ к Medax без SMS и паролей"
-            : "Medax tibbiyot uskunalari markaziga xavfsiz kirish"}
+            ? "Безопасный доступ к Medax с официальным SMS-подтверждением"
+            : "Medax tibbiyot uskunalari markaziga xavfsiz SMS tasdiqlash"}
         </div>
       </div>
     </div>

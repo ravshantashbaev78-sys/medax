@@ -153,10 +153,19 @@ export async function seedDatabase() {
 
   const adminEmails = Array.from(new Set([primaryEmail, "admin@medax.uz", "admin@medtex.uz"]));
   for (const email of adminEmails) {
+    const isOwner = email === primaryEmail;
     await prisma.user.upsert({
       where: { email },
-      create: { email, name: "Administrator", role: "ADMIN", passwordHash: hash },
-      update: { passwordHash: hash, role: "ADMIN" },
+      create: {
+        email,
+        name: isOwner ? "Loyiha Egasi" : "Administrator",
+        role: isOwner ? "OWNER" : "ADMIN",
+        passwordHash: hash,
+      },
+      update: {
+        passwordHash: hash,
+        role: isOwner ? "OWNER" : "ADMIN",
+      },
     });
   }
 
