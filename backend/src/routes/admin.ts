@@ -184,6 +184,52 @@ adminRouter.post("/products", async (req, res) => {
   res.status(201).json(p);
 });
 
+// Barcha mahsulotlarni yoki tanlanganlarni yo'q qilib qo'yish (yashirish / faol qilish)
+adminRouter.post("/products/bulk-status", requireAdmin, async (req, res) => {
+  const schema = z.object({
+    active: z.boolean(),
+    ids: z.array(z.number().int()).optional(),
+  });
+  const { active, ids } = schema.parse(req.body);
+  const where: Prisma.ProductWhereInput = ids && ids.length > 0 ? { id: { in: ids } } : {};
+  const result = await prisma.product.updateMany({
+    where,
+    data: { isActive: active },
+  });
+  res.json({ ok: true, updated: result.count, active });
+});
+
+// Barcha mahsulotlarni yoki tanlanganlarni birdaniga o'chirish
+adminRouter.post("/products/delete-all", requireAdmin, async (req, res) => {
+  const schema = z.object({
+    ids: z.array(z.number().int()).optional(),
+  });
+  const { ids } = schema.parse(req.body || {});
+  const where: Prisma.ProductWhereInput = ids && ids.length > 0 ? { id: { in: ids } } : {};
+
+  // O'chiriladigan mahsulotlar va ularning fayllarini olish
+  const products = await prisma.product.findMany({
+    where,
+    include: { images: true, documents: true },
+  });
+
+  const filePromises: Promise<any>[] = [];
+  for (const p of products) {
+    for (const img of p.images) {
+      filePromises.push(removeFile(img.url));
+      filePromises.push(removeFile(img.thumbUrl));
+    }
+    for (const doc of p.documents) {
+      filePromises.push(removeFile(doc.url));
+    }
+  }
+
+  await Promise.allSettled(filePromises);
+
+  const result = await prisma.product.deleteMany({ where });
+  res.json({ ok: true, deleted: result.count });
+});
+
 adminRouter.put("/products/:id", async (req, res) => {
   const d = productSchema.parse(req.body);
   res.json(await prisma.product.update({ where: { id: id(req.params.id) }, data: productData(d) }));
