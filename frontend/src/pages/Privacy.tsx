@@ -69,7 +69,7 @@ export default function Privacy() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>5. Удаление данных и контакты</h2>
             <p>
-              Пользователь имеет право в любой момент запросить удаление своего аккаунта и всех связанных данных. Для этого отправьте запрос на электронную почту: <strong>info@medax.uz</strong> или свяжитесь с нами по телефону: <strong>+998 71 200 00 00</strong>.
+              Пользователь имеет право в любой момент запросить удаление своего аккаунта и всех связанных данных. Для этого отправьте запрос на электронную почту: <strong>info@medax.uz</strong> или свяжитесь с нами по телефону: <strong>+998 91 186 66 61</strong>.
             </p>
           </section>
         </article>
@@ -113,7 +113,7 @@ export default function Privacy() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>5. Hisobni oʻchirish va aloqa</h2>
             <p>
-              Foydalanuvchi istalgan vaqtda oʻz hisobi va shaxsiy maʼlumotlarini butunlay oʻchirib tashlashni soʻrash huquqiga ega. Buning uchun <strong>info@medax.uz</strong> elektron pochtasiga xat yuborishingiz yoki <strong>+998 71 200 00 00</strong> raqamiga murojaat qilishingiz mumkin.
+              Foydalanuvchi istalgan vaqtda oʻz hisobi va shaxsiy maʼlumotlarini butunlay oʻchirib tashlashni soʻrash huquqiga ega. Buning uchun <strong>info@medax.uz</strong> elektron pochtasiga xat yuborishingiz yoki <strong>+998 91 186 66 61</strong> raqamiga murojaat qilishingiz mumkin.
             </p>
           </section>
         </article>

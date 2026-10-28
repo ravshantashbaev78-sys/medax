@@ -13,7 +13,7 @@ Ushbu hujjat Google Play Console'ga ilovani joylashtirishda so'raladigan barcha 
 - **Maxfiylik siyosati havolasi (Privacy Policy URL):** `https://medax.uz/privacy`
 - **Aloqa emaili:** `info@medax.uz`
 - **Veb-sayt:** `https://medax.uz`
-- **Qo'llab-quvvatlash telefoni:** `+998 71 200 00 00`
+- **Qo'llab-quvvatlash telefoni:** `+998 91 186 66 61`
 
 ---
 

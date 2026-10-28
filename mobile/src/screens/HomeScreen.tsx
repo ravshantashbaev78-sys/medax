@@ -352,7 +352,7 @@ export function HomeScreen({ navigation }: any) {
             Malakali muhandis va mutaxassislarimiz uskuna tanlashda yordam beradi.
           </Text>
           <View style={styles.contactRow}>
-            <Text style={styles.contactPhone}>📞 +998 71 200-00-00</Text>
+            <Text style={styles.contactPhone}>📞 +998 91 186-66-61</Text>
             <Text style={styles.contactHours}>Du-Sha: 09:00 - 18:00</Text>
           </View>
         </View>

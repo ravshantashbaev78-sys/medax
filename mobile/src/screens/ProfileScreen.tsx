@@ -483,12 +483,12 @@ export function ProfileScreen() {
 
         <TouchableOpacity
           style={[styles.contactItemRow, { borderTopColor: colors.border }]}
-          onPress={() => Linking.openURL("tel:+998712000000")}
+          onPress={() => Linking.openURL("tel:+998911866661")}
         >
           <Text style={styles.contactItemIcon}>📞</Text>
           <View>
             <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_phone")}</Text>
-            <Text style={[styles.contactItemValue, { color: colors.text }]}>+998 71 200 00 00</Text>
+            <Text style={[styles.contactItemValue, { color: colors.text }]}>+998 91 186 66 61</Text>
           </View>
         </TouchableOpacity>
 
