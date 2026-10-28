@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { submitOrder, sendOrderOtp, getImageUrl, formatPrice } from "../api";
-import { CartIcon, CloseIcon, ShieldIcon, BoltIcon, TelegramIcon } from "../components/Icons";
+import { CartIcon, CloseIcon, ShieldIcon, BoltIcon } from "../components/Icons";
 
 export function CartScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -223,12 +223,12 @@ export function CartScreen({ navigation }: any) {
           })}
         </View>
 
-        {/* Telegram Verified info or guest tip */}
+        {/* SMS Verified info or guest tip */}
         {customer ? (
           <View style={styles.authBadge}>
-            <TelegramIcon size={18} color="#0284c7" />
+            <ShieldIcon size={18} color="#0284c7" />
             <Text style={styles.authBadgeText}>
-              Tasdiqlangan hisob: <Text style={{ fontWeight: "800", color: "#0f172a" }}>{customer.name}</Text>
+              SMS tasdiqlangan hisob: <Text style={{ fontWeight: "800", color: "#0f172a" }}>{customer.name}</Text>
             </Text>
           </View>
         ) : null}

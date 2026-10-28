@@ -90,6 +90,26 @@ const authLimiter = rateLimit({
   message: { error: "Juda ko'p urinish. 15 daqiqadan keyin qayta urinib ko'ring." },
 });
 
+// Qat'iy SMS OTP limiter (SMS byudjetini himoya qilish)
+const customerOtpLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
+  message: { error: "SMS kod so'rash limiti oshdi. Iltimos, 10 daqiqadan keyin urinib ko'ring." },
+});
+
+// Parol bilan kirish urinishlarini cheklash (brute-force himoyasi)
+const customerLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
+  message: { error: "Kirish urinishlari ko'payib ketdi. 15 daqiqadan keyin qayta urinib ko'ring." },
+});
+
 function createCustomerToken(c: { id: number; phone: string; name: string }) {
   const payload: CustomerAuthPayload = {
     id: c.id,
@@ -101,7 +121,7 @@ function createCustomerToken(c: { id: number; phone: string; name: string }) {
 }
 
 // 1. Telefon raqamiga OTP SMS yuborish
-customerRouter.post("/auth/send-otp", authLimiter, async (req, res) => {
+customerRouter.post("/auth/send-otp", customerOtpLimiter, async (req, res) => {
   const { phone: raw, captchaToken } = z
     .object({
       phone: z.string().max(30),
@@ -396,7 +416,7 @@ customerRouter.post("/auth/telegram-webhook", async (req, res) => {
 });
 
 // 3. Telefon raqam + Parol orqali kirish (SMS siz tezkor kirish)
-customerRouter.post("/auth/login", authLimiter, async (req, res) => {
+customerRouter.post("/auth/login", customerLoginLimiter, async (req, res) => {
   const { phone: raw, password } = z
     .object({
       phone: z.string().trim().min(3, "Telefon raqamini kiriting").max(30),
