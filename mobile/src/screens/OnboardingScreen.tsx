@@ -7,6 +7,7 @@ import {
   Dimensions,
   FlatList,
   Animated,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -24,35 +25,49 @@ export interface OnboardingSlide {
   desc: string;
   icon: string;
   bgGrad: string;
+  imageKey?: string;
 }
 
 const SLIDES: OnboardingSlide[] = [
   {
     id: "1",
-    badge: "RASMIY DO'KON",
+    badge: "RASMIY KATALOG",
     title: "Klinikalar uchun",
     titleHighlight: "Zamonaviy Medtexnika",
-    desc: "UZI, rentgen, laboratoriya analizatorlari va jarrohlik uskunalarini to'g'ridan-to'g'ri yetkazib beramiz.",
+    desc: "UZI, rentgen, laboratoriya analizatorlari, jarrohlik stollari va bir martalik tibbiy vositalarning eng katta katalogi.",
     icon: "🏥",
     bgGrad: "#0284c7",
+    imageKey: "onboarding_1",
   },
   {
     id: "2",
-    badge: "KAFOLATLI XIZMAT",
-    title: "Zavod Kafolati &",
-    titleHighlight: "24/7 Muhandislik Servisi",
-    desc: "Har bir uskunaga rasmiy servis kafolati beriladi va mutaxassislarimiz tomonidan o'rnatib sozlanadi.",
+    badge: "ZAVOD KAFOLATI",
+    title: "100% Rasmiy Kafolat &",
+    titleHighlight: "Professional Muhandislar",
+    desc: "Har bir uskunaga ishlab chiqaruvchining rasmiy kafolati beriladi va malakali mutaxassislar tomonidan o'rnatib sozlanadi.",
     icon: "🛡️",
     bgGrad: "#0d9488",
+    imageKey: "onboarding_2",
   },
   {
     id: "3",
-    badge: "QULAY TO'LOV VA YETKAZISH",
-    title: "inPAY Onlayn To'lov &",
-    titleHighlight: "Tezkor Yetkazib Berish",
-    desc: "Click, Payme, kartalar orqali xavfsiz to'lov va butun O'zbekiston bo'ylab manzilgacha yetkazish.",
+    badge: "TEZKOR VA XAVFSIZ",
+    title: "1 Daqiqada SMS Bilan",
+    titleHighlight: "Xavfsiz Ro'yxatdan O'tish",
+    desc: "Ortiqcha parollarsiz telefon raqamingiz orqali SMS kod bilan xavfsiz kiring, buyurtma holatini onlayn kuzatib boring.",
+    icon: "⚡",
+    bgGrad: "#6366f1",
+    imageKey: "onboarding_3",
+  },
+  {
+    id: "4",
+    badge: "MAXSUS LOGISTIKA",
+    title: "Toshkent va Viloyatlarga",
+    titleHighlight: "Ishonchli Yetkazib Berish",
+    desc: "Nozik va qimmatbaho tibbiy uskunalar maxsus transportda xavfsiz va sug'urtalangan holda to'g'ridan-to'g'ri klinikangizga yetkaziladi.",
     icon: "🚚",
-    bgGrad: "#4f46e5",
+    bgGrad: "#059669",
+    imageKey: "onboarding_4",
   },
 ];
 
