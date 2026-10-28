@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   Dimensions,
   FlatList,
-  Animated,
   Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -25,7 +24,6 @@ export interface OnboardingSlide {
   desc: string;
   icon: string;
   bgGrad: string;
-  imageKey?: string;
 }
 
 const SLIDES: OnboardingSlide[] = [
@@ -34,10 +32,9 @@ const SLIDES: OnboardingSlide[] = [
     badge: "RASMIY KATALOG",
     title: "Klinikalar uchun",
     titleHighlight: "Zamonaviy Medtexnika",
-    desc: "UZI, rentgen, laboratoriya analizatorlari, jarrohlik stollari va bir martalik tibbiy vositalarning eng katta katalogi.",
+    desc: "UZI, rentgen, laboratoriya analizatorlari, jarrohlik stollari va sertifikatlangan tibbiy uskunalar katalogi.",
     icon: "🏥",
     bgGrad: "#0284c7",
-    imageKey: "onboarding_1",
   },
   {
     id: "2",
@@ -47,7 +44,6 @@ const SLIDES: OnboardingSlide[] = [
     desc: "Har bir uskunaga ishlab chiqaruvchining rasmiy kafolati beriladi va malakali mutaxassislar tomonidan o'rnatib sozlanadi.",
     icon: "🛡️",
     bgGrad: "#0d9488",
-    imageKey: "onboarding_2",
   },
   {
     id: "3",
@@ -57,17 +53,15 @@ const SLIDES: OnboardingSlide[] = [
     desc: "Ortiqcha parollarsiz telefon raqamingiz orqali SMS kod bilan xavfsiz kiring, buyurtma holatini onlayn kuzatib boring.",
     icon: "⚡",
     bgGrad: "#6366f1",
-    imageKey: "onboarding_3",
   },
   {
     id: "4",
     badge: "MAXSUS LOGISTIKA",
     title: "Toshkent va Viloyatlarga",
     titleHighlight: "Ishonchli Yetkazib Berish",
-    desc: "Nozik va qimmatbaho tibbiy uskunalar maxsus transportda xavfsiz va sug'urtalangan holda to'g'ridan-to'g'ri klinikangizga yetkaziladi.",
+    desc: "Nozik va qimmatbaho tibbiy apparatlar maxsus transportda xavfsiz va sug'urtalangan holda to'g'ridan-to'g'ri klinikangizga yetkaziladi.",
     icon: "🚚",
     bgGrad: "#059669",
-    imageKey: "onboarding_4",
   },
 ];
 
@@ -102,7 +96,7 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
   }).current;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top, paddingBottom: Math.max(insets.bottom, 16) }]}>
+    <View style={[styles.container, { paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 16) }]}>
       {/* Top Header: Logo + Skip */}
       <View style={styles.topHeader}>
         <View style={styles.logoRow}>
@@ -116,10 +110,12 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
           </View>
         </View>
 
-        {currentIndex < SLIDES.length - 1 && (
-          <TouchableOpacity onPress={handleComplete} style={styles.skipBtn}>
+        {currentIndex < SLIDES.length - 1 ? (
+          <TouchableOpacity onPress={handleComplete} style={styles.skipBtn} activeOpacity={0.7}>
             <Text style={styles.skipText}>O'tkazish</Text>
           </TouchableOpacity>
+        ) : (
+          <View style={{ width: 70 }} />
         )}
       </View>
 
@@ -135,19 +131,29 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
         viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
         renderItem={({ item }) => (
           <View style={styles.slide}>
-            {/* Visual Art Box (Men keyin rasim dizayn tashlab beraman degan joy) */}
-            <View style={[styles.artBox, { backgroundColor: `${item.bgGrad}15`, borderColor: `${item.bgGrad}30` }]}>
-              <View style={[styles.artBadgeCircle, { backgroundColor: item.bgGrad }]}>
-                <Text style={styles.artEmoji}>{item.icon}</Text>
-              </View>
-              <View style={styles.artDottedPulse} />
+            {/* Visual Art Box (Centered Image with Glass Frame) */}
+            <View style={[styles.artBox, { backgroundColor: `${item.bgGrad}10`, borderColor: `${item.bgGrad}25` }]}>
+              <Image
+                source={
+                  item.id === "1"
+                    ? require("../../assets/onboarding_1.png")
+                    : item.id === "2"
+                    ? require("../../assets/onboarding_2.png")
+                    : item.id === "3"
+                    ? require("../../assets/onboarding_3.png")
+                    : require("../../assets/onboarding_4.png")
+                }
+                style={styles.slideImage}
+                resizeMode="contain"
+              />
             </View>
 
-            {/* Slide Text Content */}
+            {/* Slide Text Content (Perfect Center Harmony) */}
             <View style={styles.textContent}>
-              <View style={[styles.badgePill, { backgroundColor: `${item.bgGrad}18` }]}>
+              <View style={[styles.badgePill, { backgroundColor: `${item.bgGrad}15` }]}>
                 <Text style={[styles.badgeText, { color: item.bgGrad }]}>{item.badge}</Text>
               </View>
+
               <Text style={styles.slideTitle}>{item.title}</Text>
               <Text style={[styles.slideTitleHighlight, { color: item.bgGrad }]}>
                 {item.titleHighlight}
@@ -167,7 +173,9 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
               key={idx}
               style={[
                 styles.dot,
-                currentIndex === idx && [styles.dotActive, { backgroundColor: SLIDES[currentIndex].bgGrad }],
+                currentIndex === idx
+                  ? [styles.dotActive, { backgroundColor: SLIDES[currentIndex].bgGrad }]
+                  : styles.dotInactive,
               ]}
             />
           ))}
@@ -180,7 +188,7 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
           activeOpacity={0.88}
         >
           <Text style={styles.actionBtnText}>
-            {currentIndex === SLIDES.length - 1 ? "Boshlash →" : "Keyingisi →"}
+            {currentIndex === SLIDES.length - 1 ? "Boshlash ✓" : "Keyingisi →"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -189,76 +197,134 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#ffffff", justifyContent: "space-between" },
+  container: {
+    flex: 1,
+    backgroundColor: "#ffffff",
+    justifyContent: "space-between",
+  },
   topHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 10,
   },
   logoRow: { flexDirection: "row", alignItems: "center" },
-  logoMed: { fontSize: 20, fontWeight: "900", color: "#0284c7" },
-  logoAx: { fontSize: 20, fontWeight: "900", color: "#0f172a" },
-  logoSub: { fontSize: 8, fontWeight: "800", color: "#64748b", letterSpacing: 0.8 },
-  skipBtn: { paddingVertical: 6, paddingHorizontal: 12, borderRadius: 16, backgroundColor: "#f1f5f9" },
-  skipText: { fontSize: 12.5, fontWeight: "600", color: "#64748b" },
+  logoMed: { fontSize: 21, fontWeight: "900", color: "#0284c7" },
+  logoAx: { fontSize: 21, fontWeight: "900", color: "#0f172a" },
+  logoSub: { fontSize: 8.5, fontWeight: "800", color: "#64748b", letterSpacing: 0.8 },
+  skipBtn: {
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+  },
+  skipText: { fontSize: 13, fontWeight: "700", color: "#64748b" },
 
-  slide: { width: SCREEN_WIDTH, alignItems: "center", paddingHorizontal: 24, justifyContent: "center" },
+  slide: {
+    width: SCREEN_WIDTH,
+    alignItems: "center",
+    paddingHorizontal: 24,
+    justifyContent: "center",
+  },
   artBox: {
-    width: SCREEN_WIDTH - 64,
-    height: 250,
-    borderRadius: 28,
+    width: Math.min(SCREEN_WIDTH - 48, 360),
+    height: Math.min(SCREEN_WIDTH - 48, 300),
+    borderRadius: 32,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 24,
-    position: "relative",
     overflow: "hidden",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 4,
+    padding: 12,
   },
-  artBadgeCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+  slideImage: {
+    width: "100%",
+    height: "100%",
+  },
+
+  textContent: {
     alignItems: "center",
+    paddingHorizontal: 10,
+  },
+  badgePill: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  badgeText: {
+    fontSize: 11,
+    fontWeight: "900",
+    letterSpacing: 0.9,
+  },
+  slideTitle: {
+    fontSize: 24,
+    fontWeight: "800",
+    color: "#0f172a",
+    textAlign: "center",
+    lineHeight: 30,
+  },
+  slideTitleHighlight: {
+    fontSize: 24,
+    fontWeight: "900",
+    textAlign: "center",
+    lineHeight: 30,
+    marginBottom: 10,
+  },
+  slideDesc: {
+    fontSize: 14,
+    color: "#64748b",
+    textAlign: "center",
+    lineHeight: 21,
+    maxWidth: 340,
+  },
+
+  bottomControls: {
+    paddingHorizontal: 24,
+    paddingTop: 12,
+    paddingBottom: 8,
+  },
+  dotsRow: {
+    flexDirection: "row",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    elevation: 8,
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 20,
   },
-  artEmoji: { fontSize: 44 },
-  artDottedPulse: {
-    position: "absolute",
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    borderWidth: 1,
-    borderColor: "rgba(2, 132, 199, 0.2)",
-    borderStyle: "dashed",
+  dot: {
+    height: 8,
+    borderRadius: 4,
+  },
+  dotActive: {
+    width: 26,
+  },
+  dotInactive: {
+    width: 8,
+    backgroundColor: "#cbd5e1",
   },
 
-  textContent: { alignItems: "center", paddingHorizontal: 8 },
-  badgePill: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, marginBottom: 12 },
-  badgeText: { fontSize: 10.5, fontWeight: "800", letterSpacing: 0.8 },
-  slideTitle: { fontSize: 23, fontWeight: "800", color: "#0f172a", textAlign: "center", lineHeight: 29 },
-  slideTitleHighlight: { fontSize: 23, fontWeight: "900", textAlign: "center", lineHeight: 29, marginBottom: 10 },
-  slideDesc: { fontSize: 13.5, color: "#64748b", textAlign: "center", lineHeight: 20 },
-
-  bottomControls: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 6 },
-  dotsRow: { flexDirection: "row", justifyContent: "center", gap: 7, marginBottom: 18 },
-  dot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#e2e8f0" },
-  dotActive: { width: 26, borderRadius: 4 },
   actionBtn: {
+    width: "100%",
     paddingVertical: 15,
     borderRadius: 16,
     alignItems: "center",
-    shadowColor: "#0284c7",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
+    justifyContent: "center",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
     elevation: 4,
   },
-  actionBtnText: { color: "#ffffff", fontSize: 16, fontWeight: "800" },
+  actionBtnText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 0.3,
+  },
 });
