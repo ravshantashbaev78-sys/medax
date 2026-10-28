@@ -352,8 +352,11 @@ export function Layout() {
             </div>
           </div>
 
-          <div className="footer-bottom-bar">
+          <div className="footer-bottom-bar" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
             <span>© 2026 Medax. {t("footer_rights")}</span>
+            <Link to="/privacy" style={{ color: "var(--ink-muted)", fontSize: 13, textDecoration: "underline" }}>
+              {lang === "ru" ? "Политика конфиденциальности" : lang === "en" ? "Privacy Policy" : "Maxfiylik siyosati"}
+            </Link>
           </div>
         </div>
       </footer>

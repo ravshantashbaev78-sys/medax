@@ -7,6 +7,7 @@ import ProductPage from "./pages/ProductPage";
 import Cart from "./pages/Cart";
 import Contact from "./pages/Contact";
 import CustomerAccount from "./pages/CustomerAccount";
+import Privacy from "./pages/Privacy";
 import { CustomerAuthProvider } from "./customerAuth";
 import { AuthModal } from "./components/AuthModal";
 import { ThemeProvider } from "./context/ThemeContext";
@@ -61,6 +62,7 @@ export default function App() {
               <Route path="cart" element={<Cart />} />
               <Route path="contact" element={<Contact />} />
               <Route path="account" element={<CustomerAccount />} />
+              <Route path="privacy" element={<Privacy />} />
               <Route path="*" element={<NotFound />} />
             </Route>
             <Route

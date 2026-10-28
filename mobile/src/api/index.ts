@@ -90,6 +90,54 @@ export async function fetchProductDetail(slug: string): Promise<Product | null> 
   }
 }
 
+export async function sendCustomerOtp(phone: string): Promise<{ ok: boolean; resendIn?: number; error?: string }> {
+  try {
+    const cleanPhone = phone.replace(/[^\d+]/g, "");
+    const res = await fetch(`${API_BASE}/customer/auth/send-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: cleanPhone }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error || "SMS yuborishda xatolik" };
+    return { ok: true, resendIn: data.resendIn || 60 };
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Tarmoq xatosi" };
+  }
+}
+
+export async function verifyCustomerOtp(phone: string, code: string, name?: string): Promise<{ ok: boolean; token?: string; customer?: Customer; error?: string }> {
+  try {
+    const cleanPhone = phone.replace(/[^\d+]/g, "");
+    const res = await fetch(`${API_BASE}/customer/auth/verify-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: cleanPhone, code: code.trim(), name: name?.trim() }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error || "Tasdiqlash kodi noto'g'ri" };
+    return data;
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Tarmoq xatosi" };
+  }
+}
+
+export async function loginCustomerWithPassword(phone: string, password: string): Promise<{ ok: boolean; token?: string; customer?: Customer; error?: string }> {
+  try {
+    const cleanPhone = phone.replace(/[^\d+]/g, "");
+    const res = await fetch(`${API_BASE}/customer/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: cleanPhone, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error || "Login yoki parol noto'g'ri" };
+    return data;
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Tarmoq xatosi" };
+  }
+}
+
 export async function startTelegramAuth(): Promise<{ sessionId: string; startUrl: string; botUsername: string }> {
   const res = await fetch(`${API_BASE}/customer/auth/telegram-session`, {
     method: "POST",

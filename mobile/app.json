@@ -16,11 +16,15 @@
       "bundleIdentifier": "uz.medax.mobile"
     },
     "android": {
+      "package": "uz.medax.mobile",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "uz.medax.mobile"
+      "permissions": [
+        "INTERNET"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
