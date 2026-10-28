@@ -155,9 +155,9 @@ export async function seedDatabase() {
   // 1. Kategoriyalarni har doim 5 ta yo'nalishga sinxronlashtiramiz
   const catMap = await syncCategories();
 
-  // Agar bazada allaqachon mahsulotlar mavjud bo'lsa, qayta yozilmaydi (admin o'zgartirgan narx va tavsiflar saqlanadi)
+  // Agar bazada allaqachon to'liq mahsulotlar mavjud bo'lsa, qayta yozilmaydi
   const existingProducts = await prisma.product.count();
-  if (existingProducts > 0) {
+  if (existingProducts >= 10) {
     console.log(`[Seed] Bazada allaqachon ${existingProducts} ta mahsulot mavjud. 5 ta kategoriya yangilandi va mahsulotlar taqsimlandi.`);
     return;
   }
