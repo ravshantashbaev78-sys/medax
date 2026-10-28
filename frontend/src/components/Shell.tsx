@@ -15,7 +15,7 @@ import { UzumSearchBar, useAnimatedPresence } from "./UzumSearchBar";
 import { UzumCatalogModal } from "./UzumCatalogModal";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { SITE_CONFIG } from "../siteConfig";
-import { localizeProductName } from "../utils/localize";
+import { localizeProductName, localizeUnit } from "../utils/localize";
 
 export function Layout() {
   const { count } = useCart();
@@ -507,7 +507,7 @@ export function ProductCard({ p }: { p: Product }) {
 
   const hasDiscount = Boolean(p.oldPrice && p.priceFrom && Number(p.oldPrice) > Number(p.priceFrom));
   const discountVal = p.discountPercent || (hasDiscount ? Math.round(((Number(p.oldPrice) - Number(p.priceFrom)) / Number(p.oldPrice)) * 100) : null);
-  const unitLabel = p.unit ? ` / ${p.unit}` : "";
+  const unitLabel = p.unit ? ` / ${localizeUnit(p.unit, lang)}` : "";
 
   // Donalab narx hisobi (agar 1 qutida masalan 50 yoki 100 dona bo'lsa)
   const perPiecePrice = p.priceFrom && p.packageQty && p.packageQty > 1

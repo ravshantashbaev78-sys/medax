@@ -1,6 +1,33 @@
 import { Lang } from "../context/I18nContext";
 
 // ============================================================================
+// 1. O'lchov birliklarini tarjima qilish (dona, quti, pachka, flakon va h.k.)
+// ============================================================================
+const UNIT_MAP: Record<string, Record<Lang, string>> = {
+  dona: { uz: "dona", ru: "шт", en: "pcs" },
+  ta: { uz: "ta", ru: "шт", en: "pcs" },
+  quti: { uz: "quti", ru: "упак", en: "box" },
+  pachka: { uz: "pachka", ru: "пачка", en: "pack" },
+  "o'ram": { uz: "o'ram", ru: "рулон", en: "roll" },
+  komplekt: { uz: "komplekt", ru: "комплект", en: "set" },
+  "to'plam": { uz: "to'plam", ru: "комплект", en: "set" },
+  juft: { uz: "juft", ru: "пара", en: "pair" },
+  flakon: { uz: "flakon", ru: "флакон", en: "vial" },
+  metr: { uz: "metr", ru: "м", en: "m" },
+  litr: { uz: "litr", ru: "л", en: "l" },
+  kg: { uz: "kg", ru: "кг", en: "kg" },
+};
+
+export function localizeUnit(unit: string | undefined | null, lang: Lang): string {
+  if (!unit) return "";
+  const key = unit.trim().toLowerCase();
+  return (
+    UNIT_MAP[key]?.[lang] ||
+    (lang === "ru" ? (key === "dona" ? "шт" : key) : lang === "en" ? (key === "dona" ? "pcs" : key) : key)
+  );
+}
+
+// ============================================================================
 // 1. Kategoriya nomlarini tarjima qilish (UZ, RU, EN)
 // ============================================================================
 const CATEGORY_MAP: Record<string, Record<Lang, string>> = {

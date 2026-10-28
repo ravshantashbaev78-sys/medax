@@ -26,7 +26,12 @@ export function CartToast() {
   };
 
   const title = lang === "ru" ? "Добавлено в корзину!" : lang === "en" ? "Added to cart!" : "Savatga qo'shildi!";
-  const goToCart = lang === "ru" ? "Savatga o'tish →" : lang === "en" ? "View cart →" : "Savatga o'tish →";
+  const goToCart = lang === "ru" ? "Перейти в корзину →" : lang === "en" ? "View cart →" : "Savatga o'tish →";
+  const qtyAddedText = lang === "ru"
+    ? (toast.quantity > 1 ? `Добавлено: ${toast.quantity} шт` : "Добавлено: 1 шт")
+    : lang === "en"
+    ? (toast.quantity > 1 ? `Added: ${toast.quantity} pcs` : "Added: 1 pc")
+    : (toast.quantity > 1 ? `${toast.quantity} dona qo'shildi` : "1 dona qo'shildi");
 
   return (
     <aside
@@ -61,7 +66,7 @@ export function CartToast() {
               {toast.productName}
             </span>
             <span className="cart-toast-pqty">
-              {toast.quantity > 1 ? `${toast.quantity} dona qo'shildi` : "1 dona qo'shildi"}
+              {qtyAddedText}
             </span>
           </div>
         </div>

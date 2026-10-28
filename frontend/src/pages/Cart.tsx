@@ -289,8 +289,16 @@ export default function Cart() {
           {stage === "cart" && (
             <div>
               <div className="cart-heading-row">
-                <h1 style={{ fontSize: 28, margin: 0 }}>Xaridlar savati</h1>
-                <span className="cart-count-pill">{cart.count} xil uskuna ({cart.totalQuantity} dona)</span>
+                <h1 style={{ fontSize: 28, margin: 0 }}>
+                  {lang === "ru" ? "Корзина покупок" : lang === "en" ? "Shopping Cart" : "Xaridlar savati"}
+                </h1>
+                <span className="cart-count-pill">
+                  {lang === "ru"
+                    ? `${cart.count} наим. (${cart.totalQuantity} шт)`
+                    : lang === "en"
+                    ? `${cart.count} items (${cart.totalQuantity} pcs)`
+                    : `${cart.count} xil uskuna (${cart.totalQuantity} dona)`}
+                </span>
               </div>
 
               <div className="cart-items-table">
@@ -697,11 +705,21 @@ export default function Cart() {
         {/* RIGHT COLUMN: Order Summary Box */}
         <aside className="cart-summary-panel">
           <div className="summary-card">
-            <h2 className="summary-title">Buyurtma xulosasi</h2>
+            <h2 className="summary-title">
+              {lang === "ru" ? "Итог заказа" : lang === "en" ? "Order Summary" : "Buyurtma xulosasi"}
+            </h2>
 
             <div className="summary-row">
-              <span className="summary-label">Mahsulotlar soni:</span>
-              <span className="summary-val">{cart.totalQuantity} dona ({cart.count} xil)</span>
+              <span className="summary-label">
+                {lang === "ru" ? "Количество товаров:" : lang === "en" ? "Items count:" : "Mahsulotlar soni:"}
+              </span>
+              <span className="summary-val">
+                {lang === "ru"
+                  ? `${cart.totalQuantity} шт (${cart.count} наим.)`
+                  : lang === "en"
+                  ? `${cart.totalQuantity} pcs (${cart.count} items)`
+                  : `${cart.totalQuantity} dona (${cart.count} xil)`}
+              </span>
             </div>
 
             <div className="summary-items-preview">

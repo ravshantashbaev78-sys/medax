@@ -11,6 +11,7 @@ import {
   localizeProductName,
   localizeSpecName,
   localizeSpecValue,
+  localizeUnit,
 } from "../utils/localize";
 
 export default function ProductPage() {
@@ -126,7 +127,7 @@ export default function ProductPage() {
             )}
             <div className="price">
               {p.priceFrom ? money(p.priceFrom, t("sum_currency")) : (lang === "ru" ? "По запросу" : lang === "en" ? "On request" : "Narx so'rang")}
-              {p.unit && <span className="price-unit-tag"> / {p.unit}</span>}
+              {p.unit && <span className="price-unit-tag"> / {localizeUnit(p.unit, lang)}</span>}
             </div>
             {p.priceFrom && p.packageQty && p.packageQty > 1 && (
               <p className="package-piece-hint">
