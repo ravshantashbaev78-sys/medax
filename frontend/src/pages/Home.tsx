@@ -5,6 +5,7 @@ import { ProductCard } from "../components/Shell";
 import { useI18n } from "../context/I18nContext";
 import { useTheme } from "../context/ThemeContext";
 import { MedaxEmblem } from "../components/MedaxLogo";
+import { localizeCategory } from "../utils/localize";
 
 interface HomeData {
   total: number;
@@ -427,7 +428,7 @@ export default function Home() {
             {data?.categories?.map((c) => (
               <Link key={c.id} className="cat reveal" to={`/catalog?category=${c.slug}`}>
                 <div className="cat-content">
-                  <h3>{c.name}</h3>
+                  <h3>{localizeCategory(c.slug || c.name, lang)}</h3>
                   <div className="cat-meta">
                     <small>{c.count} {t("items_count")}</small>
                     <span className="cat-arrow" aria-hidden="true">→</span>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -7,61 +7,128 @@ import {
   Dimensions,
   FlatList,
   Image,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { MedaxEmblem } from "../components/Icons";
+import { useI18n, Language } from "../context/I18nContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export const ONBOARDING_KEY = "@medax_has_seen_onboarding";
 
-export interface OnboardingSlide {
+interface MultilingualSlide {
   id: string;
-  badge: string;
-  title: string;
-  titleHighlight: string;
-  desc: string;
-  icon: string;
-  bgGrad: string;
+  badge: Record<Language, string>;
+  title: Record<Language, string>;
+  titleHighlight: Record<Language, string>;
+  desc: Record<Language, string>;
+  themeColor: string;
+  image: any;
 }
 
-const SLIDES: OnboardingSlide[] = [
+const SLIDES: MultilingualSlide[] = [
   {
     id: "1",
-    badge: "RASMIY KATALOG",
-    title: "Klinikalar uchun",
-    titleHighlight: "Zamonaviy Medtexnika",
-    desc: "UZI, rentgen, laboratoriya analizatorlari, jarrohlik stollari va sertifikatlangan tibbiy uskunalar katalogi.",
-    icon: "🏥",
-    bgGrad: "#0284c7",
+    badge: {
+      uz: "RASMIY KATALOG",
+      ru: "ОФИЦИАЛЬНЫЙ КАТАЛОГ",
+      en: "OFFICIAL CATALOG",
+    },
+    title: {
+      uz: "Klinikalar uchun",
+      ru: "Для клиник и врачей",
+      en: "For Clinics & Doctors",
+    },
+    titleHighlight: {
+      uz: "Zamonaviy Medtexnika",
+      ru: "Современная Медтехника",
+      en: "Modern Medical Tech",
+    },
+    desc: {
+      uz: "UZI, rentgen, laboratoriya analizatorlari, jarrohlik stollari va sertifikatlangan tibbiy uskunalar katalogi.",
+      ru: "Каталог сертифицированного оборудования: УЗИ, рентген, анализаторы, хирургические столы и расходные материалы.",
+      en: "Catalog of certified medical equipment: ultrasound, X-ray, lab analyzers, surgical tables, and supplies.",
+    },
+    themeColor: "#0284c7",
+    image: require("../../assets/onboarding_1.png"),
   },
   {
     id: "2",
-    badge: "ZAVOD KAFOLATI",
-    title: "100% Rasmiy Kafolat &",
-    titleHighlight: "Professional Muhandislar",
-    desc: "Har bir uskunaga ishlab chiqaruvchining rasmiy kafolati beriladi va malakali mutaxassislar tomonidan o'rnatib sozlanadi.",
-    icon: "🛡️",
-    bgGrad: "#0d9488",
+    badge: {
+      uz: "ZAVOD KAFOLATI",
+      ru: "ЗАВОДСКАЯ ГАРАНТИЯ",
+      en: "FACTORY WARRANTY",
+    },
+    title: {
+      uz: "100% Rasmiy Kafolat &",
+      ru: "100% Официальная Гарантия &",
+      en: "100% Official Warranty &",
+    },
+    titleHighlight: {
+      uz: "Professional Muhandislar",
+      ru: "Сервисные Инженеры",
+      en: "Certified Engineers",
+    },
+    desc: {
+      uz: "Har bir uskunaga ishlab chiqaruvchining rasmiy kafolati beriladi va malakali mutaxassislar tomonidan o'rnatib sozlanadi.",
+      ru: "Официальная гарантия от производителя, профессиональный монтаж, ввод в эксплуатацию и сервисное обслуживание.",
+      en: "Official manufacturer warranty, professional installation, expert commissioning, and full technical service.",
+    },
+    themeColor: "#0d9488",
+    image: require("../../assets/onboarding_2.png"),
   },
   {
     id: "3",
-    badge: "TEZKOR VA XAVFSIZ",
-    title: "1 Daqiqada SMS Bilan",
-    titleHighlight: "Xavfsiz Ro'yxatdan O'tish",
-    desc: "Ortiqcha parollarsiz telefon raqamingiz orqali SMS kod bilan xavfsiz kiring, buyurtma holatini onlayn kuzatib boring.",
-    icon: "⚡",
-    bgGrad: "#6366f1",
+    badge: {
+      uz: "TEZKOR VA XAVFSIZ",
+      ru: "БЫСТРО И БЕЗОПАСНО",
+      en: "FAST & SECURE",
+    },
+    title: {
+      uz: "1 Daqiqada SMS Bilan",
+      ru: "Вход по SMS Коду",
+      en: "1-Minute SMS Login",
+    },
+    titleHighlight: {
+      uz: "Xavfsiz Ro'yxatdan O'tish",
+      ru: "За 1 Минуту Без Паролей",
+      en: "Secure Verification",
+    },
+    desc: {
+      uz: "Ortiqcha parollarsiz telefon raqamingiz orqali SMS kod bilan xavfsiz kiring, buyurtma holatini onlayn kuzatib boring.",
+      ru: "Входите по номеру телефона через SMS код без сложных паролей и отслеживайте свои заказы в реальном времени.",
+      en: "Log in securely using your phone number and SMS code without passwords, and track your orders in real time.",
+    },
+    themeColor: "#6366f1",
+    image: require("../../assets/onboarding_3.png"),
   },
   {
     id: "4",
-    badge: "MAXSUS LOGISTIKA",
-    title: "Toshkent va Viloyatlarga",
-    titleHighlight: "Ishonchli Yetkazib Berish",
-    desc: "Nozik va qimmatbaho tibbiy apparatlar maxsus transportda xavfsiz va sug'urtalangan holda to'g'ridan-to'g'ri klinikangizga yetkaziladi.",
-    icon: "🚚",
-    bgGrad: "#059669",
+    badge: {
+      uz: "MAXSUS LOGISTIKA",
+      ru: "СПЕЦ-ДОСТАВКА",
+      en: "SPECIAL LOGISTICS",
+    },
+    title: {
+      uz: "Toshkent va Viloyatlarga",
+      ru: "По Ташкенту и Регионам",
+      en: "Across All Regions",
+    },
+    titleHighlight: {
+      uz: "Ishonchli Yetkazib Berish",
+      ru: "Надёжная Доставка",
+      en: "Safe & Fast Delivery",
+    },
+    desc: {
+      uz: "Nozik va qimmatbaho tibbiy apparatlar maxsus transportda xavfsiz va sug'urtalangan holda to'g'ridan-to'g'ri klinikangizga yetkaziladi.",
+      ru: "Бережная и застрахованная доставка сложного медицинского оборудования в спецтранспорте прямо в вашу клинику.",
+      en: "Fragile and high-value medical devices delivered securely and fully insured directly to your medical facility.",
+    },
+    themeColor: "#059669",
+    image: require("../../assets/onboarding_4.png"),
   },
 ];
 
@@ -71,15 +138,31 @@ interface OnboardingScreenProps {
 
 export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
   const insets = useSafeAreaInsets();
+  const { lang, setLang, t } = useI18n();
   const [currentIndex, setCurrentIndex] = useState(0);
-  const flatListRef = useRef<FlatList>(null);
+  const flatListRef = useRef<FlatList<MultilingualSlide>>(null);
 
-  const handleNext = async () => {
+  const activeSlide = SLIDES[currentIndex] || SLIDES[0];
+
+  const handleNext = () => {
     if (currentIndex < SLIDES.length - 1) {
-      flatListRef.current?.scrollToIndex({ index: currentIndex + 1, animated: true });
+      const nextIndex = currentIndex + 1;
+      flatListRef.current?.scrollToOffset({
+        offset: nextIndex * SCREEN_WIDTH,
+        animated: true,
+      });
+      setCurrentIndex(nextIndex);
     } else {
-      await handleComplete();
+      handleComplete();
     }
+  };
+
+  const handleDotPress = (index: number) => {
+    flatListRef.current?.scrollToOffset({
+      offset: index * SCREEN_WIDTH,
+      animated: true,
+    });
+    setCurrentIndex(index);
   };
 
   const handleComplete = async () => {
@@ -89,37 +172,80 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
     onFinish();
   };
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems && viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index || 0);
-    }
-  }).current;
+  // Rock-solid scroll listener: avoids "Changing onViewableItemsChanged on the fly" crash completely
+  const handleScrollEnd = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const offsetX = e.nativeEvent.contentOffset.x;
+      const newIndex = Math.round(offsetX / SCREEN_WIDTH);
+      if (newIndex >= 0 && newIndex < SLIDES.length && newIndex !== currentIndex) {
+        setCurrentIndex(newIndex);
+      }
+    },
+    [currentIndex]
+  );
+
+  const getItemLayout = useCallback(
+    (_: any, index: number) => ({
+      length: SCREEN_WIDTH,
+      offset: SCREEN_WIDTH * index,
+      index,
+    }),
+    []
+  );
+
+  const onScrollToIndexFailed = useCallback(
+    (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
+      flatListRef.current?.scrollToOffset({
+        offset: info.index * SCREEN_WIDTH,
+        animated: true,
+      });
+    },
+    []
+  );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 16) }]}>
-      {/* Top Header: Logo + Skip */}
+    <View style={[styles.container, { paddingTop: insets.top + 6, paddingBottom: Math.max(insets.bottom, 16) }]}>
+      {/* Top Header: Logo + Lang Switcher + Skip */}
       <View style={styles.topHeader}>
         <View style={styles.logoRow}>
-          <MedaxEmblem size={34} />
+          <MedaxEmblem size={32} />
           <View style={{ marginLeft: 8 }}>
             <View style={{ flexDirection: "row" }}>
               <Text style={styles.logoMed}>Med</Text>
               <Text style={styles.logoAx}>ax</Text>
             </View>
-            <Text style={styles.logoSub}>TIBBIY USKUNALAR</Text>
+            <Text style={styles.logoSub}>{t("onboarding_slogan")}</Text>
           </View>
         </View>
 
-        {currentIndex < SLIDES.length - 1 ? (
-          <TouchableOpacity onPress={handleComplete} style={styles.skipBtn} activeOpacity={0.7}>
-            <Text style={styles.skipText}>O'tkazish</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={{ width: 70 }} />
-        )}
+        {/* Right Header: Language Pills & Skip Button */}
+        <View style={styles.headerRight}>
+          <View style={styles.langSwitchWrap}>
+            {(["uz", "ru", "en"] as const).map((l) => (
+              <TouchableOpacity
+                key={l}
+                style={[styles.langPill, lang === l && styles.langPillActive]}
+                onPress={() => setLang(l)}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.langText, lang === l && styles.langTextActive]}>
+                  {l.toUpperCase()}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {currentIndex < SLIDES.length - 1 ? (
+            <TouchableOpacity onPress={handleComplete} style={styles.skipBtn} activeOpacity={0.7}>
+              <Text style={styles.skipText}>{t("onboarding_skip")}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={{ width: 68 }} />
+          )}
+        </View>
       </View>
 
-      {/* Slides Carousel */}
+      {/* Carousel: 100% Crash-Proof FlatList */}
       <FlatList
         ref={flatListRef}
         data={SLIDES}
@@ -127,68 +253,90 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         keyExtractor={(item) => item.id}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={{ viewAreaCoveragePercentThreshold: 50 }}
-        renderItem={({ item }) => (
-          <View style={styles.slide}>
-            {/* Visual Art Box (Centered Image with Glass Frame) */}
-            <View style={[styles.artBox, { backgroundColor: `${item.bgGrad}10`, borderColor: `${item.bgGrad}25` }]}>
-              <Image
-                source={
-                  item.id === "1"
-                    ? require("../../assets/onboarding_1.png")
-                    : item.id === "2"
-                    ? require("../../assets/onboarding_2.png")
-                    : item.id === "3"
-                    ? require("../../assets/onboarding_3.png")
-                    : require("../../assets/onboarding_4.png")
-                }
-                style={styles.slideImage}
-                resizeMode="contain"
-              />
-            </View>
+        onMomentumScrollEnd={handleScrollEnd}
+        getItemLayout={getItemLayout}
+        onScrollToIndexFailed={onScrollToIndexFailed}
+        initialNumToRender={4}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        removeClippedSubviews={false}
+        renderItem={({ item }) => {
+          const badgeText = item.badge[lang] || item.badge.uz;
+          const titleText = item.title[lang] || item.title.uz;
+          const highlightText = item.titleHighlight[lang] || item.titleHighlight.uz;
+          const descText = item.desc[lang] || item.desc.uz;
 
-            {/* Slide Text Content (Perfect Center Harmony) */}
-            <View style={styles.textContent}>
-              <View style={[styles.badgePill, { backgroundColor: `${item.bgGrad}15` }]}>
-                <Text style={[styles.badgeText, { color: item.bgGrad }]}>{item.badge}</Text>
+          return (
+            <View style={styles.slide}>
+              {/* Visual Card (Centered, Perfectly Balanced, Soft Ambient Glow) */}
+              <View
+                style={[
+                  styles.artBox,
+                  {
+                    backgroundColor: `${item.themeColor}0a`,
+                    borderColor: `${item.themeColor}22`,
+                  },
+                ]}
+              >
+                <Image
+                  source={item.image}
+                  style={styles.slideImage}
+                  resizeMode="contain"
+                />
               </View>
 
-              <Text style={styles.slideTitle}>{item.title}</Text>
-              <Text style={[styles.slideTitleHighlight, { color: item.bgGrad }]}>
-                {item.titleHighlight}
-              </Text>
-              <Text style={styles.slideDesc}>{item.desc}</Text>
+              {/* Slide Text Content (Perfect Center Harmony) */}
+              <View style={styles.textContent}>
+                <View style={[styles.badgePill, { backgroundColor: `${item.themeColor}15` }]}>
+                  <Text style={[styles.badgeText, { color: item.themeColor }]}>
+                    {badgeText}
+                  </Text>
+                </View>
+
+                <Text style={styles.slideTitle}>{titleText}</Text>
+                <Text style={[styles.slideTitleHighlight, { color: item.themeColor }]}>
+                  {highlightText}
+                </Text>
+                <Text style={styles.slideDesc}>{descText}</Text>
+              </View>
             </View>
-          </View>
-        )}
+          );
+        }}
       />
 
       {/* Bottom Controls */}
       <View style={styles.bottomControls}>
-        {/* Pagination Dots */}
+        {/* Pagination Dots (Tap to navigate) */}
         <View style={styles.dotsRow}>
           {SLIDES.map((_, idx) => (
-            <View
+            <TouchableOpacity
               key={idx}
-              style={[
-                styles.dot,
-                currentIndex === idx
-                  ? [styles.dotActive, { backgroundColor: SLIDES[currentIndex].bgGrad }]
-                  : styles.dotInactive,
-              ]}
-            />
+              onPress={() => handleDotPress(idx)}
+              activeOpacity={0.7}
+              hitSlop={{ top: 10, bottom: 10, left: 6, right: 6 }}
+            >
+              <View
+                style={[
+                  styles.dot,
+                  currentIndex === idx
+                    ? [styles.dotActive, { backgroundColor: activeSlide.themeColor }]
+                    : styles.dotInactive,
+                ]}
+              />
+            </TouchableOpacity>
           ))}
         </View>
 
         {/* Action Button */}
         <TouchableOpacity
-          style={[styles.actionBtn, { backgroundColor: SLIDES[currentIndex].bgGrad }]}
+          style={[styles.actionBtn, { backgroundColor: activeSlide.themeColor }]}
           onPress={handleNext}
           activeOpacity={0.88}
         >
           <Text style={styles.actionBtnText}>
-            {currentIndex === SLIDES.length - 1 ? "Boshlash ✓" : "Keyingisi →"}
+            {currentIndex === SLIDES.length - 1
+              ? t("onboarding_start")
+              : t("onboarding_next")}
           </Text>
         </TouchableOpacity>
       </View>
@@ -206,42 +354,77 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   logoRow: { flexDirection: "row", alignItems: "center" },
-  logoMed: { fontSize: 21, fontWeight: "900", color: "#0284c7" },
-  logoAx: { fontSize: 21, fontWeight: "900", color: "#0f172a" },
-  logoSub: { fontSize: 8.5, fontWeight: "800", color: "#64748b", letterSpacing: 0.8 },
-  skipBtn: {
-    paddingVertical: 7,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    backgroundColor: "#f1f5f9",
+  logoMed: { fontSize: 20, fontWeight: "900", color: "#0284c7" },
+  logoAx: { fontSize: 20, fontWeight: "900", color: "#0f172a" },
+  logoSub: { fontSize: 8, fontWeight: "800", color: "#64748b", letterSpacing: 0.7 },
+  headerRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  skipText: { fontSize: 13, fontWeight: "700", color: "#64748b" },
+  langSwitchWrap: {
+    flexDirection: "row",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 14,
+    padding: 2,
+  },
+  langPill: {
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  langPillActive: {
+    backgroundColor: "#ffffff",
+    shadowColor: "#0f172a",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  langText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#94a3b8",
+  },
+  langTextActive: {
+    color: "#0284c7",
+    fontWeight: "900",
+  },
+  skipBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 16,
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  skipText: { fontSize: 12, fontWeight: "700", color: "#64748b" },
 
   slide: {
     width: SCREEN_WIDTH,
     alignItems: "center",
-    paddingHorizontal: 24,
+    paddingHorizontal: 20,
     justifyContent: "center",
   },
   artBox: {
-    width: Math.min(SCREEN_WIDTH - 48, 360),
-    height: Math.min(SCREEN_WIDTH - 48, 300),
-    borderRadius: 32,
+    width: Math.min(SCREEN_WIDTH - 40, 340),
+    height: Math.min(SCREEN_WIDTH - 40, 290),
+    borderRadius: 28,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 24,
+    marginBottom: 20,
     overflow: "hidden",
     shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 10 },
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 4,
-    padding: 12,
+    shadowRadius: 18,
+    elevation: 3,
+    padding: 10,
   },
   slideImage: {
     width: "100%",
@@ -250,13 +433,13 @@ const styles = StyleSheet.create({
 
   textContent: {
     alignItems: "center",
-    paddingHorizontal: 10,
+    paddingHorizontal: 12,
   },
   badgePill: {
     paddingHorizontal: 14,
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderRadius: 20,
-    marginBottom: 12,
+    marginBottom: 10,
   },
   badgeText: {
     fontSize: 11,
@@ -264,38 +447,38 @@ const styles = StyleSheet.create({
     letterSpacing: 0.9,
   },
   slideTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800",
     color: "#0f172a",
     textAlign: "center",
-    lineHeight: 30,
+    lineHeight: 28,
   },
   slideTitleHighlight: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "900",
     textAlign: "center",
-    lineHeight: 30,
-    marginBottom: 10,
+    lineHeight: 28,
+    marginBottom: 8,
   },
   slideDesc: {
-    fontSize: 14,
+    fontSize: 13.5,
     color: "#64748b",
     textAlign: "center",
-    lineHeight: 21,
-    maxWidth: 340,
+    lineHeight: 20,
+    maxWidth: 330,
   },
 
   bottomControls: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    paddingBottom: 8,
+    paddingHorizontal: 20,
+    paddingTop: 10,
+    paddingBottom: 6,
   },
   dotsRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 18,
   },
   dot: {
     height: 8,
@@ -311,19 +494,19 @@ const styles = StyleSheet.create({
 
   actionBtn: {
     width: "100%",
-    paddingVertical: 15,
+    paddingVertical: 14,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
     elevation: 4,
   },
   actionBtnText: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 15.5,
     fontWeight: "800",
     letterSpacing: 0.3,
   },

@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Category, fetchCategories, fetchProducts, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
+import { useI18n, localizeCategoryName } from "../context/I18nContext";
 import {
   MedaxHeaderBrand,
   SearchIcon,
@@ -74,12 +75,24 @@ const BANNER_SLIDES = [
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { lang, t } = useI18n();
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [addedId, setAddedId] = useState<number | null>(null);
   const { addToCart } = useCart();
+
+  const getCategoryEmoji = (slug: string) => {
+    switch (slug) {
+      case "tibbiy-buyumlar": return "🩹";
+      case "tibbiy-apparaturalar": return "🔬";
+      case "tibbiy-jihozlar": return "🛏️";
+      case "laboratoriya-reagentlari": return "🧪";
+      case "ortopedik-mahsulotlar": return "♿";
+      default: return "🏥";
+    }
+  };
 
   // Banner avto-o'tishi
   useEffect(() => {
@@ -127,7 +140,7 @@ export function HomeScreen({ navigation }: any) {
           onPress={() => navigation.navigate("Katalog")}
         >
           <SearchIcon size={18} color="#0284c7" />
-          <Text style={styles.searchPlaceholder}>Uskunalar va sarflov materiallarini qidirish...</Text>
+          <Text style={styles.searchPlaceholder}>{t("home_search_ph")}</Text>
         </TouchableOpacity>
       </View>
 
@@ -231,9 +244,9 @@ export function HomeScreen({ navigation }: any) {
 
         {/* 5. Kategoriyalar bo'limi */}
         <View style={styles.sectionHeaderWrap}>
-          <Text style={styles.sectionTitle}>Kategoriyalar</Text>
+          <Text style={styles.sectionTitle}>{t("home_all_cat")}</Text>
           <TouchableOpacity onPress={() => navigation.navigate("Katalog")}>
-            <Text style={styles.sectionSeeAll}>Barchasi ({categories.length}) →</Text>
+            <Text style={styles.sectionSeeAll}>{t("cat_all_count")} ({categories.length}) →</Text>
           </TouchableOpacity>
         </View>
 
@@ -249,10 +262,10 @@ export function HomeScreen({ navigation }: any) {
               onPress={() => navigation.navigate("Katalog", { categoryId: cat.id })}
             >
               <View style={styles.catIconWrap}>
-                <ShieldIcon size={20} color="#0284c7" />
+                <Text style={{ fontSize: 20 }}>{getCategoryEmoji(cat.slug)}</Text>
               </View>
               <Text style={styles.categoryName} numberOfLines={2}>
-                {cat.name}
+                {localizeCategoryName(cat.slug || cat.name, lang)}
               </Text>
             </TouchableOpacity>
           ))}
@@ -261,11 +274,11 @@ export function HomeScreen({ navigation }: any) {
         {/* 6. Ommabop Mahsulotlar (Web sayt kartochkalari kabi) */}
         <View style={styles.sectionHeaderWrap}>
           <View>
-            <Text style={styles.sectionTitle}>Ommabop Uskunalar</Text>
+            <Text style={styles.sectionTitle}>{t("home_popular")}</Text>
             <Text style={styles.sectionSub}>Klinikalar va shifokorlar tanlovi</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate("Katalog")}>
-            <Text style={styles.sectionSeeAll}>Barchasi →</Text>
+            <Text style={styles.sectionSeeAll}>{t("cat_all_count")} →</Text>
           </TouchableOpacity>
         </View>
 
@@ -310,7 +323,7 @@ export function HomeScreen({ navigation }: any) {
                   <View style={styles.productBody}>
                     {item.category?.name && (
                       <Text style={styles.productCatName} numberOfLines={1}>
-                        {item.category.name}
+                        {localizeCategoryName(item.category.slug || item.category.name, lang)}
                       </Text>
                     )}
 

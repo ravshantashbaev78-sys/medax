@@ -88,6 +88,14 @@ const translations: Record<Language, Record<string, string>> = {
     cat_title: "Katalog",
     cat_search_ph: "Uskunalar nomi bo'yicha qidirish...",
     cat_not_found: "Uskuna topilmadi",
+    cat_not_found_sub: "Boshqa kategoriya yoki kalit so'z bilan qidirib ko'ring",
+    cat_all_count: "Barchasi",
+
+    // Onboarding
+    onboarding_skip: "O'tkazish",
+    onboarding_next: "Keyingisi →",
+    onboarding_start: "Boshlash ✓",
+    onboarding_slogan: "TIBBIY USKUNALAR",
   },
   ru: {
     // Nav
@@ -173,6 +181,14 @@ const translations: Record<Language, Record<string, string>> = {
     cat_title: "Каталог",
     cat_search_ph: "Поиск по названию оборудования...",
     cat_not_found: "Оборудование не найдено",
+    cat_not_found_sub: "Попробуйте изменить категорию или поисковый запрос",
+    cat_all_count: "Все",
+
+    // Onboarding
+    onboarding_skip: "Пропустить",
+    onboarding_next: "Далее →",
+    onboarding_start: "Начать ✓",
+    onboarding_slogan: "МЕДИЦИНСКАЯ ТЕХНИКА",
   },
   en: {
     // Nav
@@ -258,6 +274,14 @@ const translations: Record<Language, Record<string, string>> = {
     cat_title: "Catalog",
     cat_search_ph: "Search by equipment name...",
     cat_not_found: "No equipment found",
+    cat_not_found_sub: "Try searching with another category or keyword",
+    cat_all_count: "All",
+
+    // Onboarding
+    onboarding_skip: "Skip",
+    onboarding_next: "Next →",
+    onboarding_start: "Get Started ✓",
+    onboarding_slogan: "MEDICAL EQUIPMENT",
   },
 };
 
@@ -303,3 +327,99 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 }
 
 export const useI18n = () => useContext(I18nContext);
+
+// ============================================================================
+// Asosiy 5 ta toifani 3 tilda tarjima qilish (UZ, RU, EN)
+// ============================================================================
+export const CATEGORY_TRANSLATIONS: Record<string, Record<Language, string>> = {
+  "tibbiy-buyumlar": {
+    uz: "Tibbiy buyumlar",
+    ru: "Медицинские изделия",
+    en: "Medical Supplies",
+  },
+  "tibbiy-apparaturalar": {
+    uz: "Tibbiy apparaturalar",
+    ru: "Медицинская аппаратура",
+    en: "Medical Equipment",
+  },
+  "tibbiy-jihozlar": {
+    uz: "Tibbiy jihozlar",
+    ru: "Медицинское оборудование",
+    en: "Medical Devices & Furniture",
+  },
+  "laboratoriya-reagentlari": {
+    uz: "Laboratoriya reagentlari",
+    ru: "Лабораторные реагенты",
+    en: "Laboratory Reagents",
+  },
+  "ortopedik-mahsulotlar": {
+    uz: "Ortopedik mahsulotlar",
+    ru: "Ортопедические изделия",
+    en: "Orthopedic Products",
+  },
+  "all": {
+    uz: "Barchasi",
+    ru: "Все",
+    en: "All",
+  },
+  // Eski toifalar uchun moslashtirish (Backwards compatibility)
+  "reabilitatsiya-va-invalit-aravachalari": {
+    uz: "Reabilitatsiya va aravachalar",
+    ru: "Реабилитация и инвалидные коляски",
+    en: "Rehabilitation & Wheelchairs",
+  },
+  "ultratovush-diagnostikasi": {
+    uz: "Ultratovush diagnostikasi (UZI)",
+    ru: "Ультразвуковая диагностика (УЗИ)",
+    en: "Ultrasound Diagnostics (USG)",
+  },
+  "reanimatsiya-va-anesteziologiya": {
+    uz: "Reanimatsiya va anesteziologiya",
+    ru: "Реанимация и анестезиология",
+    en: "ICU & Anesthesiology",
+  },
+  "jarrohlik": {
+    uz: "Jarrohlik jihozlari",
+    ru: "Хирургическое оборудование",
+    en: "Surgical Equipment",
+  },
+  "tibbiy-mebel": {
+    uz: "Tibbiy mebel",
+    ru: "Медицинская мебель",
+    en: "Medical Furniture",
+  },
+  "operatsion-raqamli-integratsiya": {
+    uz: "Operatsion integratsiya",
+    ru: "Операционная интеграция",
+    en: "Operating Room Integration",
+  },
+};
+
+export function localizeCategoryName(slugOrName: string | undefined | null, lang: Language): string {
+  if (!slugOrName) return "";
+  const key = slugOrName.toLowerCase().trim();
+
+  // 1. To'g'ridan-to'g'ri slug orqali tekshirish
+  if (CATEGORY_TRANSLATIONS[key]) {
+    return CATEGORY_TRANSLATIONS[key][lang];
+  }
+
+  // 2. Toifa nomi bo'yicha qidirish
+  for (const item of Object.values(CATEGORY_TRANSLATIONS)) {
+    if (
+      item.uz.toLowerCase() === key ||
+      item.ru.toLowerCase() === key ||
+      item.en.toLowerCase() === key
+    ) {
+      return item[lang];
+    }
+  }
+
+  // 3. Probeldan defisga o'girilgan holat
+  const slugified = key.replace(/\s+/g, "-");
+  if (CATEGORY_TRANSLATIONS[slugified]) {
+    return CATEGORY_TRANSLATIONS[slugified][lang];
+  }
+
+  return slugOrName;
+}

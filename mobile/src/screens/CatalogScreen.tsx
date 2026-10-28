@@ -13,12 +13,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Category, fetchCategories, fetchProducts, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
+import { useI18n, localizeCategoryName } from "../context/I18nContext";
 import { SearchIcon, CloseIcon, CartIcon } from "../components/Icons";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 export function CatalogScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
+  const { lang, t } = useI18n();
   const initialCategory = route?.params?.categoryId;
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -60,7 +62,7 @@ export function CatalogScreen({ navigation, route }: any) {
           <SearchIcon size={18} color="#0284c7" />
           <TextInput
             style={styles.searchInput}
-            placeholder="Uskuna nomini qidiring..."
+            placeholder={t("cat_search_ph")}
             value={search}
             onChangeText={setSearch}
             placeholderTextColor="#94a3b8"
@@ -78,7 +80,7 @@ export function CatalogScreen({ navigation, route }: any) {
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
-          data={[{ id: 0, name: "Barchasi", slug: "all" }, ...categories]}
+          data={[{ id: 0, name: t("cat_all_count"), slug: "all" }, ...categories]}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={{ paddingRight: 16 }}
           renderItem={({ item }) => {
@@ -88,7 +90,9 @@ export function CatalogScreen({ navigation, route }: any) {
                 style={[styles.pill, active && styles.pillActive]}
                 onPress={() => setSelectedCat(item.id === 0 ? undefined : item.id)}
               >
-                <Text style={[styles.pillText, active && styles.pillTextActive]}>{item.name}</Text>
+                <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                  {item.slug === "all" ? t("cat_all_count") : localizeCategoryName(item.slug || item.name, lang)}
+                </Text>
               </TouchableOpacity>
             );
           }}
@@ -101,8 +105,8 @@ export function CatalogScreen({ navigation, route }: any) {
       ) : products.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Text style={{ fontSize: 40, marginBottom: 12 }}>🔎</Text>
-          <Text style={styles.emptyTitle}>Uskuna topilmadi</Text>
-          <Text style={styles.emptySub}>Boshqa kategoriya yoki kalit so'z bilan qidirib ko'ring</Text>
+          <Text style={styles.emptyTitle}>{t("cat_not_found")}</Text>
+          <Text style={styles.emptySub}>{t("cat_not_found_sub")}</Text>
         </View>
       ) : (
         <FlatList
@@ -138,7 +142,7 @@ export function CatalogScreen({ navigation, route }: any) {
                 <View style={styles.productBody}>
                   {item.category?.name && (
                     <Text style={styles.productCatName} numberOfLines={1}>
-                      {item.category.name}
+                      {localizeCategoryName(item.category.slug || item.category.name, lang)}
                     </Text>
                   )}
                   <Text style={styles.productName} numberOfLines={2}>

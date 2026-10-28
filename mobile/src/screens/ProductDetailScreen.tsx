@@ -11,10 +11,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchProductDetail, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
+import { useI18n, localizeCategoryName } from "../context/I18nContext";
 import { ShieldIcon, CartIcon } from "../components/Icons";
 
 export function ProductDetailScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { lang, t } = useI18n();
   const { slug } = route.params;
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -64,7 +66,9 @@ export function ProductDetailScreen({ route, navigation }: any) {
 
         <View style={styles.body}>
           {product.category && (
-            <Text style={styles.catName}>{product.category.name}</Text>
+            <Text style={styles.catName}>
+              {localizeCategoryName(product.category.slug || product.category.name, lang)}
+            </Text>
           )}
 
           <Text style={styles.title}>{product.name}</Text>
