@@ -22,6 +22,14 @@ export async function syncCategories(): Promise<Record<string, number>> {
     catMap[c.name] = row.id;
   }
 
+  // Eski toifalarni yangi 5 ta asosiy yo'nalishga moslashtirish
+  catMap["Reanimatsiya va anesteziologiya"] = catMap["tibbiy-apparaturalar"];
+  catMap["Ultratovush diagnostikasi"] = catMap["tibbiy-apparaturalar"];
+  catMap["Operatsion raqamli integratsiya"] = catMap["tibbiy-apparaturalar"];
+  catMap["Jarrohlik"] = catMap["tibbiy-jihozlar"];
+  catMap["Tibbiy mebel"] = catMap["tibbiy-jihozlar"];
+  catMap["Reabilitatsiya va aravachalar"] = catMap["ortopedik-mahsulotlar"];
+
   // Barcha mahsulotlarni yangi 5 ta yo'nalishga ko'chirish
   const products = await prisma.product.findMany({
     include: { category: true },
@@ -645,8 +653,8 @@ export async function seedDatabase() {
         isHit: item.isHit,
         isNew: item.isNew,
         isActive: true,
-        categoryId: catMap[item.cat],
-        brandId: brandMap[item.brand],
+        categoryId: catMap[item.cat] || catMap["tibbiy-jihozlar"] || 1,
+        brandId: brandMap[item.brand] || null,
         description: item.desc,
         specs: item.specs,
       },
@@ -657,7 +665,7 @@ export async function seedDatabase() {
         priceFrom: item.price,
         isHit: item.isHit,
         isNew: item.isNew,
-        categoryId: catMap[item.cat],
+        categoryId: catMap[item.cat] || catMap["tibbiy-jihozlar"] || 1,
         brandId: brandMap[item.brand],
         description: item.desc,
         specs: item.specs,
