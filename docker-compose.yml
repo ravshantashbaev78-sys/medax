@@ -34,6 +34,8 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-medax_user}:${POSTGRES_PASSWORD:-StrongDatabasePass2026!}@db:5432/${POSTGRES_DB:-medax_db}?schema=public
       JWT_SECRET: ${JWT_SECRET}
       CUSTOMER_JWT_SECRET: ${CUSTOMER_JWT_SECRET}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@medax.uz}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe123!}
       SMS_PROVIDER: ${SMS_PROVIDER:-eskiz}
       ESKIZ_EMAIL: ${ESKIZ_EMAIL}
       ESKIZ_PASSWORD: ${ESKIZ_PASSWORD}
