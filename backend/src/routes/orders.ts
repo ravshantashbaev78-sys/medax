@@ -170,6 +170,16 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
   // Jami buyurtma summasini hisoblaymiz
   const totalAmount = items.reduce((sum, item) => sum + (prices.get(item.productId) || 0) * item.quantity, 0);
 
+  // inPAY to'lov talablarini bazaga yozishdan oldin tekshiramiz (osilib qoluvchi buyurtmalar bo'lmasligi uchun)
+  if (body.paymentMethod === "inpay") {
+    if (totalAmount < 1000) {
+      throw new HttpError(400, "inPAY orqali to'lash uchun buyurtma summasi kamida 1 000 so'm bo'lishi kerak.");
+    }
+    if (!config.inpay.merchantId || !config.inpay.merchantToken) {
+      throw new HttpError(503, "inPAY to'lov tizimi sozlanmagan. Iltimos, 'Do'konda to'lash' usulini tanlang yoki do'kon bilan bog'laning.");
+    }
+  }
+
   // Mehmon bo'lsa, OTP kodini tekshiramiz (hech qanday master kodlarsiz!)
   let otpRecordId: number | null = null;
   if (!req.customer) {
@@ -251,14 +261,8 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
 
   let payUrl: string | undefined;
 
-  // 2. Agar inPAY to'lov usuli tanlangan bo'lsa, limitdan o'tgan buyurtma uchun to'lov havolasi olamiz
+  // 2. Agar inPAY to'lov usuli tanlangan bo'lsa, to'lov havolasini olamiz
   if (body.paymentMethod === "inpay") {
-    if (totalAmount < 1000) {
-      throw new HttpError(400, "inPAY orqali to'lash uchun buyurtma summasi kamida 1 000 so'm bo'lishi kerak.");
-    }
-    if (!config.inpay.merchantId || !config.inpay.merchantToken) {
-      throw new HttpError(503, "inPAY to'lov tizimi sozlanmagan. Iltimos, 'Do'konda to'lash' usulini tanlang yoki do'kon bilan bog'laning.");
-    }
     try {
       const payment = await createInpayPayment({
         amount: totalAmount,

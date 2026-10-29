@@ -142,19 +142,6 @@ export async function loginCustomerWithPassword(phone: string, password: string)
   }
 }
 
-export async function startTelegramAuth(): Promise<{ sessionId: string; startUrl: string; botUsername: string }> {
-  const res = await fetch(`${API_BASE}/customer/auth/telegram-session`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-  return await res.json();
-}
-
-export async function pollTelegramAuth(sessionId: string): Promise<{ ok: boolean; status: string; token?: string; customer?: Customer }> {
-  const res = await fetch(`${API_BASE}/customer/auth/telegram-poll?sessionId=${encodeURIComponent(sessionId)}`);
-  return await res.json();
-}
-
 export async function fetchCustomerProfile(): Promise<Customer | null> {
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);

@@ -594,9 +594,17 @@ export function ProductForm() {
       if (isNew) {
         const p = await api<Product>("/admin/products", { json: body, admin: true });
         if (newFiles.length > 0) {
-          const fd = new FormData();
-          newFiles.forEach((x) => fd.append("files", x.file));
-          await api(`/admin/products/${p.id}/images`, { form: fd, admin: true });
+          try {
+            const fd = new FormData();
+            newFiles.forEach((x) => fd.append("files", x.file));
+            await api(`/admin/products/${p.id}/images`, { form: fd, admin: true });
+          } catch (imgErr) {
+            // Mahsulot yaratildi, ammo rasm yuklashda xatolik bo'lsa, qayta urinish dublikat yaratmasligi uchun tahrirlash rejimiga o'tkazamiz
+            nav(`/admin/products/${p.id}`);
+            throw new Error(
+              `Mahsulot bazaga qo'shildi, lekin rasmlarni yuklashda xatolik yuz berdi: ${(imgErr as any)?.message || ""}`
+            );
+          }
         }
         nav("/admin/products");
       } else {
