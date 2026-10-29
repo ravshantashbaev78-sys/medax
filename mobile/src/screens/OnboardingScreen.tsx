@@ -7,17 +7,39 @@ import {
   Dimensions,
   FlatList,
   Image,
+  ScrollView,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { MedaxEmblem } from "../components/Icons";
+import {
+  MedaxEmblem,
+  StethoscopeIcon,
+  PriceTagIcon,
+  FilterSearchIcon,
+  ShieldCheckIcon,
+  WrenchToolIcon,
+  SupportIcon,
+  LockCheckIcon,
+  UserCheckIcon,
+  BellRingIcon,
+  TruckFastIcon,
+  BoxShieldIcon,
+  MapPinCheckIcon,
+} from "../components/Icons";
 import { useI18n, Language } from "../context/I18nContext";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const isCompactScreen = SCREEN_HEIGHT < 720;
 
 export const ONBOARDING_KEY = "@medax_has_seen_onboarding";
+
+interface FeaturePoint {
+  icon: (props: { size?: number; color?: string }) => React.JSX.Element;
+  title: Record<Language, string>;
+  desc: Record<Language, string>;
+}
 
 interface MultilingualSlide {
   id: string;
@@ -27,6 +49,7 @@ interface MultilingualSlide {
   desc: Record<Language, string>;
   themeColor: string;
   image: any;
+  features: FeaturePoint[];
 }
 
 const SLIDES: MultilingualSlide[] = [
@@ -38,9 +61,9 @@ const SLIDES: MultilingualSlide[] = [
       en: "OFFICIAL CATALOG",
     },
     title: {
-      uz: "Klinikalar uchun",
-      ru: "Для клиник и врачей",
-      en: "For Clinics & Doctors",
+      uz: "Klinika va Shifoxonalar Uchun",
+      ru: "Для Клиник и Медцентров",
+      en: "For Clinics & Hospitals",
     },
     titleHighlight: {
       uz: "Zamonaviy Medtexnika",
@@ -48,87 +71,251 @@ const SLIDES: MultilingualSlide[] = [
       en: "Modern Medical Tech",
     },
     desc: {
-      uz: "UZI, rentgen, laboratoriya analizatorlari, jarrohlik stollari va sertifikatlangan tibbiy uskunalar katalogi.",
-      ru: "Каталог сертифицированного оборудования: УЗИ, рентген, анализаторы, хирургические столы и расходные материалы.",
-      en: "Catalog of certified medical equipment: ultrasound, X-ray, lab analyzers, surgical tables, and supplies.",
+      uz: "O'zbekistondagi yetakchi tibbiy uskunalar markazi. 500 dan ortiq sertifikatlangan zamonaviy apparatlar, laboratoriya tizimlari va tibbiy sarflov materiallari to'g'ridan-to'g'ri ishlab chiqaruvchilardan.",
+      ru: "Ведущий медицинский каталог Узбекистана. Более 500 сертифицированных аппаратов, лабораторных систем и расходных материалов напрямую от заводов-производителей.",
+      en: "Uzbekistan's premier medical equipment hub. Over 500 certified diagnostic devices, laboratory analyzers, and surgical supplies directly from certified manufacturers.",
     },
     themeColor: "#0284c7",
     image: require("../../assets/onboarding_1.png"),
+    features: [
+      {
+        icon: StethoscopeIcon,
+        title: {
+          uz: "500+ Sertifikatlangan apparatlar",
+          ru: "500+ Сертифицированных аппаратов",
+          en: "500+ Certified Medical Devices",
+        },
+        desc: {
+          uz: "UZI apparatlari, rentgen, EKG, analizatorlar va operatsiya stollari",
+          ru: "УЗИ аппараты, рентгены, ЭКГ, анализаторы и операционные столы",
+          en: "Ultrasound, digital X-ray, ECG monitors, lab systems & surgical tables",
+        },
+      },
+      {
+        icon: PriceTagIcon,
+        title: {
+          uz: "Birinchi qo'l zavod narxlari",
+          ru: "Прямые заводские цены",
+          en: "Direct Factory Prices",
+        },
+        desc: {
+          uz: "Vositachilarsiz to'g'ridan-to'g'ri import, eng maqbul va shaffof narxlar",
+          ru: "Прямой импорт без посредников, прозрачные и выгодные условия",
+          en: "Direct import without middleman margins, transparent terms & discounts",
+        },
+      },
+      {
+        icon: FilterSearchIcon,
+        title: {
+          uz: "Qulay filtr va tezkor qidiruv",
+          ru: "Умный поиск и фильтры",
+          en: "Smart Search & Filtering",
+        },
+        desc: {
+          uz: "Kategoriya, brend va texnik parametrlar bo'yicha darhol topish",
+          ru: "Быстрый поиск по направлениям, брендам и техническим параметрам",
+          en: "Instant filtering by clinical specialty, brand, and technical specs",
+        },
+      },
+    ],
   },
   {
     id: "2",
     badge: {
-      uz: "ZAVOD KAFOLATI",
-      ru: "ЗАВОДСКАЯ ГАРАНТИЯ",
-      en: "FACTORY WARRANTY",
+      uz: "RASMIY KAFOLAT",
+      ru: "ОФИЦИАЛЬНАЯ ГАРАНТИЯ",
+      en: "OFFICIAL WARRANTY",
     },
     title: {
-      uz: "100% Rasmiy Kafolat &",
-      ru: "100% Официальная Гарантия &",
-      en: "100% Official Warranty &",
+      uz: "100% Rasmiy Zavod Kafolati &",
+      ru: "100% Заводская Гарантия &",
+      en: "100% Factory Warranty &",
     },
     titleHighlight: {
-      uz: "Professional Muhandislar",
-      ru: "Сервисные Инженеры",
+      uz: "Sertifikatlangan Muhandislar",
+      ru: "Сертифицированный Сервис",
       en: "Certified Engineers",
     },
     desc: {
-      uz: "Har bir uskunaga ishlab chiqaruvchining rasmiy kafolati beriladi va malakali mutaxassislar tomonidan o'rnatib sozlanadi.",
-      ru: "Официальная гарантия от производителя, профессиональный монтаж, ввод в эксплуатацию и сервисное обслуживание.",
-      en: "Official manufacturer warranty, professional installation, expert commissioning, and full technical service.",
+      uz: "Har bir xarid qilingan uskunaga 1 yildan 3 yilgacha rasmiy kafolat beriladi. Malakali biotibbiy muhandislarimiz uskunani klinikangizda o'rnatib, sozlab, shifokorlaringizga to'liq o'rgatadi.",
+      ru: "Официальная заводская гарантия от 1 до 3 лет на всё оборудование. Дипломированные биомедицинские инженеры выполнят монтаж, пусконаладку и проведут инструктаж врачей.",
+      en: "Official 1 to 3-year factory warranty on all equipment. Our certified biomedical engineers handle complete installation, calibration, and clinic staff training.",
     },
     themeColor: "#0d9488",
     image: require("../../assets/onboarding_2.png"),
+    features: [
+      {
+        icon: ShieldCheckIcon,
+        title: {
+          uz: "1-3 Yil to'liq zavod kafolati",
+          ru: "1-3 Года заводской гарантии",
+          en: "1-3 Years Full Warranty",
+        },
+        desc: {
+          uz: "Davlat muvofiqlik sertifikati va rasmiy kafolat taloni beriladi",
+          ru: "Государственные сертификаты и официальный гарантийный талон",
+          en: "Official warranty certificate & full regulatory compliance papers",
+        },
+      },
+      {
+        icon: WrenchToolIcon,
+        title: {
+          uz: "Bepul montaj va kalibrovka",
+          ru: "Монтаж и пусконаладка",
+          en: "Installation & Commissioning",
+        },
+        desc: {
+          uz: "Muhandislar klinikangizga borib uskunani professional sozlab beradi",
+          ru: "Выезд сервисного инженера в клинику для настройки и пуска в работу",
+          en: "On-site precision calibration and operational readiness by engineers",
+        },
+      },
+      {
+        icon: SupportIcon,
+        title: {
+          uz: "24/7 Texnik servis va ehtiyot qismlar",
+          ru: "Сервисная поддержка 24/7",
+          en: "24/7 Technical Support",
+        },
+        desc: {
+          uz: "Tezkor texnik maslahat va original butlovchi qismlar doimiy mavjud",
+          ru: "Оперативная помощь и постоянный запас оригинальных запчастей на складе",
+          en: "Dedicated engineering hotline and permanent local stock of genuine parts",
+        },
+      },
+    ],
   },
   {
     id: "3",
     badge: {
-      uz: "TEZKOR VA XAVFSIZ",
-      ru: "БЫСТРО И БЕЗОПАСНО",
+      uz: "XAVFSIZ VA TEZKOR",
+      ru: "БЕЗОПАСНО И БЫСТРО",
       en: "FAST & SECURE",
     },
     title: {
-      uz: "1 Daqiqada SMS Bilan",
-      ru: "Вход по SMS Коду",
+      uz: "1 Daqiqada SMS Kod Bilan",
+      ru: "Вход за 1 Минуту по SMS",
       en: "1-Minute SMS Login",
     },
     titleHighlight: {
-      uz: "Xavfsiz Ro'yxatdan O'tish",
-      ru: "За 1 Минуту Без Паролей",
-      en: "Secure Verification",
+      uz: "Oson va Xavfsiz Kirish",
+      ru: "Без Сложных Паролей",
+      en: "Instant Secure Access",
     },
     desc: {
-      uz: "Ortiqcha parollarsiz telefon raqamingiz orqali SMS kod bilan xavfsiz kiring, buyurtma holatini onlayn kuzatib boring.",
-      ru: "Входите по номеру телефона через SMS код без сложных паролей и отслеживайте свои заказы в реальном времени.",
-      en: "Log in securely using your phone number and SMS code without passwords, and track your orders in real time.",
+      uz: "Hech qanday esdan chiqadigan murakkab parollarsiz! Shaxsiy telefon raqamingizga keladigan 1 martalik SMS kod orqali tizimga xavfsiz kiring va klinikangiz buyurtmalarini boshqaring.",
+      ru: "Никаких забытых паролей! Мгновенная и надёжная авторизация по одноразовому SMS коду на ваш номер для легкого управления всеми заказами и счетами клиники.",
+      en: "No forgotten passwords! Instant and highly secure authentication via one-time SMS code directly to your phone to manage clinic orders and financial documents.",
     },
     themeColor: "#6366f1",
     image: require("../../assets/onboarding_3.png"),
+    features: [
+      {
+        icon: LockCheckIcon,
+        title: {
+          uz: "1 Martalik SMS tasdiqlash",
+          ru: "Одноразовый SMS код",
+          en: "One-Time SMS Passcode",
+        },
+        desc: {
+          uz: "Bank darajasidagi shifrlash va akkauntingizning 100% himoyasi",
+          ru: "Банковский уровень защиты и 100% безопасность ваших данных",
+          en: "Bank-grade encryption and 100% protection of clinic account",
+        },
+      },
+      {
+        icon: UserCheckIcon,
+        title: {
+          uz: "Klinika shaxsiy kabineti",
+          ru: "Кабинет клиники и врача",
+          en: "Dedicated Clinic Account",
+        },
+        desc: {
+          uz: "Barcha buyurtmalar tarixi, elektron fakturalar va shartnomalar bir joyda",
+          ru: "История заказов, электронные счета и договоры всегда под рукой",
+          en: "Complete purchase history, electronic invoices and contracts in one place",
+        },
+      },
+      {
+        icon: BellRingIcon,
+        title: {
+          uz: "Buyurtma holatini jonli kuzatish",
+          ru: "Онлайн отслеживание заказа",
+          en: "Real-Time Order Tracking",
+        },
+        desc: {
+          uz: "Qabul qilindi, yig'ilmoqda, yetkazilmoqda — har bir bosqich ekranda",
+          ru: "Принят, на сборке, передан курьеру — статус доставки всегда на виду",
+          en: "Received, prepared, in transit — monitor every delivery step live",
+        },
+      },
+    ],
   },
   {
     id: "4",
     badge: {
       uz: "MAXSUS LOGISTIKA",
-      ru: "СПЕЦ-ДОСТАВКА",
+      ru: "СПЕЦ-ЛОГИСТИКА",
       en: "SPECIAL LOGISTICS",
     },
     title: {
       uz: "Toshkent va Viloyatlarga",
       ru: "По Ташкенту и Регионам",
-      en: "Across All Regions",
+      en: "Tashkent & All Regions",
     },
     titleHighlight: {
-      uz: "Ishonchli Yetkazib Berish",
-      ru: "Надёжная Доставка",
-      en: "Safe & Fast Delivery",
+      uz: "Xavfsiz Yetkazib Berish",
+      ru: "Бережная Доставка",
+      en: "Insured Safe Transport",
     },
     desc: {
-      uz: "Nozik va qimmatbaho tibbiy apparatlar maxsus transportda xavfsiz va sug'urtalangan holda to'g'ridan-to'g'ri klinikangizga yetkaziladi.",
-      ru: "Бережная и застрахованная доставка сложного медицинского оборудования в спецтранспорте прямо в вашу клинику.",
-      en: "Fragile and high-value medical devices delivered securely and fully insured directly to your medical facility.",
+      uz: "Nozik va yuqori aniqlikdagi tibbiy uskunalar maxsus pnevmo-amortizatsiyali transportda, to'liq sug'urtalangan holda to'g'ridan-to'g'ri klinikangiz binosigacha yetkaziladi.",
+      ru: "Высокоточное и хрупкое медицинское оборудование доставляется на спецтранспорте с пневмоподвеской и полной страховкой прямо до дверей вашей клиники.",
+      en: "Fragile and high-precision medical devices transported in pneumatic shock-absorbing vehicles with full transit insurance right to your medical facility.",
     },
     themeColor: "#059669",
     image: require("../../assets/onboarding_4.png"),
+    features: [
+      {
+        icon: TruckFastIcon,
+        title: {
+          uz: "Tezkor yetkazish muddati",
+          ru: "Экспресс доставка",
+          en: "Express Delivery Schedule",
+        },
+        desc: {
+          uz: "Toshkent shahri bo'ylab 24 soatda, viloyat markazlariga 48 soatda",
+          ru: "По Ташкенту в течение 24 часов, в областные центры за 48 часов",
+          en: "Within 24 hours in Tashkent, 48 hours to all regional centers",
+        },
+      },
+      {
+        icon: BoxShieldIcon,
+        title: {
+          uz: "100% Sug'urta va mustahkam qadoq",
+          ru: "100% Страховка и защита",
+          en: "100% Insured & Shock-Proof",
+        },
+        desc: {
+          uz: "Uskunaning shikastlanishsiz, soz yetib borishi to'liq kafolatlanadi",
+          ru: "Гарантия сохранности и целостности каждого датчика и прибора",
+          en: "Guaranteed zero-damage arrival for all sensitive probes and consoles",
+        },
+      },
+      {
+        icon: MapPinCheckIcon,
+        title: {
+          uz: "14 ta Hudud bo'yicha to'liq qamrov",
+          ru: "Охват всех 14 регионов",
+          en: "All 14 Regions of Uzbekistan",
+        },
+        desc: {
+          uz: "Qoraqalpog'iston va barcha viloyatlar shifoxonalariga yetkazib beramiz",
+          ru: "Доставка в Республику Каракалпакстан и все области до дверей",
+          en: "Direct delivery across Karakalpakstan and every province of Uzbekistan",
+        },
+      },
+    ],
   },
 ];
 
@@ -172,7 +359,6 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
     onFinish();
   };
 
-  // Rock-solid scroll listener: avoids "Changing onViewableItemsChanged on the fly" crash completely
   const handleScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const offsetX = e.nativeEvent.contentOffset.x;
@@ -204,11 +390,11 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
   );
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top + 6, paddingBottom: Math.max(insets.bottom, 16) }]}>
+    <View style={[styles.container, { paddingTop: insets.top + 6, paddingBottom: Math.max(insets.bottom, 14) }]}>
       {/* Top Header: Logo + Lang Switcher + Skip */}
       <View style={styles.topHeader}>
         <View style={styles.logoRow}>
-          <MedaxEmblem size={32} />
+          <MedaxEmblem size={30} />
           <View style={{ marginLeft: 8 }}>
             <View style={{ flexDirection: "row" }}>
               <Text style={styles.logoMed}>Med</Text>
@@ -245,7 +431,7 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
         </View>
       </View>
 
-      {/* Carousel: 100% Crash-Proof FlatList */}
+      {/* Carousel: 100% Crash-Proof FlatList with Smooth Content Scrolling */}
       <FlatList
         ref={flatListRef}
         data={SLIDES}
@@ -267,38 +453,73 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
           const descText = item.desc[lang] || item.desc.uz;
 
           return (
-            <View style={styles.slide}>
-              {/* Visual Card (Centered, Perfectly Balanced, Soft Ambient Glow) */}
-              <View
-                style={[
-                  styles.artBox,
-                  {
-                    backgroundColor: `${item.themeColor}0a`,
-                    borderColor: `${item.themeColor}22`,
-                  },
-                ]}
+            <View style={styles.slidePage}>
+              <ScrollView
+                style={styles.slideScroll}
+                contentContainerStyle={styles.slideScrollContent}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+                bounces={false}
               >
-                <Image
-                  source={item.image}
-                  style={styles.slideImage}
-                  resizeMode="contain"
-                />
-              </View>
+                {/* Visual Art Box (Centered, Soft Ambient Tint) */}
+                <View
+                  style={[
+                    styles.artBox,
+                    {
+                      backgroundColor: `${item.themeColor}0a`,
+                      borderColor: `${item.themeColor}25`,
+                    },
+                  ]}
+                >
+                  <Image
+                    source={item.image}
+                    style={styles.slideImage}
+                    resizeMode="contain"
+                  />
+                </View>
 
-              {/* Slide Text Content (Perfect Center Harmony) */}
-              <View style={styles.textContent}>
+                {/* Badge Pill */}
                 <View style={[styles.badgePill, { backgroundColor: `${item.themeColor}15` }]}>
                   <Text style={[styles.badgeText, { color: item.themeColor }]}>
                     {badgeText}
                   </Text>
                 </View>
 
+                {/* Title & Subtitle Highlight */}
                 <Text style={styles.slideTitle}>{titleText}</Text>
                 <Text style={[styles.slideTitleHighlight, { color: item.themeColor }]}>
                   {highlightText}
                 </Text>
+
+                {/* Expanded Rich Description */}
                 <Text style={styles.slideDesc}>{descText}</Text>
-              </View>
+
+                {/* 3 Benefit Feature Points with Crisp React SVG Vector Icons */}
+                <View style={styles.featuresContainer}>
+                  {item.features.map((feat, idx) => {
+                    const FeatIcon = feat.icon;
+                    const featTitle = feat.title[lang] || feat.title.uz;
+                    const featDesc = feat.desc[lang] || feat.desc.uz;
+
+                    return (
+                      <View key={idx} style={styles.featureCard}>
+                        <View
+                          style={[
+                            styles.featureIconWrap,
+                            { backgroundColor: `${item.themeColor}14` },
+                          ]}
+                        >
+                          <FeatIcon size={20} color={item.themeColor} />
+                        </View>
+                        <View style={styles.featureTextWrap}>
+                          <Text style={styles.featureTitle}>{featTitle}</Text>
+                          <Text style={styles.featureDesc}>{featDesc}</Text>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </ScrollView>
             </View>
           );
         }}
@@ -355,12 +576,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   logoRow: { flexDirection: "row", alignItems: "center" },
-  logoMed: { fontSize: 20, fontWeight: "900", color: "#0284c7" },
-  logoAx: { fontSize: 20, fontWeight: "900", color: "#0f172a" },
-  logoSub: { fontSize: 8, fontWeight: "800", color: "#64748b", letterSpacing: 0.7 },
+  logoMed: { fontSize: 19, fontWeight: "900", color: "#0284c7" },
+  logoAx: { fontSize: 19, fontWeight: "900", color: "#0f172a" },
+  logoSub: { fontSize: 7.5, fontWeight: "800", color: "#64748b", letterSpacing: 0.7 },
   headerRight: {
     flexDirection: "row",
     alignItems: "center",
@@ -386,7 +607,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   langText: {
-    fontSize: 10,
+    fontSize: 9.5,
     fontWeight: "700",
     color: "#94a3b8",
   },
@@ -395,118 +616,161 @@ const styles = StyleSheet.create({
     fontWeight: "900",
   },
   skipBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 16,
+    paddingVertical: 5,
+    paddingHorizontal: 9,
+    borderRadius: 14,
     backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  skipText: { fontSize: 12, fontWeight: "700", color: "#64748b" },
+  skipText: { fontSize: 11.5, fontWeight: "700", color: "#64748b" },
 
-  slide: {
+  slidePage: {
     width: SCREEN_WIDTH,
+    flex: 1,
+  },
+  slideScroll: {
+    flex: 1,
+  },
+  slideScrollContent: {
     alignItems: "center",
     paddingHorizontal: 20,
-    justifyContent: "center",
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   artBox: {
-    width: Math.min(SCREEN_WIDTH - 40, 340),
-    height: Math.min(SCREEN_WIDTH - 40, 290),
-    borderRadius: 28,
+    width: Math.min(SCREEN_WIDTH - 44, 320),
+    height: isCompactScreen ? 180 : Math.min(SCREEN_WIDTH - 44, 230),
+    borderRadius: 24,
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 20,
+    marginBottom: 14,
     overflow: "hidden",
     shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.08,
-    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.07,
+    shadowRadius: 14,
     elevation: 3,
-    padding: 10,
+    padding: 8,
   },
   slideImage: {
     width: "100%",
     height: "100%",
   },
 
-  textContent: {
-    alignItems: "center",
-    paddingHorizontal: 12,
-  },
   badgePill: {
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    marginBottom: 8,
   },
   badgeText: {
-    fontSize: 11,
+    fontSize: 10.5,
     fontWeight: "900",
-    letterSpacing: 0.9,
+    letterSpacing: 0.8,
   },
   slideTitle: {
-    fontSize: 22,
+    fontSize: isCompactScreen ? 19 : 21,
     fontWeight: "800",
     color: "#0f172a",
     textAlign: "center",
-    lineHeight: 28,
+    lineHeight: isCompactScreen ? 25 : 27,
   },
   slideTitleHighlight: {
-    fontSize: 22,
+    fontSize: isCompactScreen ? 19 : 21,
     fontWeight: "900",
     textAlign: "center",
-    lineHeight: 28,
+    lineHeight: isCompactScreen ? 25 : 27,
     marginBottom: 8,
   },
   slideDesc: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     color: "#64748b",
     textAlign: "center",
-    lineHeight: 20,
-    maxWidth: 330,
+    lineHeight: 18.5,
+    maxWidth: 340,
+    marginBottom: 16,
+  },
+
+  featuresContainer: {
+    width: "100%",
+    maxWidth: 360,
+    gap: 8,
+  },
+  featureCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+    borderRadius: 14,
+    paddingVertical: 9,
+    paddingHorizontal: 11,
+  },
+  featureIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 11,
+  },
+  featureTextWrap: {
+    flex: 1,
+  },
+  featureTitle: {
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#0f172a",
+    lineHeight: 17,
+  },
+  featureDesc: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 1.5,
+    lineHeight: 15,
   },
 
   bottomControls: {
     paddingHorizontal: 20,
-    paddingTop: 10,
-    paddingBottom: 6,
+    paddingTop: 8,
+    paddingBottom: 4,
   },
   dotsRow: {
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    gap: 8,
-    marginBottom: 18,
+    gap: 7,
+    marginBottom: 14,
   },
   dot: {
-    height: 8,
+    height: 7,
     borderRadius: 4,
   },
   dotActive: {
     width: 26,
   },
   dotInactive: {
-    width: 8,
+    width: 7,
     backgroundColor: "#cbd5e1",
   },
 
   actionBtn: {
     width: "100%",
-    paddingVertical: 14,
+    paddingVertical: 13.5,
     borderRadius: 16,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: 5 },
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    elevation: 3,
   },
   actionBtnText: {
     color: "#ffffff",
-    fontSize: 15.5,
+    fontSize: 15,
     fontWeight: "800",
     letterSpacing: 0.3,
   },
