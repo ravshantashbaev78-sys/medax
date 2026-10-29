@@ -143,7 +143,14 @@ adminRouter.get("/products", async (req, res) => {
   const q = z.object({ q: z.string().trim().optional(), category: z.coerce.number().optional(), page, limit: z.coerce.number().int().min(1).max(100).default(30) }).parse(req.query);
   const where: Prisma.ProductWhereInput = {};
   if (q.category) where.categoryId = q.category;
-  if (q.q) where.OR = [{ name: { contains: q.q, mode: "insensitive" } }, { sku: { contains: q.q, mode: "insensitive" } }];
+  if (q.q) {
+    where.OR = [
+      { name: { contains: q.q, mode: "insensitive" } },
+      { nameRu: { contains: q.q, mode: "insensitive" } },
+      { nameEn: { contains: q.q, mode: "insensitive" } },
+      { sku: { contains: q.q, mode: "insensitive" } },
+    ];
+  }
   const [total, items] = await Promise.all([
     prisma.product.count({ where }),
     prisma.product.findMany({
