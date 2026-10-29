@@ -31,7 +31,12 @@ export async function sendSms(phone: string, text: string): Promise<void> {
       body,
       signal: AbortSignal.timeout(10000),
     });
-    if (!r.ok) throw new Error(`SMS yuborilmadi (${r.status})`);
+    const resData: any = await r.json().catch(() => null);
+    if (!r.ok || resData?.status === "error") {
+      console.error("[Eskiz SMS Error]", r.status, resData);
+      throw new Error(resData?.message || `SMS yuborilmadi (${r.status})`);
+    }
+    console.log(`[Eskiz SMS Success] To: ${phone}, ID: ${resData?.id || resData?.data?.id || "ok"}, Status: ${resData?.status || "sent"}`);
     return;
   }
   console.log(`[SMS:console] ${phone} -> ${text}`);
