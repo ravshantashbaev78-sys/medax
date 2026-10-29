@@ -78,6 +78,7 @@ export default function Cart() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [orderCode, setOrderCode] = useState("");
+  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
 
   // Guest OTP verification states
   const [guestOtpSent, setGuestOtpSent] = useState(false);
@@ -218,7 +219,7 @@ export default function Cart() {
       const headers: Record<string, string> = {};
       if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
-      const res = await api<{ code: string; payUrl?: string }>("/orders", {
+      const res = await api<{ code: string; orderId?: number; payUrl?: string }>("/orders", {
         headers,
         json: {
           name: name.trim(),
@@ -235,6 +236,7 @@ export default function Cart() {
       });
 
       setOrderCode(res.code);
+      if (res.orderId) setCreatedOrderId(res.orderId);
       cart.clear();
       setGuestOtpSent(false);
       setGuestOtpCode("");
@@ -272,7 +274,9 @@ export default function Cart() {
 
           <div className="order-number-banner">
             <span className="order-num-label">Buyurtma kodi:</span>
-            <span className="order-num-value">{orderCode}</span>
+            <span className="order-num-value">
+              {orderCode} {createdOrderId ? <small style={{ fontSize: 15, opacity: 0.85, marginLeft: 8 }}>(Raqam:# {createdOrderId})</small> : null}
+            </span>
           </div>
 
           <div className="order-next-steps">

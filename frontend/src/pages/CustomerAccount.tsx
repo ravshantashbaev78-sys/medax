@@ -380,7 +380,7 @@ export default function CustomerAccount() {
                 <article key={o.id} className="customer-order-card">
                   <div className="order-card-header">
                     <div className="order-code-group">
-                      <span className="order-code">{t("acc_order_title")}: <b>{o.code}</b></span>
+                      <span className="order-code">{t("acc_order_title")}: <b>{o.code}</b> <span style={{ fontSize: 13, color: "var(--ink2)", fontWeight: "normal" }}>(Raqam:# {o.id})</span></span>
                       <span className="order-date">
                         {new Date(o.createdAt).toLocaleDateString(dateLocale, {
                           day: "numeric",

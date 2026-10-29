@@ -289,7 +289,7 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
     }
   }
 
-  res.status(201).json({ ok: true, code: orderCode, payUrl });
+  res.status(201).json({ ok: true, code: orderCode, orderId: createdOrderId!, payUrl });
 });
 
 // inPAY Webhook bildirishnomasi (Server-to-Server qat'iy tekshiruv bilan)

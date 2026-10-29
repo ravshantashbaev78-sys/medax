@@ -447,11 +447,10 @@ adminRouter.patch("/orders/:id", async (req, res) => {
   if (d.status === "FAKE") blocked = await applyFakeStrike(order.phone);
 
   // Agar holat "READY" ga o'zgargan bo'lsa va avval READY bo'lmagan bo'lsa, mijozga avtomatik SMS yuboramiz
+  // Eskiz rasmiy tasdiqlangan shabloni bo'yicha:
   if (d.status === "READY" && prevOrder.status !== "READY") {
     try {
-      const smsText = order.isPaid
-        ? `Medax: ${order.code} buyurtmangiz tayyor. To'lov qabul qilingan, olib ketishingiz mumkin. Manzil: Namangan, Beruniy 2. Kodni ko'rsating.`
-        : `Medax: ${order.code} buyurtmangiz tayyor. To'lovni do'konda qilasiz. 3 kun ichida olib keting.`;
+      const smsText = `Siz Medax saytida bergan buyurtmangiz tayyor. Raqam:# ${order.id}. Uni do'kondan olib ketishingiz mumkin.`;
       await sendSms(order.phone, smsText);
       console.log(`[Order READY SMS sent] ${order.phone} -> ${smsText}`);
     } catch (smsErr) {
