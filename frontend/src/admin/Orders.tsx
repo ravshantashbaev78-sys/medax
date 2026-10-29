@@ -20,7 +20,21 @@ interface Order {
   totalAmount?: number | string | null;
   isPaid?: boolean;
   paidAt?: string | null;
-  items: { id: number; productName: string; quantity: number }[];
+  items: {
+    id: number;
+    productName: string;
+    quantity: number;
+    price?: number | string | null;
+    productId?: number | null;
+    product?: {
+      id: number;
+      sku?: string | null;
+      slug?: string | null;
+      priceFrom?: number | string | null;
+      isActive?: boolean;
+      images?: { thumbUrl: string; url: string }[];
+    } | null;
+  }[];
 }
 
 import { useAdminI18n } from "./i18n";
@@ -305,9 +319,83 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
           </div>
         )}
 
-        <table className="specs"><tbody>
-          {order.items.map((i) => <tr key={i.id}><td style={{ width: "auto", color: "var(--ink)" }}>{i.productName}</td><td style={{ width: 70, textAlign: "right" }}>{i.quantity} {lang === "ru" ? "шт" : lang === "en" ? "pcs" : "dona"}</td></tr>)}
-        </tbody></table>
+        <h4 style={{ margin: "18px 0 8px", fontSize: 15, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
+          <span>📦</span>
+          <span>{lang === "ru" ? "Заказанные товары:" : "Buyurtma qilingan mahsulotlar:"}</span>
+        </h4>
+        <div style={{ display: "grid", gap: 8, margin: "8px 0 16px" }}>
+          {order.items.map((i) => {
+            const img = i.product?.images?.[0]?.thumbUrl || "/logo.png";
+            const price = i.price ? Number(i.price) : null;
+            const itemTotal = price ? price * i.quantity : null;
+            return (
+              <div
+                key={i.id}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  padding: "10px 14px",
+                  borderRadius: 12,
+                  background: "var(--card, #fff)",
+                  border: "1px solid var(--line, #e2e8f0)",
+                }}
+              >
+                <img
+                  src={img}
+                  alt={i.productName}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    objectFit: "cover",
+                    borderRadius: 8,
+                    background: "#f8fafc",
+                    border: "1px solid #e2e8f0",
+                    flexShrink: 0,
+                  }}
+                  onError={(e) => { (e.target as any).src = "/logo.png"; }}
+                />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                    <strong style={{ fontSize: 14, color: "var(--ink)" }}>{i.productName}</strong>
+                    {i.product?.sku && (
+                      <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 4, background: "#f1f5f9", color: "#475569", fontWeight: 600 }}>
+                        Artikul: {i.product.sku}
+                      </span>
+                    )}
+                    {i.product?.isActive !== undefined && (
+                      <span style={{ fontSize: 11, fontWeight: 700, color: i.product.isActive ? "#16a34a" : "#dc2626" }}>
+                        {i.product.isActive ? "● Omborda bor" : "○ Saytdan yashirilgan"}
+                      </span>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4, fontSize: 13, color: "var(--ink-muted, #64748b)", flexWrap: "wrap" }}>
+                    {price ? (
+                      <span>{price.toLocaleString()} so'm × <b>{i.quantity} dona</b></span>
+                    ) : (
+                      <span>Kelishilgan narxda × <b>{i.quantity} dona</b></span>
+                    )}
+                    {i.product?.id && (
+                      <a
+                        href={`/admin/products/${i.product.id}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: "#0284c7", fontSize: 12, textDecoration: "underline" }}
+                      >
+                        Tahrirlash / Ko'rish ↗
+                      </a>
+                    )}
+                  </div>
+                </div>
+                <div style={{ textAlign: "right", flexShrink: 0 }}>
+                  <strong style={{ fontSize: 15, color: "var(--ink)" }}>
+                    {itemTotal ? itemTotal.toLocaleString() + " so'm" : "Kelishuv"}
+                  </strong>
+                </div>
+              </div>
+            );
+          })}
+        </div>
 
         {/* Jami summa va to'lov holati */}
         <div style={{ background: "var(--sea, #f0f9ff)", border: "1px solid rgba(2, 132, 199, 0.25)", borderRadius: 12, padding: "12px 16px", margin: "12px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>

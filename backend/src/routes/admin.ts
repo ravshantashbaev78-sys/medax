@@ -398,7 +398,28 @@ adminRouter.get("/orders", async (req, res) => {
   }
   const [total, items] = await Promise.all([
     prisma.order.count({ where }),
-    prisma.order.findMany({ where, orderBy: { createdAt: "desc" }, skip: (q.page - 1) * 30, take: 30, include: { items: true } }),
+    prisma.order.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip: (q.page - 1) * 30,
+      take: 30,
+      include: {
+        items: {
+          include: {
+            product: {
+              select: {
+                id: true,
+                sku: true,
+                slug: true,
+                priceFrom: true,
+                isActive: true,
+                images: { orderBy: { sortOrder: "asc" }, take: 1, select: { thumbUrl: true, url: true } },
+              },
+            },
+          },
+        },
+      },
+    }),
   ]);
   res.json({ items, total, page: q.page, pages: Math.max(1, Math.ceil(total / 30)) });
 });
