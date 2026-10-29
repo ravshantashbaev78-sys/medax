@@ -96,7 +96,7 @@ const productSchema = z.object({
   priceFrom: z.coerce.number().nonnegative().nullish(),
   oldPrice: z.coerce.number().nonnegative().nullish(),
   discountPercent: z.coerce.number().int().min(1).max(99).nullish(),
-  unit: z.string().trim().max(30).default("dona"),
+  unit: z.string().trim().max(30).nullish().transform((v) => v || "dona"),
   packageQty: z.coerce.number().int().positive().default(1),
   mfdDate: z.string().trim().max(40).nullish(),
   expDate: z.string().trim().max(40).nullish(),

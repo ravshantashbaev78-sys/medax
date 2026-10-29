@@ -71,11 +71,5 @@ export const config = {
     baseUrl: process.env.INPAY_BASE_URL || "https://inpay.uz/api/v1",
     callbackUrl: process.env.INPAY_CALLBACK_URL || "https://medax.uz/api/orders/inpay/callback",
   },
-
-  // Telegram Bot sozlamalari
-  telegram: {
-    botToken: process.env.TELEGRAM_BOT_TOKEN || "",
-    botUsername: process.env.TELEGRAM_BOT_USERNAME || "MedaxAuthbot",
-  },
 };
 

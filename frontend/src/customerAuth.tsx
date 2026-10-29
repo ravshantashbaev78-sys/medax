@@ -9,13 +9,6 @@ export interface Customer {
   hasPassword?: boolean;
 }
 
-export interface TelegramSessionResponse {
-  sessionId: string;
-  code: string;
-  botUsername: string;
-  startUrl: string;
-}
-
 interface CustomerAuthContextType {
   customer: Customer | null;
   token: string | null;
@@ -24,9 +17,6 @@ interface CustomerAuthContextType {
   openAuthModal: () => void;
   closeAuthModal: () => void;
   refreshCustomer: () => Promise<void>;
-  startTelegramSession: () => Promise<TelegramSessionResponse>;
-  pollTelegramSession: (sessionId: string) => Promise<{ ok: boolean; status: string; token?: string; customer?: Customer }>;
-  loginWithTelegramWidget: (userData: any) => Promise<{ ok: boolean; token: string; customer: Customer }>;
   sendOtp: (phone: string, captchaToken?: string) => Promise<{ ok: boolean; resendIn: number }>;
   verifyOtp: (data: { phone: string; code: string; name?: string; organization?: string; password?: string }) => Promise<{ ok: boolean; token: string; customer: Customer }>;
   loginWithPassword: (phone: string, password: string) => Promise<{ ok: boolean; token: string; customer: Customer }>;
@@ -98,48 +88,6 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
 
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
-
-  // Telegram orqali 1-klikda kirish sessiyasi ochish
-  const startTelegramSession = async (): Promise<TelegramSessionResponse> => {
-    const res = await fetch("/api/customer/auth/telegram-session", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Telegram sessiyasini yaratishda xatolik");
-    }
-    return data;
-  };
-
-  // Telegram botda tasdiqlanganini tekshirish (polling)
-  const pollTelegramSession = async (sessionId: string) => {
-    const res = await fetch(`/api/customer/auth/telegram-poll?sessionId=${encodeURIComponent(sessionId)}`);
-    const data = await res.json();
-    if (data.status === "confirmed" && data.token && data.customer) {
-      saveToken(data.token);
-      setCustomer(data.customer);
-      closeAuthModal();
-    }
-    return data;
-  };
-
-  // Telegram Login Widget orqali to'g'ridan-to'g'ri kirish
-  const loginWithTelegramWidget = async (userData: any) => {
-    const res = await fetch("/api/customer/auth/telegram-widget", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(userData),
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      throw new Error(data.error || "Telegram orqali kirishda xatolik");
-    }
-    saveToken(data.token);
-    setCustomer(data.customer);
-    closeAuthModal();
-    return data;
-  };
 
   // SMS orqali kod yuborish
   const sendOtp = async (phone: string, captchaToken?: string) => {
@@ -243,9 +191,6 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
         openAuthModal,
         closeAuthModal,
         refreshCustomer,
-        startTelegramSession,
-        pollTelegramSession,
-        loginWithTelegramWidget,
         sendOtp,
         verifyOtp,
         loginWithPassword,

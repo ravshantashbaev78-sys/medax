@@ -79,6 +79,58 @@ export default function Cart() {
   const [error, setError] = useState("");
   const [orderCode, setOrderCode] = useState("");
 
+  // Guest OTP verification states
+  const [guestOtpSent, setGuestOtpSent] = useState(false);
+  const [guestOtpCode, setGuestOtpCode] = useState("");
+  const [guestOtpTimer, setGuestOtpTimer] = useState(0);
+  const [guestOtpSending, setGuestOtpSending] = useState(false);
+
+  useEffect(() => {
+    let t: any;
+    if (guestOtpTimer > 0) {
+      t = setTimeout(() => setGuestOtpTimer(guestOtpTimer - 1), 1000);
+    }
+    return () => clearTimeout(t);
+  }, [guestOtpTimer]);
+
+  const handleSendGuestOtp = async () => {
+    setNameTouched(true);
+    setPhoneTouched(true);
+    if (!isNameValid) {
+      setError(
+        lang === "ru"
+          ? "Пожалуйста, введите ваше имя и фамилию (не менее 2 символов)"
+          : "Iltimos, ism va familiyangizni to'liq kiriting (kamida 2 ta belgi)"
+      );
+      return false;
+    }
+    if (!isPhoneValid) {
+      setError(
+        lang === "ru"
+          ? "Пожалуйста, введите корректный номер телефона (+998 __ ___ __ __)"
+          : "Iltimos, telefon raqamini to'liq kiriting (+998 __ ___ __ __)"
+      );
+      return false;
+    }
+
+    const cleanPhone = "+998" + cleanDigits.slice(3);
+    setGuestOtpSending(true);
+    setError("");
+    try {
+      const res = await api<{ ok: boolean; resendIn?: number }>("/orders/otp", {
+        json: { phone: cleanPhone },
+      });
+      setGuestOtpSent(true);
+      setGuestOtpTimer(res.resendIn || 60);
+      return true;
+    } catch (err: any) {
+      setError(err?.message || "SMS kod yuborishda xatolik yuz berdi");
+      return false;
+    } finally {
+      setGuestOtpSending(false);
+    }
+  };
+
   // Sync logged in customer info
   useEffect(() => {
     if (customer) {
@@ -123,13 +175,40 @@ export default function Cart() {
     setPhoneTouched(true);
 
     if (!isNameValid) {
-      setError("Iltimos, ism va familiyangizni to'liq kiriting (kamida 2 ta belgi)");
+      setError(
+        lang === "ru"
+          ? "Пожалуйста, введите ваше имя и фамилию (не менее 2 символов)"
+          : "Iltimos, ism va familiyangizni to'liq kiriting (kamida 2 ta belgi)"
+      );
       return;
     }
 
     if (!isPhoneValid) {
-      setError("Iltimos, telefon raqamini to'liq kiriting (+998 __ ___ __ __)");
+      setError(
+        lang === "ru"
+          ? "Пожалуйста, введите корректный номер телефона (+998 __ ___ __ __)"
+          : "Iltimos, telefon raqamini to'liq kiriting (+998 __ ___ __ __)"
+      );
       return;
+    }
+
+    const authToken = token || localStorage.getItem(CUSTOMER_TOKEN_KEY);
+    const isGuest = !customer && !authToken;
+
+    // Guest checkout requires SMS OTP verification
+    if (isGuest) {
+      if (!guestOtpSent) {
+        await handleSendGuestOtp();
+        return;
+      }
+      if (guestOtpCode.trim().length !== 6) {
+        setError(
+          lang === "ru"
+            ? "Введите 6-значный код подтверждения из SMS"
+            : "SMS orqali yuborilgan 6 xonali tasdiqlash kodini kiriting"
+        );
+        return;
+      }
     }
 
     const cleanPhone = "+998" + cleanDigits.slice(3);
@@ -137,7 +216,6 @@ export default function Cart() {
     setBusy(true);
     try {
       const headers: Record<string, string> = {};
-      const authToken = token || localStorage.getItem(CUSTOMER_TOKEN_KEY);
       if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
 
       const res = await api<{ code: string; payUrl?: string }>("/orders", {
@@ -152,11 +230,14 @@ export default function Cart() {
           website, // honeypot
           elapsedMs: Date.now() - startedAt.current,
           items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
+          code: isGuest ? guestOtpCode.trim() : undefined,
         },
       });
 
       setOrderCode(res.code);
       cart.clear();
+      setGuestOtpSent(false);
+      setGuestOtpCode("");
       refreshCustomer();
 
       if (res.payUrl) {
@@ -456,6 +537,10 @@ export default function Cart() {
                       onBlur={() => setPhoneTouched(true)}
                       onChange={(e) => {
                         setPhone(formatUzPhone(e.target.value));
+                        if (guestOtpSent) {
+                          setGuestOtpSent(false);
+                          setGuestOtpCode("");
+                        }
                         if (error) setError("");
                       }}
                       required
@@ -677,23 +762,128 @@ export default function Cart() {
                   </label>
                 </div>
 
+                {/* Guest OTP verification input */}
+                {!customer && !token && guestOtpSent && (
+                  <div
+                    style={{
+                      marginTop: 24,
+                      padding: "20px 22px",
+                      borderRadius: 16,
+                      background: "rgba(2, 132, 199, 0.06)",
+                      border: "2px solid rgba(2, 132, 199, 0.35)",
+                      display: "grid",
+                      gap: 12,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                      <strong style={{ fontSize: 16, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
+                        <span>📩</span>
+                        <span>{lang === "ru" ? "SMS подтверждение" : "SMS orqali tasdiqlash"}</span>
+                      </strong>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setGuestOtpSent(false);
+                          setGuestOtpCode("");
+                        }}
+                        style={{
+                          background: "none",
+                          border: "none",
+                          color: "#0284c7",
+                          fontSize: 13,
+                          cursor: "pointer",
+                          fontWeight: 600,
+                          textDecoration: "underline",
+                        }}
+                      >
+                        {lang === "ru" ? "Изменить номер" : "Raqamni o'zgartirish"}
+                      </button>
+                    </div>
+
+                    <p style={{ margin: 0, fontSize: 13, color: "var(--ink2)", lineHeight: 1.5 }}>
+                      {lang === "ru"
+                        ? `На номер ${phone} отправлен 6-значный код подтверждения:`
+                        : `${phone} raqamingizga buyurtmani tasdiqlash uchun 6 xonali SMS kod yuborildi:`}
+                    </p>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 4 }}>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
+                        maxLength={6}
+                        value={guestOtpCode}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/\D/g, "").slice(0, 6);
+                          setGuestOtpCode(val);
+                          if (error) setError("");
+                        }}
+                        placeholder="123456"
+                        autoFocus
+                        style={{
+                          width: 170,
+                          height: 48,
+                          fontSize: 22,
+                          fontWeight: 700,
+                          letterSpacing: 6,
+                          textAlign: "center",
+                          borderRadius: 10,
+                          border: "2px solid #0284c7",
+                          background: "var(--card, #fff)",
+                          outline: "none",
+                        }}
+                      />
+
+                      {guestOtpTimer > 0 ? (
+                        <span style={{ fontSize: 13, color: "var(--ink2)", fontWeight: 500 }}>
+                          ⏳ {lang === "ru" ? `Повторный запрос: ${guestOtpTimer} сек` : `Kodni qayta yuborish: ${guestOtpTimer} soniya`}
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSendGuestOtp}
+                          disabled={guestOtpSending}
+                          className="btn ghost sm"
+                          style={{ height: 42, fontSize: 13, borderRadius: 8 }}
+                        >
+                          {guestOtpSending
+                            ? (lang === "ru" ? "Отправка..." : "Yuborilmoqda...")
+                            : (lang === "ru" ? "🔄 Отправить код повторно" : "🔄 Kodni qayta yuborish")}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div style={{ marginTop: 28 }}>
                   <button
                     type="submit"
                     className="btn btn-primary-sheen"
                     style={{ width: "100%", height: 52, fontSize: 17, fontWeight: 700 }}
-                    disabled={busy}
+                    disabled={busy || guestOtpSending}
                   >
                     {busy
-                      ? "Buyurtma yuborilmoqda…"
+                      ? (lang === "ru" ? "Оформление заказа…" : "Buyurtma yuborilmoqda…")
+                      : guestOtpSending
+                      ? (lang === "ru" ? "Отправка SMS-кода…" : "SMS kod yuborilmoqda…")
+                      : !customer && !token && !guestOtpSent
+                      ? (lang === "ru" ? "Получить SMS-код и продолжить →" : "SMS kod olish va davom etish →")
                       : paymentMethod === "inpay"
-                      ? "💳 inPAY orqali to'lov sahifasiga o'tish →"
-                      : "Buyurtma so'rovini yuborish ✓"}
+                      ? (lang === "ru" ? "💳 Подтвердить и оплатить через inPAY →" : "💳 Tasdiqlash va inPAY to'loviga o'tish →")
+                      : (lang === "ru" ? "Подтвердить и отправить заказ ✓" : "Buyurtmani tasdiqlash va yuborish ✓")}
                   </button>
                   <p className="note" style={{ textAlign: "center", marginTop: 12 }}>
-                    {paymentMethod === "inpay"
-                      ? "Tugmani bosgach, to'lov uchun inPAY xavfsiz sahifasiga (Click, Payme, Kartalar) yo'naltirilasiz."
-                      : "Tugmani bosish orqali siz do'kondan olib ketish qoidalariga rozilik bildirasiz."}
+                    {!customer && !token && !guestOtpSent
+                      ? (lang === "ru"
+                          ? "Для подтверждения номера вам будет отправлен бесплатный SMS-код."
+                          : "Telefon raqamingizni tasdiqlash uchun bepul SMS tasdiqlash kodi yuboriladi.")
+                      : paymentMethod === "inpay"
+                      ? (lang === "ru"
+                          ? "После подтверждения вы будете перенаправлены на безопасную страницу оплаты inPAY (Click, Payme, Карты)."
+                          : "Tugmani bosgach, to'lov uchun inPAY xavfsiz sahifasiga (Click, Payme, Kartalar) yo'naltirilasiz.")
+                      : (lang === "ru"
+                          ? "Нажимая кнопку, вы соглашаетесь с условиями самовывоза из магазина."
+                          : "Tugmani bosish orqali siz do'kondan olib ketish qoidalariga rozilik bildirasiz.")}
                   </p>
                 </div>
               </form>

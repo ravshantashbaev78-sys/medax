@@ -45,7 +45,22 @@ app.use(
 
 app.use(
   cors({
-    origin: true,
+    origin: (origin, callback) => {
+      // Mobil ilovalar, WebView va Postman ko'pincha origin sarlavhasisiz keladi
+      if (!origin) return callback(null, true);
+      const allowedOrigins = [
+        ...config.corsOrigin,
+        "https://medax.uz",
+        "https://www.medax.uz",
+        "http://localhost:5173",
+        "http://localhost:3000",
+        "http://localhost:8080",
+      ];
+      if (allowedOrigins.includes(origin) || allowedOrigins.includes("*")) {
+        return callback(null, true);
+      }
+      return callback(new HttpError(403, "CORS: Ruxsat berilmagan domen."));
+    },
     credentials: true,
   })
 );

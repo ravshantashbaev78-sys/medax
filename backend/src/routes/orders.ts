@@ -78,9 +78,9 @@ ordersRouter.post("/otp", otpIpLimiter, async (req, res) => {
 
   const code = String(crypto.randomInt(100000, 1000000));
 
-  // SMS jo'natish xavfsizligi
+  // SMS jo'natish (Eskiz rasmiy tasdiqlangan buyurtma shabloni bo'yicha)
   try {
-    await sendSms(phone, `Medax: tasdiqlash kodi ${code}. Kodni hech kimga bermang.`);
+    await sendSms(phone, `Medax saytida buyurtmani tasdiqlash uchun tasdiqlash kodi: ${code}. Kodni hech kimga bermang.`);
   } catch (err: any) {
     console.error("SMS yuborishda xatolik:", err);
     if (config.smsProvider === "eskiz") {

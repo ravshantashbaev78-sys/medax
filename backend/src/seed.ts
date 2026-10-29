@@ -21,51 +21,31 @@ export async function syncCategories(): Promise<Record<string, number>> {
     catMap[c.slug] = row.id;
     catMap[c.name] = row.id;
   }
-
-  // Eskirgan va mahsuloti qolmagan kategoriyalarni tozalash
-  const targetSlugs = TARGET_CATEGORIES.map((c) => c.slug);
-  const oldCats = await prisma.category.findMany({
-    where: { slug: { notIn: targetSlugs } },
-    include: { _count: { select: { products: true } } },
-  });
-
-  for (const oc of oldCats) {
-    if (oc._count.products === 0) {
-      await prisma.category.delete({ where: { id: oc.id } });
-      console.log(`[CategorySync] Eski bo'sh kategoriya o'chirildi: ${oc.name} (${oc.slug})`);
-    }
-  }
-
   return catMap;
 }
 
 export async function seedDatabase() {
-  const primaryEmail = (process.env.ADMIN_EMAIL || "admin@medax.uz").toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || "ChangeMe123!";
-  const hash = await bcrypt.hash(password, 10);
-
-  const adminEmails = Array.from(new Set([primaryEmail, "admin@medax.uz", "admin@medtex.uz"]));
-  for (const email of adminEmails) {
-    const isOwner = email === primaryEmail;
-    await prisma.user.upsert({
-      where: { email },
-      create: {
-        email,
-        name: isOwner ? "Loyiha Egasi" : "Administrator",
-        role: isOwner ? "OWNER" : "ADMIN",
+  // 1. Admin hisobini faqat bazada umuman admin bo'lmaganda yaratamiz (Mavjud admin parolini hech qachon o'chirib yubormaydi!)
+  const adminCount = await prisma.user.count({ where: { role: { in: ["OWNER", "ADMIN"] } } });
+  if (adminCount === 0) {
+    const primaryEmail = (process.env.ADMIN_EMAIL || "admin@medax.uz").toLowerCase();
+    const password = process.env.ADMIN_PASSWORD || "ChangeMe123!";
+    const hash = await bcrypt.hash(password, 10);
+    await prisma.user.create({
+      data: {
+        email: primaryEmail,
+        name: "Loyiha Egasi",
+        role: "OWNER",
         passwordHash: hash,
-      },
-      update: {
-        passwordHash: hash,
-        role: isOwner ? "OWNER" : "ADMIN",
       },
     });
+    console.log(`[Seed] Birlamchi admin yaratildi: ${primaryEmail}`);
   }
 
-  // 1. Kategoriyalarni har doim 5 ta yo'nalishga sinxronlashtiramiz
+  // 2. Kategoriyalarni faqat mavjudligini ta'minlaymiz (mavjud toifalarni yoki tovarlarni o'chirmaydi!)
   await syncCategories();
 
-  // 2. Brendlar ro'yxatini shakllantirish
+  // 3. Brendlar ro'yxatini shakllantirish
   const brands: [string, string][] = [
     ["Dirui", "Xitoy"],
     ["Rayto", "Xitoy"],
@@ -91,8 +71,8 @@ export async function seedDatabase() {
     });
   }
 
-  // Mahsulotlarni 0 ta saqlaymiz: do'kon egasi o'zi admin panel orqali 0 dan kiritadi
-  console.log("[Seed] Tizim tayyor: Foydalanuvchi mahsulotlarni admin panel orqali 0 dan qo'shadi.");
+  // Mahsulotlar 0 ta saqlanadi: do'kon egasi o'zi admin panel orqali 0 dan kiritadi
+  console.log("[Seed] Tizim tayyor: Mahsulotlar to'liq do'kon egasi tomonidan boshqariladi.");
 }
 
 if (process.argv[1] && (process.argv[1].endsWith("seed.ts") || process.argv[1].endsWith("seed.js"))) {

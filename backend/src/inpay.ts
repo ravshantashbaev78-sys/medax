@@ -113,10 +113,14 @@ export async function createInpayPayment(
  */
 export async function getInpayTransactionStatus(orderId: string) {
   const { baseUrl } = config.inpay;
+  const bearerToken = await getInpayBearerToken();
   const res = await fetch(
     `${baseUrl.replace(/\/+$/, "")}/transactions/?order_id=${encodeURIComponent(orderId)}`,
     {
-      headers: { Accept: "application/json" },
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${bearerToken}`,
+      },
       signal: AbortSignal.timeout(10000),
     }
   );
