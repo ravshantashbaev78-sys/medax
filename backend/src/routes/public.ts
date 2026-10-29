@@ -123,3 +123,47 @@ publicRouter.get("/products/:slug", async (req, res) => {
   });
   res.json({ ...p, related });
 });
+
+publicRouter.get("/sitemap.xml", async (_req, res) => {
+  const [products, categories] = await Promise.all([
+    prisma.product.findMany({
+      where: { isActive: true },
+      select: { id: true, slug: true, updatedAt: true },
+    }),
+    prisma.category.findMany({
+      select: { slug: true },
+    }),
+  ]);
+
+  const baseUrl = "https://medax.uz";
+  const staticUrls = [
+    { loc: `${baseUrl}/`, priority: "1.0", changefreq: "daily" },
+    { loc: `${baseUrl}/catalog`, priority: "0.9", changefreq: "daily" },
+    { loc: `${baseUrl}/contact`, priority: "0.7", changefreq: "monthly" },
+    { loc: `${baseUrl}/delivery`, priority: "0.6", changefreq: "monthly" },
+    { loc: `${baseUrl}/faq`, priority: "0.6", changefreq: "monthly" },
+  ];
+
+  let xml = `<?xml version="1.0" encoding="UTF-8"?>\n`;
+  xml += `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n`;
+
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  for (const s of staticUrls) {
+    xml += `  <url>\n    <loc>${s.loc}</loc>\n    <lastmod>${todayStr}</lastmod>\n    <changefreq>${s.changefreq}</changefreq>\n    <priority>${s.priority}</priority>\n  </url>\n`;
+  }
+
+  for (const c of categories) {
+    xml += `  <url>\n    <loc>${baseUrl}/catalog?category=${encodeURIComponent(c.slug)}</loc>\n    <lastmod>${todayStr}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+  }
+
+  for (const p of products) {
+    const pDate = p.updatedAt ? p.updatedAt.toISOString().split("T")[0] : todayStr;
+    xml += `  <url>\n    <loc>${baseUrl}/product/${p.slug || p.id}</loc>\n    <lastmod>${pDate}</lastmod>\n    <changefreq>weekly</changefreq>\n    <priority>0.8</priority>\n  </url>\n`;
+  }
+
+  xml += `</urlset>`;
+
+  res.header("Content-Type", "application/xml; charset=utf-8");
+  res.send(xml);
+});

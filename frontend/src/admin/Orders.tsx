@@ -68,6 +68,54 @@ export default function Orders() {
     }
   };
 
+  const exportToCsv = () => {
+    if (!data?.items?.length) {
+      alert(lang === "ru" ? "Нет заказов для экспорта" : "Eksport qilish uchun buyurtmalar mavjud emas");
+      return;
+    }
+    const headers = [
+      "Buyurtma kodi",
+      "Mijoz ismi",
+      "Tashkilot",
+      "Telefon",
+      "Manzil",
+      "To'lov usuli",
+      "To'langan",
+      "Jami summa (so'm)",
+      "Holati",
+      "Sana",
+      "Izoh",
+      "Mahsulotlar",
+    ];
+
+    const rows = data.items.map((o) => {
+      const itemsList = o.items.map((i) => `${i.productName} (${i.quantity} dona)`).join("; ");
+      return [
+        `"${o.code}"`,
+        `"${(o.customerName || "").replace(/"/g, '""')}"`,
+        `"${(o.organization || "").replace(/"/g, '""')}"`,
+        `"${o.phone}"`,
+        `"${(o.deliveryAddress || "").replace(/"/g, '""')}"`,
+        `"${(o.paymentMethod || "").replace(/"/g, '""')}"`,
+        o.isPaid ? "Ha" : "Yo'q",
+        o.totalAmount ? Number(o.totalAmount) : 0,
+        `"${getStatusLabel(o.status)}"`,
+        `"${fmt(o.createdAt)}"`,
+        `"${(o.comment || "").replace(/"/g, '""')}"`,
+        `"${itemsList.replace(/"/g, '""')}"`,
+      ].join(",");
+    });
+
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `medax_buyurtmalar_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <h1>{t("orders")}</h1>
@@ -78,6 +126,16 @@ export default function Orders() {
           </button>
         ))}
         <span className="grow" />
+        <button
+          type="button"
+          className="btn sm ghost"
+          onClick={exportToCsv}
+          style={{ display: "flex", alignItems: "center", gap: 6, height: 38 }}
+          title="Buyurtmalar ro'yxatini Excel (.csv) formatida yuklab olish"
+        >
+          <span>📥</span>
+          <span>{lang === "ru" ? "Экспорт в Excel" : "Excel (CSV)"}</span>
+        </button>
         <form className="search" onSubmit={(e: FormEvent) => { e.preventDefault(); setPage(1); setQuery(q.trim()); }}>
           <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kod, ism yoki telefon" aria-label="Qidirish" />
           <button className="btn sm">Qidirish</button>
