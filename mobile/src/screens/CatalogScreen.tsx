@@ -13,7 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Category, fetchCategories, fetchProducts, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
-import { useI18n, localizeCategoryName } from "../context/I18nContext";
+import { useI18n, localizeCategoryName, localizeProductName } from "../context/I18nContext";
 import { SearchIcon, CloseIcon, CartIcon } from "../components/Icons";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -146,7 +146,7 @@ export function CatalogScreen({ navigation, route }: any) {
                     </Text>
                   )}
                   <Text style={styles.productName} numberOfLines={2}>
-                    {item.name}
+                    {localizeProductName(item, lang)}
                   </Text>
                   {item.country && (
                     <Text style={styles.productCountry}>🌍 {item.country}</Text>

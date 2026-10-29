@@ -70,7 +70,11 @@ export interface Product {
   slug: string;
   sku?: string | null;
   name: string;
+  nameRu?: string | null;
+  nameEn?: string | null;
   description: string;
+  descriptionRu?: string | null;
+  descriptionEn?: string | null;
   specs: { name: string; value: string }[];
   country?: string | null;
   priceFrom?: string | null;

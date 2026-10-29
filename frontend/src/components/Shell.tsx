@@ -487,7 +487,7 @@ export function ProductCard({ p }: { p: Product }) {
   const { lang, t } = useI18n();
   const [added, setAdded] = useState(false);
   const img = p.images?.[0];
-  const localizedName = localizeProductName(p.name, lang);
+  const localizedName = localizeProductName(p, lang);
 
   const onAddToCart = (e: React.MouseEvent) => {
     e.preventDefault();

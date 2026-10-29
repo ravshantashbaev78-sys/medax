@@ -15,10 +15,12 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { submitOrder, sendOrderOtp, getImageUrl, formatPrice } from "../api";
+import { useI18n, localizeProductName } from "../context/I18nContext";
 import { CartIcon, CloseIcon, ShieldIcon, BoltIcon } from "../components/Icons";
 
 export function CartScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { lang, t } = useI18n();
   const { items, updateQuantity, removeFromCart, clearCart, totalPrice, totalItems } = useCart();
   const { customer, token } = useAuth();
 
@@ -186,7 +188,7 @@ export function CartScreen({ navigation }: any) {
                 <Image source={{ uri: imgUrl }} style={styles.cardImg} resizeMode="contain" />
                 <View style={styles.cardInfo}>
                   <Text style={styles.cardName} numberOfLines={2}>
-                    {product.name}
+                    {localizeProductName(product, lang)}
                   </Text>
                   <Text style={styles.cardPrice}>
                     {price ? `${(price * quantity).toLocaleString()} UZS` : "Kelishuv asosida"}

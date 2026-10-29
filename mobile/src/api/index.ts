@@ -12,6 +12,8 @@ export interface Category {
 export interface Product {
   id: number;
   name: string;
+  nameRu?: string | null;
+  nameEn?: string | null;
   slug: string;
   priceFrom?: number | string | null;
   oldPrice?: number | string | null;
@@ -20,6 +22,8 @@ export interface Product {
   images?: { url: string; thumbUrl: string }[];
   category?: Category;
   description?: string;
+  descriptionRu?: string | null;
+  descriptionEn?: string | null;
   specs?: any;
   country?: string | null;
   isHit?: boolean;

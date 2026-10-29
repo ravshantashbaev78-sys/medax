@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchProductDetail, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
-import { useI18n, localizeCategoryName } from "../context/I18nContext";
+import { useI18n, localizeCategoryName, localizeProductName, localizeProductDescription } from "../context/I18nContext";
 import { ShieldIcon, CartIcon } from "../components/Icons";
 
 export function ProductDetailScreen({ route, navigation }: any) {
@@ -71,7 +71,7 @@ export function ProductDetailScreen({ route, navigation }: any) {
             </Text>
           )}
 
-          <Text style={styles.title}>{product.name}</Text>
+          <Text style={styles.title}>{localizeProductName(product, lang)}</Text>
 
           <View style={styles.priceRow}>
             <Text style={styles.price}>{formatPrice(product.priceFrom)}</Text>
@@ -83,17 +83,21 @@ export function ProductDetailScreen({ route, navigation }: any) {
           </View>
 
           {/* Description */}
-          {product.description ? (
+          {product.description || product.descriptionRu || product.descriptionEn ? (
             <View style={styles.section}>
-              <Text style={styles.sectionHeader}>Tavsif va ma'lumot</Text>
-              <Text style={styles.desc}>{product.description}</Text>
+              <Text style={styles.sectionHeader}>
+                {lang === "ru" ? "Описание и назначение" : lang === "en" ? "Description & Details" : "Tavsif va ma'lumot"}
+              </Text>
+              <Text style={styles.desc}>{localizeProductDescription(product, lang)}</Text>
             </View>
           ) : null}
 
           {/* Specs Table */}
           {Array.isArray(product.specs) && product.specs.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionHeader}>Xususiyatlari</Text>
+              <Text style={styles.sectionHeader}>
+                {lang === "ru" ? "Характеристики" : lang === "en" ? "Specifications" : "Xususiyatlari"}
+              </Text>
               <View style={styles.specsWrap}>
                 {product.specs.map((spec: any, idx: number) => (
                   <View key={idx} style={[styles.specRow, idx % 2 === 1 && styles.specRowAlt]}>

@@ -336,14 +336,24 @@ const PRODUCT_DESC_MAP: Record<string, Record<Lang, string>> = {
 };
 
 export function localizeProductDescription(
-  desc: string | null | undefined,
+  descOrProduct: { description?: string | null; descriptionRu?: string | null; descriptionEn?: string | null } | string | null | undefined,
   lang: Lang,
   productName?: string
 ): string {
+  if (!descOrProduct) return "";
+
+  // 1. Agar to'liq mahsulot obyekti berilgan bo'lsa
+  if (typeof descOrProduct === "object") {
+    if (lang === "ru" && descOrProduct.descriptionRu?.trim()) return descOrProduct.descriptionRu.trim();
+    if (lang === "en" && descOrProduct.descriptionEn?.trim()) return descOrProduct.descriptionEn.trim();
+    return localizeProductDescription(descOrProduct.description || "", lang, productName);
+  }
+
+  const desc = descOrProduct;
   if (lang === "uz") return desc || "";
   if (!desc && !productName) return "";
 
-  // 1. Name match
+  // 2. Lug'atdan qidirish
   if (productName) {
     const key = productName.toLowerCase().trim();
     if (PRODUCT_DESC_MAP[key]) {
@@ -351,7 +361,7 @@ export function localizeProductDescription(
     }
   }
 
-  // 2. Generic translation replacement for common clinical patterns
+  // 3. Umumiy klinik iboralarni almashtirish
   if (desc) {
     let t = desc;
     if (lang === "ru") {
@@ -433,7 +443,24 @@ const PRODUCT_NAME_MAP: Record<string, Record<Lang, string>> = {
   },
 };
 
-export function localizeProductName(name: string, lang: Lang): string {
+export function localizeProductName(
+  productOrName: { name: string; nameRu?: string | null; nameEn?: string | null } | string | null | undefined,
+  lang: Lang
+): string {
+  if (!productOrName) return "";
+
+  // 1. Agar obyekt berilgan bo'lsa
+  if (typeof productOrName === "object") {
+    if (lang === "ru" && productOrName.nameRu?.trim()) return productOrName.nameRu.trim();
+    if (lang === "en" && productOrName.nameEn?.trim()) return productOrName.nameEn.trim();
+    const raw = productOrName.name || "";
+    if (lang === "uz") return raw;
+    const key = raw.toLowerCase().trim();
+    if (PRODUCT_NAME_MAP[key]?.[lang]) return PRODUCT_NAME_MAP[key][lang];
+    return raw;
+  }
+
+  const name = productOrName;
   if (lang === "uz" || !name) return name;
   const key = name.toLowerCase().trim();
   if (PRODUCT_NAME_MAP[key]) {

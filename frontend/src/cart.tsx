@@ -5,6 +5,8 @@ export interface CartItem {
   productId: number;
   slug: string;
   name: string;
+  nameRu?: string | null;
+  nameEn?: string | null;
   thumb?: string;
   priceFrom?: string | null;
   quantity: number;
@@ -13,6 +15,8 @@ export interface CartItem {
 export interface CartToastItem {
   id: number;
   productName: string;
+  nameRu?: string | null;
+  nameEn?: string | null;
   thumb?: string;
   priceFrom?: string | null;
   quantity: number;
@@ -65,6 +69,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
         setToast({
           id: Date.now(),
           productName: p.name,
+          nameRu: p.nameRu,
+          nameEn: p.nameEn,
           thumb: p.images?.[0]?.thumbUrl,
           priceFrom: p.priceFrom || null,
           quantity: qty,
@@ -79,6 +85,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
               productId: p.id,
               slug: p.slug,
               name: p.name,
+              nameRu: p.nameRu,
+              nameEn: p.nameEn,
               thumb: p.images[0]?.thumbUrl,
               priceFrom: p.priceFrom || null,
               quantity: Math.min(100, qty),

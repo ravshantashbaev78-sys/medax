@@ -53,13 +53,17 @@ model Brand {
 }
 
 model Product {
-  id          Int               @id @default(autoincrement())
-  slug        String            @unique
-  sku         String?           @unique
-  name        String
-  description String            @default("")
-  specs       Json              @default("[]")
-  country     String?
+  id            Int               @id @default(autoincrement())
+  slug          String            @unique
+  sku           String?           @unique
+  name          String
+  nameRu        String?
+  nameEn        String?
+  description   String            @default("")
+  descriptionRu String?
+  descriptionEn String?
+  specs         Json              @default("[]")
+  country       String?
   priceFrom       Decimal?          @db.Decimal(14, 2)
   oldPrice        Decimal?          @db.Decimal(14, 2)
   discountPercent Int?

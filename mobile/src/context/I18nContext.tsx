@@ -423,3 +423,29 @@ export function localizeCategoryName(slugOrName: string | undefined | null, lang
 
   return slugOrName;
 }
+
+export function localizeProductName(
+  productOrName: { name: string; nameRu?: string | null; nameEn?: string | null } | string | undefined | null,
+  lang: Language
+): string {
+  if (!productOrName) return "";
+  if (typeof productOrName === "object") {
+    if (lang === "ru" && productOrName.nameRu?.trim()) return productOrName.nameRu.trim();
+    if (lang === "en" && productOrName.nameEn?.trim()) return productOrName.nameEn.trim();
+    return productOrName.name || "";
+  }
+  return productOrName;
+}
+
+export function localizeProductDescription(
+  productOrDesc: { description?: string | null; descriptionRu?: string | null; descriptionEn?: string | null } | string | undefined | null,
+  lang: Language
+): string {
+  if (!productOrDesc) return "";
+  if (typeof productOrDesc === "object") {
+    if (lang === "ru" && productOrDesc.descriptionRu?.trim()) return productOrDesc.descriptionRu.trim();
+    if (lang === "en" && productOrDesc.descriptionEn?.trim()) return productOrDesc.descriptionEn.trim();
+    return productOrDesc.description || "";
+  }
+  return productOrDesc;
+}

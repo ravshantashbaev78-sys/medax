@@ -85,6 +85,8 @@ publicRouter.get("/products", async (req, res) => {
   if (searchText) {
     where.OR = [
       { name: { contains: searchText, mode: "insensitive" } },
+      { nameRu: { contains: searchText, mode: "insensitive" } },
+      { nameEn: { contains: searchText, mode: "insensitive" } },
       { sku: { contains: searchText, mode: "insensitive" } },
       { brand: { name: { contains: searchText, mode: "insensitive" } } },
     ];

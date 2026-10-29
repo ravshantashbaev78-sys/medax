@@ -85,8 +85,12 @@ adminRouter.delete("/brands/:id", requireAdmin, async (req, res) => {
 
 const productSchema = z.object({
   name: z.string().trim().min(2).max(200),
+  nameRu: z.string().trim().max(200).nullish(),
+  nameEn: z.string().trim().max(200).nullish(),
   sku: z.string().trim().max(60).nullish(),
   description: z.string().max(20000).default(""),
+  descriptionRu: z.string().max(20000).nullish(),
+  descriptionEn: z.string().max(20000).nullish(),
   specs: z.array(z.object({ name: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(300) })).max(60).default([]),
   country: z.string().trim().max(60).nullish(),
   priceFrom: z.coerce.number().nonnegative().nullish(),
@@ -112,8 +116,12 @@ function productData(d: z.infer<typeof productSchema>) {
 
   return {
     name: d.name,
+    nameRu: d.nameRu || null,
+    nameEn: d.nameEn || null,
     sku: d.sku || null,
     description: d.description,
+    descriptionRu: d.descriptionRu || null,
+    descriptionEn: d.descriptionEn || null,
     specs: d.specs as Prisma.InputJsonValue,
     country: d.country || null,
     priceFrom: d.priceFrom ?? null,

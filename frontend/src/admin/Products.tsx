@@ -472,7 +472,7 @@ const DEFAULT_CATEGORY_RULE: CategoryRule = {
 };
 
 const empty = {
-  name: "", sku: "", description: "", country: "", priceFrom: "" as string | number,
+  name: "", nameRu: "", nameEn: "", sku: "", description: "", descriptionRu: "", descriptionEn: "", country: "", priceFrom: "" as string | number,
   oldPrice: "" as string | number, discountPercent: "" as string | number,
   unit: "dona", packageQty: 1 as string | number,
   mfdDate: "", expDate: "",
@@ -505,7 +505,14 @@ export function ProductForm() {
     if (isNew) { setF(empty); setWarranty(""); setImages([]); setDocs([]); return; }
     api<Product>(`/admin/products/${id}`, { admin: true }).then((p) => {
       setF({
-        name: p.name, sku: p.sku || "", description: p.description, country: p.country || "",
+        name: p.name,
+        nameRu: p.nameRu || "",
+        nameEn: p.nameEn || "",
+        sku: p.sku || "",
+        description: p.description,
+        descriptionRu: p.descriptionRu || "",
+        descriptionEn: p.descriptionEn || "",
+        country: p.country || "",
         priceFrom: p.priceFrom ? Number(p.priceFrom) : "",
         oldPrice: p.oldPrice ? Number(p.oldPrice) : "",
         discountPercent: p.discountPercent ?? "",
@@ -684,7 +691,7 @@ export function ProductForm() {
       <form onSubmit={save} style={{ maxWidth: 860 }}>
         <div className="formgrid">
           <div className="field full">
-            <label htmlFor="name">Nomi *</label>
+            <label htmlFor="name">Mahsulot nomi (O'zbekcha) *</label>
             <input
               id="name"
               type="text"
@@ -692,6 +699,32 @@ export function ProductForm() {
               placeholder="Masalan: UZI apparati Mindray DC-70 yoki Steril shprits 5ml"
               value={f.name}
               onChange={(e) => set("name", e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="nameRu">
+              🇷🇺 Nomi (Русский) <span style={{ fontSize: 11, color: "#64748b" }}>(Ixtiyoriy)</span>
+            </label>
+            <input
+              id="nameRu"
+              type="text"
+              placeholder="Например: УЗИ аппарат Mindray DC-70"
+              value={f.nameRu}
+              onChange={(e) => set("nameRu", e.target.value)}
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="nameEn">
+              🇬🇧 Nomi (English) <span style={{ fontSize: 11, color: "#64748b" }}>(Optional)</span>
+            </label>
+            <input
+              id="nameEn"
+              type="text"
+              placeholder="e.g. Ultrasound System Mindray DC-70"
+              value={f.nameEn}
+              onChange={(e) => set("nameEn", e.target.value)}
             />
           </div>
 
@@ -863,13 +896,39 @@ export function ProductForm() {
           </div>
 
           <div className="field full">
-            <label htmlFor="d">Tavsif va qo'llanish sohasi</label>
+            <label htmlFor="d">Tavsif (O'zbekcha)</label>
             <textarea
               id="d"
               value={f.description}
               onChange={(e) => set("description", e.target.value)}
-              style={{ minHeight: 140 }}
+              style={{ minHeight: 110 }}
               placeholder="Mahsulot haqida to'liq tibbiy ma'lumot, qo'llanish ko'rsatmalari va texnik afzalliklari..."
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="dRu">
+              🇷🇺 Tavsif (Русский) <span style={{ fontSize: 11, color: "#64748b" }}>(Ixtiyoriy)</span>
+            </label>
+            <textarea
+              id="dRu"
+              value={f.descriptionRu}
+              onChange={(e) => set("descriptionRu", e.target.value)}
+              style={{ minHeight: 110 }}
+              placeholder="Медицинское описание, область применения и характеристики на русском языке..."
+            />
+          </div>
+
+          <div className="field">
+            <label htmlFor="dEn">
+              🇬🇧 Tavsif (English) <span style={{ fontSize: 11, color: "#64748b" }}>(Optional)</span>
+            </label>
+            <textarea
+              id="dEn"
+              value={f.descriptionEn}
+              onChange={(e) => set("descriptionEn", e.target.value)}
+              style={{ minHeight: 110 }}
+              placeholder="Medical description, clinical application and highlights in English..."
             />
           </div>
         </div>

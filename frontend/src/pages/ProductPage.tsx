@@ -100,7 +100,7 @@ export default function ProductPage() {
             {p.brand && <Link className="pill" to={`/catalog?brand=${p.brand.slug}`}>{p.brand.name}</Link>}
             {p.country && <span className="pill">{localizeCountry(p.country, lang)}</span>}
           </div>
-          <h1>{localizeProductName(p.name, lang)}</h1>
+          <h1>{localizeProductName(p, lang)}</h1>
           {p.sku && <div className="muted sku-code"><span className="sku-tag">{t("pd_sku")}</span> {p.sku}</div>}
 
           {/* Sana va yaroqlilik ma'lumotlari */}
@@ -185,7 +185,7 @@ export default function ProductPage() {
       <div className="pd" style={{ paddingTop: 0 }}>
         <div>
           <h2 style={{ fontSize: 24, marginBottom: 12 }}>{t("pd_description")}</h2>
-          <p className="prose">{localizeProductDescription(p.description, lang, p.name) || (lang === "ru" ? "Описание отсутствует." : lang === "en" ? "No description available." : "Tavsif hali kiritilmagan.")}</p>
+          <p className="prose">{localizeProductDescription(p, lang) || (lang === "ru" ? "Описание отсутствует." : lang === "en" ? "No description available." : "Tavsif hali kiritilmagan.")}</p>
         </div>
         <div>
           <h2 style={{ fontSize: 24, marginBottom: 4 }}>{t("pd_specifications")}</h2>

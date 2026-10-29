@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useCart } from "../cart";
 import { useI18n } from "../context/I18nContext";
+import { localizeProductName } from "../utils/localize";
 
 export function CartToast() {
   const { toast, dismissToast } = useCart();
@@ -33,6 +34,8 @@ export function CartToast() {
     ? (toast.quantity > 1 ? `Added: ${toast.quantity} pcs` : "Added: 1 pc")
     : (toast.quantity > 1 ? `${toast.quantity} dona qo'shildi` : "1 dona qo'shildi");
 
+  const localizedToastName = localizeProductName({ name: toast.productName, nameRu: toast.nameRu, nameEn: toast.nameEn }, lang);
+
   return (
     <aside
       className={`cart-toast-side ${closing ? "closing" : ""}`}
@@ -62,8 +65,8 @@ export function CartToast() {
             <div className="cart-toast-no-img">🩺</div>
           )}
           <div className="cart-toast-details">
-            <span className="cart-toast-pname" title={toast.productName}>
-              {toast.productName}
+            <span className="cart-toast-pname" title={localizedToastName}>
+              {localizedToastName}
             </span>
             <span className="cart-toast-pqty">
               {qtyAddedText}

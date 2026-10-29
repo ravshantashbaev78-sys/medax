@@ -307,12 +307,12 @@ export default function Cart() {
                   return (
                     <div className="line cart-table-row" key={i.productId}>
                       <div className="th">
-                        {i.thumb ? <img src={i.thumb} alt={localizeProductName(i.name, lang)} /> : <DeviceIcon />}
+                        {i.thumb ? <img src={i.thumb} alt={localizeProductName(i, lang)} /> : <DeviceIcon />}
                       </div>
 
                       <div className="cart-item-info">
                         <Link to={`/product/${i.slug}`} className="cart-item-title">
-                          {localizeProductName(i.name, lang)}
+                          {localizeProductName(i, lang)}
                         </Link>
                         <div className="cart-item-unit-price">
                           {i.priceFrom ? (
@@ -724,7 +724,7 @@ export default function Cart() {
             <div className="summary-items-preview">
               {cart.items.map((i) => (
                 <div className="preview-row" key={i.productId}>
-                  <span className="preview-name">{i.name}</span>
+                  <span className="preview-name">{localizeProductName(i, lang)}</span>
                   <span className="preview-qty">× {i.quantity}</span>
                 </div>
               ))}

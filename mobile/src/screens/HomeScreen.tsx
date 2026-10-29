@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Category, fetchCategories, fetchProducts, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
-import { useI18n, localizeCategoryName } from "../context/I18nContext";
+import { useI18n, localizeCategoryName, localizeProductName } from "../context/I18nContext";
 import {
   MedaxHeaderBrand,
   SearchIcon,
@@ -328,7 +328,7 @@ export function HomeScreen({ navigation }: any) {
                     )}
 
                     <Text style={styles.productTitle} numberOfLines={2}>
-                      {item.name}
+                      {localizeProductName(item, lang)}
                     </Text>
 
                     {item.country && (
