@@ -123,6 +123,15 @@ customerRouter.post("/auth/send-otp", customerOtpLimiter, async (req, res) => {
   const phone = normalizePhone(raw);
   if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri. Misol: +998 90 123 45 67");
 
+  // Agar mijoz allaqachon ro'yxatdan o'tgan bo'lsa va paroli bo'lsa, ro'yxatdan o'tish uchun SMS yuborilmaydi!
+  const existing = await prisma.customer.findUnique({ where: { phone } });
+  if (existing && existing.passwordHash) {
+    throw new HttpError(
+      400,
+      "Ushbu telefon raqami allaqachon ro'yxatdan o'tgan. Iltimos, 'Kirish' bo'limi orqali parolingiz bilan kiring."
+    );
+  }
+
   const ip = getClientIp(req);
   await assertNotBlocked(phone, ip);
 
@@ -279,6 +288,137 @@ customerRouter.post("/auth/login", customerLoginLimiter, async (req, res) => {
       phone: customer.phone,
       organization: customer.organization,
       avatar: customer.avatar,
+      hasPassword: true,
+    },
+  });
+});
+
+// 3a. Telefon raqam holatini tekshirish
+customerRouter.post("/auth/check-phone", async (req, res) => {
+  const { phone: raw } = z.object({ phone: z.string().max(30) }).parse(req.body);
+  const phone = normalizePhone(raw);
+  if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri.");
+  const customer = await prisma.customer.findUnique({ where: { phone } });
+  res.json({
+    exists: Boolean(customer),
+    hasPassword: Boolean(customer?.passwordHash),
+  });
+});
+
+// 3b. Parolni unutganda SMS kod yuborish (12 soatda 1 marta limit bilan)
+customerRouter.post("/auth/forgot-password-otp", customerOtpLimiter, async (req, res) => {
+  const { phone: raw, captchaToken } = z
+    .object({
+      phone: z.string().max(30),
+      captchaToken: z.string().optional(),
+    })
+    .parse(req.body);
+
+  const phone = normalizePhone(raw);
+  if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri formatda.");
+
+  const customer = await prisma.customer.findUnique({ where: { phone } });
+  if (!customer) {
+    throw new HttpError(404, "Ushbu telefon raqamiga ega mijoz topilmadi. Iltimos, ro'yxatdan o'ting.");
+  }
+
+  const ip = getClientIp(req);
+  await assertNotBlocked(phone, ip);
+  await verifyTurnstile(captchaToken, ip);
+
+  // 12 soatda 1 marta urinish qoidasi:
+  const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+  if (customer.resetPasswordOtpSentAt) {
+    const elapsed = Date.now() - customer.resetPasswordOtpSentAt.getTime();
+    if (elapsed < TWELVE_HOURS_MS) {
+      const remainingMs = TWELVE_HOURS_MS - elapsed;
+      const hours = Math.floor(remainingMs / (60 * 60 * 1000));
+      const minutes = Math.ceil((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
+      const timeText = hours > 0 ? `${hours} soat ${minutes} daqiqa` : `${minutes} daqiqa`;
+      throw new HttpError(
+        429,
+        `Parolni tiklash uchun SMS 12 soatda faqat 1 marta yuboriladi. Iltimos, ${timeText}dan so'ng qayta urinib ko'ring.`
+      );
+    }
+  }
+
+  // Eskiz SMS balansi va limitlar
+  await assertSmsBudgetAvailable(ip);
+
+  const code = String(crypto.randomInt(100000, 1000000));
+
+  try {
+    await sendSms(phone, `Kodni hech kimga bermang! Medax saytiga kirish uchun tasdiqlash kodi: ${code}`);
+  } catch (err: any) {
+    console.error("SMS jo'natishda xatolik:", err);
+    if (config.smsProvider === "eskiz") {
+      throw new HttpError(503, "SMS xizmatida vaqtinchalik nosozlik. Iltimos, birozdan so'ng qayta urinib ko'ring.");
+    }
+  }
+
+  await prisma.otpCode.create({
+    data: {
+      phone,
+      codeHash: hashCode(phone, code),
+      ip,
+      expiresAt: new Date(Date.now() + config.otpTtlMin * 60_000),
+    },
+  });
+
+  await prisma.customer.update({
+    where: { id: customer.id },
+    data: { resetPasswordOtpSentAt: new Date() },
+  });
+
+  res.json({ ok: true, message: "Tasdiqlash kodi telefoningizga yuborildi." });
+});
+
+// 3c. SMS kod orqali parolni tiklash va yangilash
+customerRouter.post("/auth/reset-password", authLimiter, async (req, res) => {
+  const { phone: raw, code, newPassword } = z
+    .object({
+      phone: z.string().max(30),
+      code: z.string().regex(/^\d{6}$/, "Kod 6 ta raqamdan iborat"),
+      newPassword: z.string().min(6, "Parol kamida 6 belgidan iborat bo'lishi kerak").max(100),
+    })
+    .parse(req.body);
+
+  const phone = normalizePhone(raw);
+  if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri.");
+
+  const customer = await prisma.customer.findUnique({ where: { phone } });
+  if (!customer) throw new HttpError(404, "Mijoz topilmadi.");
+
+  const otp = await prisma.otpCode.findFirst({
+    where: { phone, usedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+  });
+
+  if (!otp) throw new HttpError(400, "Tasdiqlash kodi eskirgan yoki topilmadi. Yangi kod so'rang.");
+  if (otp.attempts >= 5) throw new HttpError(429, "Kod ko'p marta noto'g'ri kiritildi. Qayta urinib ko'ring.");
+  if (otp.codeHash !== hashCode(phone, code)) {
+    await prisma.otpCode.update({ where: { id: otp.id }, data: { attempts: { increment: 1 } } });
+    throw new HttpError(400, "Tasdiqlash kodi noto'g'ri.");
+  }
+
+  await prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: new Date() } });
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const updated = await prisma.customer.update({
+    where: { id: customer.id },
+    data: { passwordHash },
+  });
+
+  const token = createCustomerToken({ id: updated.id, phone: updated.phone || phone, name: updated.name });
+  res.json({
+    ok: true,
+    token,
+    customer: {
+      id: updated.id,
+      name: updated.name,
+      phone: updated.phone,
+      organization: updated.organization,
+      avatar: updated.avatar,
       hasPassword: true,
     },
   });

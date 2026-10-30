@@ -138,15 +138,16 @@ model Order {
 }
 
 model Customer {
-  id           Int       @id @default(autoincrement())
-  phone        String?   @unique
-  name         String
-  organization String?   @default("")
-  avatar       String?
-  passwordHash String?
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  orders       Order[]
+  id                     Int       @id @default(autoincrement())
+  phone                  String?   @unique
+  name                   String
+  organization           String?   @default("")
+  avatar                 String?
+  passwordHash           String?
+  resetPasswordOtpSentAt DateTime?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+  orders                 Order[]
 
   @@index([phone])
 }

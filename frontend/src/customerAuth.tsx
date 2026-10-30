@@ -17,9 +17,12 @@ interface CustomerAuthContextType {
   openAuthModal: () => void;
   closeAuthModal: () => void;
   refreshCustomer: () => Promise<void>;
+  checkPhone: (phone: string) => Promise<{ exists: boolean; hasPassword: boolean }>;
   sendOtp: (phone: string, captchaToken?: string) => Promise<{ ok: boolean; resendIn: number }>;
   verifyOtp: (data: { phone: string; code: string; name?: string; organization?: string; password?: string }) => Promise<{ ok: boolean; token: string; customer: Customer }>;
   loginWithPassword: (phone: string, password: string) => Promise<{ ok: boolean; token: string; customer: Customer }>;
+  forgotPasswordOtp: (phone: string, captchaToken?: string) => Promise<{ ok: boolean; message: string }>;
+  resetPassword: (params: { phone: string; code: string; newPassword: string }) => Promise<{ ok: boolean; token: string; customer: Customer }>;
   changePassword: (data: { currentPassword?: string; newPassword: string }) => Promise<void>;
   updateProfile: (data: { name: string; organization?: string }) => Promise<void>;
   logout: () => void;
@@ -89,6 +92,17 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
+  const checkPhone = async (phone: string) => {
+    const res = await fetch("/api/customer/auth/check-phone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Tekshirishda xatolik yuz berdi");
+    return data;
+  };
+
   // SMS orqali kod yuborish
   const sendOtp = async (phone: string, captchaToken?: string) => {
     const res = await fetch("/api/customer/auth/send-otp", {
@@ -100,6 +114,37 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
     if (!res.ok) {
       throw new Error(data.error || "Kod yuborishda xatolik yuz berdi");
     }
+    return data;
+  };
+
+  // Parolni unutganda SMS kod yuborish (12 soatda 1 marta limit)
+  const forgotPasswordOtp = async (phone: string, captchaToken?: string) => {
+    const res = await fetch("/api/customer/auth/forgot-password-otp", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone, captchaToken }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "SMS yuborishda xatolik yuz berdi");
+    }
+    return data;
+  };
+
+  // Parolni tiklash va yangilash
+  const resetPassword = async (params: { phone: string; code: string; newPassword: string }) => {
+    const res = await fetch("/api/customer/auth/reset-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      throw new Error(data.error || "Parolni tiklashda xatolik yuz berdi");
+    }
+    saveToken(data.token);
+    setCustomer(data.customer);
+    closeAuthModal();
     return data;
   };
 
@@ -191,9 +236,12 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
         openAuthModal,
         closeAuthModal,
         refreshCustomer,
+        checkPhone,
         sendOtp,
         verifyOtp,
         loginWithPassword,
+        forgotPasswordOtp,
+        resetPassword,
         changePassword,
         updateProfile,
         logout,
