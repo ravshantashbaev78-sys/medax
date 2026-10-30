@@ -87,21 +87,6 @@ export function CloseIcon({ size = 16, color = "#94a3b8" }: IconProps) {
   );
 }
 
-// 7. Telegram ikonkasi
-export function TelegramIcon({ size = 20, color = "#ffffff" }: IconProps) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M21.5 2.5L2 10.5l7 3 2.5 7.5 4-4.5 6 5.5 2-19.5zM9 13.5l9-8-6.5 9.5"
-        stroke={color}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </Svg>
-  );
-}
-
 // 8. Rasmiy Kafolat (Shield)
 export function ShieldIcon({ size = 18, color = "#0284c7" }: IconProps) {
   return (

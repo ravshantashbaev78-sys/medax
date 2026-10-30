@@ -496,8 +496,8 @@ export default function Cart() {
                     <strong>{lang === "ru" ? "У вас уже есть аккаунт?" : "Sizda hisob bormi?"}</strong>
                     <span>{lang === "ru" ? "Войдите по номеру телефона для удобного отслеживания заказа." : "Buyurtmalarni shaxsiy kabinetda qulay kuzatish uchun telefon orqali kiring."}</span>
                   </div>
-                  <button type="button" className="btn btn-tg-callout" onClick={() => openAuthModal()}>
-                    {lang === "ru" ? "Войти по SMS" : "SMS orqali kirish"}
+                  <button type="button" className="btn btn-primary" onClick={() => openAuthModal()}>
+                    {lang === "ru" ? "Войти в аккаунт" : "Kabinetga kirish"}
                   </button>
                 </div>
               )}

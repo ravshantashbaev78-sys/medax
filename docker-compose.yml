@@ -48,8 +48,6 @@ services:
       INPAY_MERCHANT_TOKEN: ${INPAY_MERCHANT_TOKEN:-}
       INPAY_BASE_URL: ${INPAY_BASE_URL:-https://inpay.uz/api/v1}
       INPAY_CALLBACK_URL: ${INPAY_CALLBACK_URL:-https://medax.uz/api/orders/inpay/callback}
-      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
-      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-MedaxAuthbot}
     volumes:
       - uploads_data:/app/uploads
     ports:

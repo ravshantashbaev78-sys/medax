@@ -492,17 +492,6 @@ export function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.contactItemRow, { borderTopColor: colors.border }]}
-          onPress={() => Linking.openURL("https://t.me/medax_uz")}
-        >
-          <Text style={styles.contactItemIcon}>💬</Text>
-          <View>
-            <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_tg_channel")}</Text>
-            <Text style={[styles.contactItemValue, { color: colors.text }]}>@medax_uz</Text>
-          </View>
-        </TouchableOpacity>
-
         <View style={[styles.contactItemRow, { borderTopColor: colors.border }]}>
           <Text style={styles.contactItemIcon}>📍</Text>
           <View style={{ flex: 1 }}>

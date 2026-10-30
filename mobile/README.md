@@ -3,7 +3,6 @@
 Ushbu ilova Medax tibbiyot uskunalari do'konining Android va iOS uchun mo'ljallangan rasmiy mobil ilovasi.
 
 ## Imkoniyatlari:
-- 📱 **Telegram orqali 1-klikda kirish**: Hech qanday SMS kutmasdan, @MedaxAuthbot orqali telefon raqamni bir zumda tasdiqlash.
 - 🏥 **Tibbiy uskunalar katalogi**: Kategoriyalar, qidiruv va filtrlash.
 - 🛒 **Savatcha va Buyurtma berish**: Oflayn rejimda saqlanuvchi savatcha va backendga to'g'ridan-to'g'ri buyurtma jo'natish.
 - ⚡ **Tezkor va zamonaviy UI**: React Navigation va Native komponentlar yordamida silliq ishlash.

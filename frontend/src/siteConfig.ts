@@ -7,8 +7,6 @@ export const SITE_CONFIG = {
   phone: "+998 91 186 66 61",
   phoneRaw: "+998911866661",
   email: "info@medax.uz",
-  telegramHandle: "@medax_uz",
-  telegramUrl: "https://t.me/medax_uz",
   addressUz: "Namangan viloyati, Namangan sh., Ozod MFY, Abu Rayhon Beruniy ko'chasi, 2-uy",
   addressRu: "Наманганская область, г. Наманган, сгм Озод, улица Абу Райхона Беруни, дом 2",
   addressEn: "Namangan region, Namangan city, Ozod MCC, Abu Rayhon Beruniy street, 2",

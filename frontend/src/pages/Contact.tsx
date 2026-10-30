@@ -206,13 +206,13 @@ export default function Contact() {
                 </div>
                 <div className="contact-card-body">
                   <span className="contact-card-label">
-                    {lang === "ru" ? "Служба поддержки и Telegram" : lang === "en" ? "Support & Telegram" : "Tezkor konsultatsiya va Telegram"}
+                    {lang === "ru" ? "Служба поддержки и консультации" : lang === "en" ? "Support & Consultation" : "Tezkor konsultatsiya va qo'llab-quvvatlash"}
                   </span>
-                  <a href={SITE_CONFIG.telegramUrl} target="_blank" rel="noreferrer" className="contact-card-value tel-link">
-                    {SITE_CONFIG.telegramHandle}
+                  <a href={`tel:${SITE_CONFIG.phone.replace(/\s+/g, "")}`} className="contact-card-value tel-link">
+                    {SITE_CONFIG.phone}
                   </a>
                   <span className="contact-card-hint">
-                    {lang === "ru" ? "Инженерные консультации и онлайн поддержка 24/7" : lang === "en" ? "Engineering consultations & 24/7 online support" : "Muhandislik maslahati va 24/7 onlayn qo'llab-quvvatlash"}
+                    {lang === "ru" ? "Инженерные консультации и онлайн поддержка 24/7" : lang === "en" ? "Engineering consultations & 24/7 online support" : "Muhandislik maslahati va 24/7 qo'llab-quvvatlash"}
                   </span>
                 </div>
               </div>

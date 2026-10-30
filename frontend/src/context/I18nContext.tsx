@@ -254,8 +254,6 @@ export interface Translations {
   float_hub_sub: string;
   float_call_btn: string;
   float_call_sub: string;
-  float_tg_btn: string;
-  float_tg_sub: string;
   float_gmail_btn: string;
   float_gmail_sub: string;
   float_map_btn: string;
@@ -596,8 +594,6 @@ export const translations: Record<Lang, Translations> = {
     float_hub_sub: "15 daqiqada tezkor muhandislik javobi",
     float_call_btn: "To'g'ridan-to'g'ri qo'ng'iroq",
     float_call_sub: "+998 91 186 66 61",
-    float_tg_btn: "Telegram orqali yozish",
-    float_tg_sub: "@medax_uz rasmiy boti",
     float_gmail_btn: "Gmail orqali xat yozish",
     float_gmail_sub: "info@medax.uz",
     float_map_btn: "Xaritadan manzilni ko'rish",
@@ -935,8 +931,6 @@ export const translations: Record<Lang, Translations> = {
     float_hub_sub: "Ответ инженера за 15 минут",
     float_call_btn: "Прямой звонок",
     float_call_sub: "+998 91 186 66 61",
-    float_tg_btn: "Написать в Telegram",
-    float_tg_sub: "@medax_uz официальный бот",
     float_gmail_btn: "Написать в Gmail",
     float_gmail_sub: "info@medax.uz",
     float_map_btn: "Смотреть адрес на карте",
@@ -1274,8 +1268,6 @@ export const translations: Record<Lang, Translations> = {
     float_hub_sub: "Quick engineer response in 15 mins",
     float_call_btn: "Direct Phone Call",
     float_call_sub: "+998 91 186 66 61",
-    float_tg_btn: "Message on Telegram",
-    float_tg_sub: "@medax_uz official bot",
     float_gmail_btn: "Email via Gmail",
     float_gmail_sub: "info@medax.uz",
     float_map_btn: "View Office Location",

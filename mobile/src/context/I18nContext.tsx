@@ -51,7 +51,6 @@ const translations: Record<Language, Record<string, string>> = {
     contact_title: "Medax aloqa markazi",
     contact_sub: "Savollar, takliflar yoki servis xizmati uchun biz bilan bog'laning:",
     contact_phone: "Aloqa telefoni",
-    contact_tg_channel: "Rasmiy Telegram kanal",
     contact_store: "Do'kon va ombor",
 
     // Home
@@ -144,7 +143,6 @@ const translations: Record<Language, Record<string, string>> = {
     contact_title: "Контактный центр Medax",
     contact_sub: "Свяжитесь с нами по любым вопросам, сервису или заказам:",
     contact_phone: "Телефон для связи",
-    contact_tg_channel: "Официальный Telegram-канал",
     contact_store: "Магазин и склад",
 
     // Home
@@ -237,7 +235,6 @@ const translations: Record<Language, Record<string, string>> = {
     contact_title: "Medax Contact Center",
     contact_sub: "Get in touch with us for equipment inquiry, service or orders:",
     contact_phone: "Contact phone",
-    contact_tg_channel: "Official Telegram channel",
     contact_store: "Store and warehouse",
 
     // Home
