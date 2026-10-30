@@ -51,7 +51,11 @@ const translations: Record<Language, Record<string, string>> = {
     contact_title: "Medax aloqa markazi",
     contact_sub: "Savollar, takliflar yoki servis xizmati uchun biz bilan bog'laning:",
     contact_phone: "Aloqa telefoni",
+    contact_email: "Rasmiy Gmail pochta",
     contact_store: "Do'kon va ombor",
+    stock_in: "Omborda: {n} dona mavjud",
+    stock_out: "Omborda qolmagan (Tugagan)",
+    stock_cart_empty: "Omborda tugagan",
 
     // Home
     home_search_ph: "Uskuna yoki sarflov materiallarini qidirish...",
@@ -140,7 +144,11 @@ const translations: Record<Language, Record<string, string>> = {
     contact_title: "Контактный центр Medax",
     contact_sub: "Свяжитесь с нами по любым вопросам, сервису или заказам:",
     contact_phone: "Телефон для связи",
+    contact_email: "Официальная почта Gmail",
     contact_store: "Магазин и склад",
+    stock_in: "В наличии: {n} шт",
+    stock_out: "Нет в наличии (Закончился)",
+    stock_cart_empty: "Закончился",
 
     // Home
     home_search_ph: "Поиск оборудования или расходных материалов...",
@@ -229,7 +237,11 @@ const translations: Record<Language, Record<string, string>> = {
     contact_title: "Medax Contact Center",
     contact_sub: "Get in touch with us for equipment inquiry, service or orders:",
     contact_phone: "Contact phone",
+    contact_email: "Official Gmail Email",
     contact_store: "Store and warehouse",
+    stock_in: "In stock: {n} pcs",
+    stock_out: "Out of stock",
+    stock_cart_empty: "Out of stock",
 
     // Home
     home_search_ph: "Search equipment or medical supplies...",

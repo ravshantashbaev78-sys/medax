@@ -177,7 +177,9 @@ export function CartScreen({ navigation }: any) {
                         marginTop: 2,
                       }}
                     >
-                      {(product.stock ?? 0) > 0 ? `Omborda: ${product.stock} dona` : "Omborda tugagan"}
+                      {(product.stock ?? 0) > 0
+                        ? t("stock_in").replace("{n}", String(product.stock))
+                        : t("stock_cart_empty")}
                     </Text>
                   )}
 

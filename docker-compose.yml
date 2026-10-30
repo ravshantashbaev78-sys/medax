@@ -44,6 +44,9 @@ services:
       DAILY_IP_SMS_LIMIT: ${DAILY_IP_SMS_LIMIT:-8}
       HOURLY_PHONE_OTP_LIMIT: ${HOURLY_PHONE_OTP_LIMIT:-4}
       TURNSTILE_SECRET_KEY: ${TURNSTILE_SECRET_KEY:-}
+      GMAIL_USER: ${GMAIL_USER:-medaxuz@gmail.com}
+      GMAIL_APP_PASSWORD: ${GMAIL_APP_PASSWORD:-}
+      GMAIL_DESTINATION: ${GMAIL_DESTINATION:-medaxuz@gmail.com}
     volumes:
       - uploads_data:/app/uploads
     ports:

@@ -6,7 +6,7 @@ export const SITE_CONFIG = {
   companyName: "Medax",
   phone: "+998 91 186 66 61",
   phoneRaw: "+998911866661",
-  email: "info@medax.uz",
+  email: "medaxuz@gmail.com",
   addressUz: "Namangan viloyati, Namangan sh., Ozod MFY, Abu Rayhon Beruniy ko'chasi, 2-uy",
   addressRu: "Наманганская область, г. Наманган, сгм Озод, улица Абу Райхона Беруни, дом 2",
   addressEn: "Namangan region, Namangan city, Ozod MCC, Abu Rayhon Beruniy street, 2",

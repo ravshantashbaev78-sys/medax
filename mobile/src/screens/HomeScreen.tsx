@@ -335,22 +335,45 @@ export function HomeScreen({ navigation }: any) {
                       <Text style={styles.productCountry}>🌍 {item.country}</Text>
                     )}
 
+                    {item.stock !== undefined && (
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          fontWeight: "700",
+                          color: (item.stock ?? 0) > 0 ? "#0284c7" : "#ef4444",
+                          marginBottom: 4,
+                        }}
+                      >
+                        {(item.stock ?? 0) > 0
+                          ? t("stock_in").replace("{n}", String(item.stock))
+                          : t("stock_out")}
+                      </Text>
+                    )}
+
                     <View style={styles.priceRow}>
                       <Text style={styles.productPrice}>{formatPrice(item.priceFrom)}</Text>
                     </View>
 
                     {/* Add to Cart Button with SVG Icon */}
-                    <TouchableOpacity
-                      style={[styles.addBtn, isAdded && styles.addBtnDone]}
-                      onPress={() => handleAddToCart(item)}
-                    >
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                        <CartIcon size={14} color={isAdded ? "#ffffff" : "#0284c7"} />
-                        <Text style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}>
-                          {isAdded ? "Qo'shildi" : "Savatchaga"}
+                    {item.stock !== undefined && item.stock <= 0 ? (
+                      <View style={[styles.addBtn, { backgroundColor: "#fee2e2", borderColor: "#fca5a5" }]}>
+                        <Text style={[styles.addBtnText, { color: "#dc2626" }]}>
+                          {t("stock_cart_empty")}
                         </Text>
                       </View>
-                    </TouchableOpacity>
+                    ) : (
+                      <TouchableOpacity
+                        style={[styles.addBtn, isAdded && styles.addBtnDone]}
+                        onPress={() => handleAddToCart(item)}
+                      >
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
+                          <CartIcon size={14} color={isAdded ? "#ffffff" : "#0284c7"} />
+                          <Text style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}>
+                            {isAdded ? "Qo'shildi" : "Savatchaga"}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 </TouchableOpacity>
               );

@@ -86,10 +86,10 @@ export function ProductDetailScreen({ route, navigation }: any) {
             <Text style={[styles.stockText, { color: (product.stock ?? 1) > 0 ? "#0284c7" : "#dc2626" }]}>
               {product.stock !== undefined && product.stock !== null ? (
                 product.stock > 0
-                  ? `📦 Omborda: ${product.stock} dona mavjud`
-                  : "❌ Omborda qolmagan (Tugagan)"
+                  ? `📦 ${t("stock_in").replace("{n}", String(product.stock))}`
+                  : `❌ ${t("stock_out")}`
               ) : (
-                "📦 Omborda mavjud"
+                `📦 ${t("stock_in").replace("{n}", "10+")}`
               )}
             </Text>
           </View>
@@ -139,7 +139,7 @@ export function ProductDetailScreen({ route, navigation }: any) {
         {product.stock !== undefined && product.stock <= 0 ? (
           <View style={[styles.addToCartBtn, { backgroundColor: "#fee2e2", flex: 1, elevation: 0 }]}>
             <Text style={{ color: "#dc2626", fontWeight: "800", fontSize: 15 }}>
-              Omborda tugagan
+              {t("stock_cart_empty")}
             </Text>
           </View>
         ) : (

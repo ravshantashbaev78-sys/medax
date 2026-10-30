@@ -247,6 +247,13 @@ export interface Translations {
   contact_form_direct_btn: string;
   contact_copied_toast: string;
   contact_map_badge: string;
+  contact_success_title: string;
+  contact_success_desc: string;
+  contact_send_btn: string;
+  contact_send_busy: string;
+  contact_via_gmail: string;
+  stock_in_count: string;
+  stock_out_badge: string;
 
   // Floating Contact Hub
   float_hub_btn: string;
@@ -588,6 +595,13 @@ export const translations: Record<Lang, Translations> = {
     contact_form_direct_btn: "Pochta manzilini nusxalash",
     contact_copied_toast: "Email nusxalandi!",
     contact_map_badge: "Interaktiv Google Xaritasi",
+    contact_success_title: "Murojaatingiz muvaffaqiyatli qabul qilindi! ✓",
+    contact_success_desc: "Xabaringiz rasmiy pochtamizga (medaxuz@gmail.com) yuborildi. Menejerimiz tez orada bog'lanadi.",
+    contact_send_btn: "Murojaatni yuborish ✓",
+    contact_send_busy: "Yuborilmoqda…",
+    contact_via_gmail: "Gmail orqali",
+    stock_in_count: "Omborda: {n} dona mavjud",
+    stock_out_badge: "Omborda qolmagan (Tugagan)",
 
     float_hub_btn: "Tezkor aloqa",
     float_hub_title: "Medax bilan bog'lanish",
@@ -595,7 +609,7 @@ export const translations: Record<Lang, Translations> = {
     float_call_btn: "To'g'ridan-to'g'ri qo'ng'iroq",
     float_call_sub: "+998 91 186 66 61",
     float_gmail_btn: "Gmail orqali xat yozish",
-    float_gmail_sub: "info@medax.uz",
+    float_gmail_sub: "medaxuz@gmail.com",
     float_map_btn: "Xaritadan manzilni ko'rish",
     float_map_sub: "Namangan, Beruniy ko'chasi, 2-uy",
 
@@ -925,6 +939,13 @@ export const translations: Record<Lang, Translations> = {
     contact_form_direct_btn: "Скопировать Email",
     contact_copied_toast: "Email скопирован!",
     contact_map_badge: "Интерактивная карта Google",
+    contact_success_title: "Ваше обращение успешно принято! ✓",
+    contact_success_desc: "Сообщение отправлено на нашу официальную почту (medaxuz@gmail.com). Менеджер свяжется с вами в ближайшее время.",
+    contact_send_btn: "Отправить обращение ✓",
+    contact_send_busy: "Отправка…",
+    contact_via_gmail: "Через Gmail",
+    stock_in_count: "В наличии: {n} шт",
+    stock_out_badge: "Нет в наличии (Закончился)",
 
     float_hub_btn: "Быстрая связь",
     float_hub_title: "Связаться с Medax",
@@ -932,7 +953,7 @@ export const translations: Record<Lang, Translations> = {
     float_call_btn: "Прямой звонок",
     float_call_sub: "+998 91 186 66 61",
     float_gmail_btn: "Написать в Gmail",
-    float_gmail_sub: "info@medax.uz",
+    float_gmail_sub: "medaxuz@gmail.com",
     float_map_btn: "Смотреть адрес на карте",
     float_map_sub: "Наманган, ул. Беруни, 2",
 
@@ -1262,6 +1283,13 @@ export const translations: Record<Lang, Translations> = {
     contact_form_direct_btn: "Copy Email Address",
     contact_copied_toast: "Email copied!",
     contact_map_badge: "Interactive Google Maps",
+    contact_success_title: "Your message has been received! ✓",
+    contact_success_desc: "Your message was sent to our official email (medaxuz@gmail.com). Our team will contact you shortly.",
+    contact_send_btn: "Submit Inquiry ✓",
+    contact_send_busy: "Sending…",
+    contact_via_gmail: "Via Gmail",
+    stock_in_count: "In stock: {n} pcs",
+    stock_out_badge: "Out of stock",
 
     float_hub_btn: "Quick Contact",
     float_hub_title: "Contact Medax",
@@ -1269,7 +1297,7 @@ export const translations: Record<Lang, Translations> = {
     float_call_btn: "Direct Phone Call",
     float_call_sub: "+998 91 186 66 61",
     float_gmail_btn: "Email via Gmail",
-    float_gmail_sub: "info@medax.uz",
+    float_gmail_sub: "medaxuz@gmail.com",
     float_map_btn: "View Office Location",
     float_map_sub: "Namangan, Beruniy St., 2",
 

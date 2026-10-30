@@ -405,7 +405,15 @@ export default function Cart() {
                         {i.stock !== undefined && (
                           <div style={{ fontSize: 12, marginTop: 4, fontWeight: 600, color: (i.stock ?? 0) > 0 ? "#0284c7" : "#dc2626" }}>
                             {(i.stock ?? 0) > 0
-                              ? `Omborda: ${i.stock} dona mavjud`
+                              ? lang === "ru"
+                                ? `В наличии: ${i.stock} шт`
+                                : lang === "en"
+                                ? `In stock: ${i.stock} pcs`
+                                : `Omborda: ${i.stock} dona mavjud`
+                              : lang === "ru"
+                              ? "⚠️ Нет в наличии"
+                              : lang === "en"
+                              ? "⚠️ Out of stock"
                               : "⚠️ Omborda tugagan"}
                           </div>
                         )}

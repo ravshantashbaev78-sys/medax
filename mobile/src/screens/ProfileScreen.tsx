@@ -585,6 +585,17 @@ export function ProfileScreen() {
           </View>
         </TouchableOpacity>
 
+        <TouchableOpacity
+          style={[styles.contactItemRow, { borderTopColor: colors.border }]}
+          onPress={() => Linking.openURL("mailto:medaxuz@gmail.com?subject=Medax%20murojaat")}
+        >
+          <Text style={styles.contactItemIcon}>✉️</Text>
+          <View>
+            <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_email")}</Text>
+            <Text style={[styles.contactItemValue, { color: colors.primary }]}>medaxuz@gmail.com</Text>
+          </View>
+        </TouchableOpacity>
+
         <View style={[styles.contactItemRow, { borderTopColor: colors.border }]}>
           <Text style={styles.contactItemIcon}>📍</Text>
           <View style={{ flex: 1 }}>

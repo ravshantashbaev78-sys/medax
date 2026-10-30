@@ -571,7 +571,17 @@ export function ProductCard({ p }: { p: Product }) {
                   marginBottom: 2,
                 }}
               >
-                {(p.stock ?? 0) > 0 ? `Omborda: ${p.stock} dona` : "Omborda tugagan"}
+                {(p.stock ?? 0) > 0
+                  ? lang === "ru"
+                    ? `В наличии: ${p.stock} шт`
+                    : lang === "en"
+                    ? `In stock: ${p.stock} pcs`
+                    : `Omborda: ${p.stock} dona`
+                  : lang === "ru"
+                  ? "Нет в наличии"
+                  : lang === "en"
+                  ? "Out of stock"
+                  : "Omborda tugagan"}
               </span>
             )}
             {hasDiscount && (
@@ -596,7 +606,7 @@ export function ProductCard({ p }: { p: Product }) {
                 borderRadius: 8,
               }}
             >
-              Tugagan
+              {lang === "ru" ? "Закончился" : lang === "en" ? "Out of stock" : "Tugagan"}
             </span>
           ) : (
             <button

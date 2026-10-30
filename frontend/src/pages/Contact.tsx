@@ -231,9 +231,9 @@ export default function Contact() {
 
                 {sentSuccess && (
                   <div className="ok auth-alert" style={{ marginBottom: 20 }}>
-                    <strong>Murojaatingiz muvaffaqiyatli qabul qilindi! ✓</strong>
+                    <strong>{t("contact_success_title")}</strong>
                     <p style={{ margin: "4px 0 0", fontSize: 14 }}>
-                      Menejerimiz qisqa vaqt ichida ko'rsatilgan telefon raqamingiz orqali bog'lanadi.
+                      {t("contact_success_desc")}
                     </p>
                   </div>
                 )}
@@ -313,7 +313,7 @@ export default function Contact() {
 
                   <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
                     <button type="submit" className="btn btn-primary-sheen" style={{ flex: 1, minWidth: 200, height: 48 }} disabled={busy}>
-                      {busy ? "Yuborilmoqda…" : "Murojaatni yuborish ✓"}
+                      {busy ? t("contact_send_busy") : t("contact_send_btn")}
                     </button>
                     <button
                       type="button"
@@ -325,7 +325,7 @@ export default function Contact() {
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M24 5.457v13.909c0 .904-.732 1.636-1.636 1.636h-3.819V11.73L12 16.64l-6.545-4.91v9.273H1.636A1.636 1.636 0 0 1 0 19.366V5.457c0-2.023 2.309-3.178 3.927-1.964L12 9.491l8.073-5.998C21.69 2.28 24 3.434 24 5.457z"/>
                       </svg>
-                      <span>Gmail orqali</span>
+                      <span>{t("contact_via_gmail")}</span>
                     </button>
                   </div>
                 </form>

@@ -19,6 +19,7 @@ import {
 } from "../antispam";
 import { optionalCustomerAuth } from "./customer";
 import { getClientIp } from "../ip";
+import { sendNewOrderEmail } from "../email";
 
 export const ordersRouter = Router();
 
@@ -254,6 +255,22 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
     });
     createdOrderId = ord.id;
   });
+
+  // medaxuz@gmail.com ga yangi buyurtma xabari jo'natish
+  sendNewOrderEmail({
+    id: createdOrderId!,
+    code: orderCode,
+    customerName: body.name,
+    phone,
+    organization: body.organization,
+    deliveryAddress: body.deliveryAddress,
+    totalAmount,
+    items: items.map((i) => ({
+      productName: names.get(i.productId)!,
+      quantity: i.quantity,
+      price: prices.get(i.productId) || null,
+    })),
+  }).catch((err) => console.error("[Order Email Error]", err));
 
   res.status(201).json({ ok: true, code: orderCode, orderId: createdOrderId! });
 });
