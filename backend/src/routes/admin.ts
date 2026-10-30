@@ -10,6 +10,7 @@ import { applyFakeStrike, normalizePhone } from "../antispam";
 import { memoryUpload, removeFile, saveImage, savePdf } from "../upload";
 import { uniqueSlug } from "../utils";
 import { sendSms } from "../sms";
+import { notifyOrderConfirmed } from "../notifications";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -446,16 +447,16 @@ adminRouter.patch("/orders/:id", async (req, res) => {
   let blocked = false;
   if (d.status === "FAKE") blocked = await applyFakeStrike(order.phone);
 
-  // Agar holat "READY" ga o'zgargan bo'lsa va avval READY bo'lmagan bo'lsa, mijozga avtomatik SMS yuboramiz
-  // Eskiz rasmiy tasdiqlangan shabloni bo'yicha:
-  if (d.status === "READY" && prevOrder.status !== "READY") {
-    try {
-      const smsText = `Siz Medax saytida bergan buyurtmangiz tayyor. Raqam:# ${order.id}. Uni do'kondan olib ketishingiz mumkin.`;
-      await sendSms(order.phone, smsText);
-      console.log(`[Order READY SMS sent] ${order.phone} -> ${smsText}`);
-    } catch (smsErr) {
-      console.error("[Order READY SMS error]:", smsErr);
-    }
+  // Agar holat "CONFIRMED" yoki "READY" ga o'zgargan bo'lsa (va avval tasdiqlanmagan bo'lsa):
+  // 1. Mijozga SMS boradi (Eskiz rasmiy tasdiqlangan shabloni bo'yicha)
+  // 2. Tizimda bildirishnoma (Notification) saqlanadi
+  // 3. Agar mijozda mobil ilova bo'lsa (pushToken mavjud bo'lsa), PUSH bildirishnoma ham boradi!
+  if (
+    (d.status === "CONFIRMED" || d.status === "READY") &&
+    prevOrder.status !== "CONFIRMED" &&
+    prevOrder.status !== "READY"
+  ) {
+    await notifyOrderConfirmed(order);
   }
 
   res.json({ order, blocked });

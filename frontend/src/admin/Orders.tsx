@@ -409,7 +409,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
             <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)", textAlign: "right" }}>To'lov holati:</strong>
             {order.isPaid ? (
               <span style={{ color: "var(--moss, #065f46)", fontWeight: 800, fontSize: 14, background: "var(--mint, #ecfdf5)", padding: "4px 10px", borderRadius: 8 }}>
-                To'langan ({order.paymentMethod === "inpay" ? "inPAY orqali" : "Kassada"})
+                To'langan (Kassada / Hisob raqamda)
               </span>
             ) : (
               <span style={{ color: "#854d0e", fontWeight: 700, fontSize: 14, background: "#fef9c3", padding: "4px 10px", borderRadius: 8 }}>
@@ -434,13 +434,9 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
               To'lov usuli:
             </strong>
             <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ink, #0f172a)" }}>
-              {order.paymentMethod === "inpay"
-                ? "inPAY — Onlayn to'lov (Click, Payme, Kartalar)"
-                : order.paymentMethod.includes("Do'konda to'lash") || order.paymentMethod === "cash"
-                ? "Do'konda to'lash (Olib ketish paytida)"
-                : order.paymentMethod === "bank_transfer"
-                ? "Bank hisob-faktura (Shartnoma / B2B)"
-                : order.paymentMethod}
+              {order.paymentMethod.includes("Shartnoma") || order.paymentMethod.includes("B2B")
+                ? "Shartnoma asosida (B2B / Bank o'tkazmasi)"
+                : "Do'konda to'lash (Olib ketish paytida)"}
             </span>
           </div>
         )}
@@ -514,13 +510,23 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
             </div>
             <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
               {order.status === "NEW" && (
-                <button className="btn" disabled={busy} onClick={() => patch({ status: "CONFIRMED", managerNote: note })}>
-                  Tasdiqlash (Menejer qo'ng'iroq qildi)
+                <button
+                  className="btn"
+                  style={{ background: "#0284c7" }}
+                  disabled={busy}
+                  onClick={() => patch({ status: "CONFIRMED", managerNote: note })}
+                >
+                  ✓ Tasdiqlash (Mijozga SMS va Bildirishnoma)
                 </button>
               )}
               {order.status === "CONFIRMED" && (
-                <button className="btn" style={{ background: "#0284c7" }} disabled={busy} onClick={() => patch({ status: "READY", managerNote: note })}>
-                  Olib ketishga tayyor qilish (SMS yuborish)
+                <button
+                  className="btn"
+                  style={{ background: "#059669" }}
+                  disabled={busy}
+                  onClick={() => patch({ status: "READY", managerNote: note })}
+                >
+                  Olib ketishga tayyor (READY)
                 </button>
               )}
               {order.status === "READY" && (

@@ -75,13 +75,10 @@ const translations: Record<Language, Record<string, string>> = {
     cart_address_label: "Yetkazib berish / Olib ketish manzili *",
     cart_comment_label: "Qo'shimcha izoh (ixtiyoriy)",
     cart_pay_method: "To'lov usuli *",
-    cart_inpay_title: "inPAY — Onlayn to'lov",
-    cart_inpay_desc: "Click, Payme, Uzcard, Humo kartalari orqali to'lov.",
     cart_cash_title: "Qabul qilishda to'lash",
     cart_cash_desc: "Do'kondan olib ketishda yoki topshirilganda naqd/karta bilan to'lov.",
     cart_total_label: "Jami to'lov:",
     cart_order_btn: "Buyurtmani tasdiqlash →",
-    cart_inpay_btn: "inPAY orqali to'lash →",
 
     // Catalog
     cat_title: "Katalog",
@@ -167,13 +164,10 @@ const translations: Record<Language, Record<string, string>> = {
     cart_address_label: "Адрес доставки / самовывоза *",
     cart_comment_label: "Дополнительный комментарий (необязательно)",
     cart_pay_method: "Способ оплаты *",
-    cart_inpay_title: "inPAY — Онлайн оплата",
-    cart_inpay_desc: "Оплата картами Click, Payme, Uzcard, Humo.",
     cart_cash_title: "Оплата при получении",
     cart_cash_desc: "Оплата при самовывозе или доставке наличными / картой.",
     cart_total_label: "Итого к оплате:",
     cart_order_btn: "Подтвердить заказ →",
-    cart_inpay_btn: "Оплатить через inPAY →",
 
     // Catalog
     cat_title: "Каталог",
@@ -259,13 +253,10 @@ const translations: Record<Language, Record<string, string>> = {
     cart_address_label: "Delivery / Pickup Address *",
     cart_comment_label: "Order Note (optional)",
     cart_pay_method: "Payment Method *",
-    cart_inpay_title: "inPAY — Online Payment",
-    cart_inpay_desc: "Pay securely via Click, Payme, Uzcard, Humo.",
     cart_cash_title: "Pay on Delivery / Pickup",
     cart_cash_desc: "Pay by cash or card upon receipt or pickup.",
     cart_total_label: "Order Total:",
     cart_order_btn: "Confirm Order →",
-    cart_inpay_btn: "Pay with inPAY →",
 
     // Catalog
     cat_title: "Catalog",

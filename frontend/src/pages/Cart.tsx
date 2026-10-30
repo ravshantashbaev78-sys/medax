@@ -50,7 +50,7 @@ export default function Cart() {
   const [phone, setPhone] = useState("+998 ");
   const [name, setName] = useState("");
   const [organization, setOrganization] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"inpay" | "cash">("inpay");
+  const [paymentMethod, setPaymentMethod] = useState<string>("Do'konda to'lash (Olib ketishda)");
   const [comment, setComment] = useState("");
   const [website, setWebsite] = useState(""); // honeypot
 
@@ -152,13 +152,6 @@ export default function Cart() {
     return acc;
   }, 0);
 
-  // Agar savatda narxi kelishiladigan mahsulot bo'lsa, to'lov usulini avtomatik "cash" ga o'tkazamiz
-  useEffect(() => {
-    if (hasUnpricedItems && paymentMethod === "inpay") {
-      setPaymentMethod("cash");
-    }
-  }, [hasUnpricedItems]);
-
   const hasAnyPrice = cart.items.some((i) => i.priceFrom);
 
   // Click "Buyurtmani rasmiylashtirish"
@@ -226,7 +219,7 @@ export default function Cart() {
           phone: cleanPhone,
           organization: organization.trim(),
           deliveryAddress: "Do'kondan olib ketish (Namangan sh., Ozod MFY, Beruniy 2-uy)",
-          paymentMethod: paymentMethod === "inpay" ? "inpay" : "Do'konda to'lash (Olib ketishda)",
+          paymentMethod,
           comment: comment.trim(),
           website, // honeypot
           elapsedMs: Date.now() - startedAt.current,
@@ -666,16 +659,10 @@ export default function Cart() {
                   <input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
                 </div>
 
-                <h3 className="section-subhead" style={{ marginTop: 24 }}>3. To'lov usulini tanlang</h3>
-
-                {hasUnpricedItems && (
-                  <div style={{ background: "#fffbeb", border: "1.5px solid #fde68a", borderRadius: 12, padding: "12px 16px", marginBottom: 12, color: "#92400e", fontSize: 13, lineHeight: 1.5 }}>
-                    <strong>ℹ️ Narxi kelishiladigan mahsulotlar:</strong> Savatingizda narxi aniq belgilanmagan uskunalar mavjud. Shuning uchun onlayn karta to'lovi yopiq va buyurtma <b>"Do'konda to'lash / Shartnoma asosida"</b> qabul qilinadi. Mutaxassisimiz siz bilan narxni kelishish uchun bog'lanadi.
-                  </div>
-                )}
+                <h3 className="section-subhead" style={{ marginTop: 24 }}>3. To'lov va buyurtma shartlari</h3>
 
                 <div style={{ display: "grid", gap: 12 }}>
-                  {/* inPAY option */}
+                  {/* Option 1: Cash / Store pickup */}
                   <label
                     style={{
                       display: "flex",
@@ -683,63 +670,8 @@ export default function Cart() {
                       gap: 14,
                       padding: "16px 18px",
                       borderRadius: 14,
-                      border: paymentMethod === "inpay" ? "2px solid #0284c7" : "1.5px solid var(--line)",
-                      background: paymentMethod === "inpay" ? "rgba(2, 132, 199, 0.05)" : "var(--card, #fff)",
-                      cursor: isEveryPriceFixed && totalAmount >= 1000 ? "pointer" : "not-allowed",
-                      opacity: isEveryPriceFixed && totalAmount >= 1000 ? 1 : 0.5,
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="inpay"
-                      checked={paymentMethod === "inpay"}
-                      disabled={!isEveryPriceFixed || totalAmount < 1000}
-                      onChange={() => setPaymentMethod("inpay")}
-                      style={{ marginTop: 4, accentColor: "#0284c7", width: 18, height: 18 }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 20 }}>💳</span>
-                          <strong style={{ fontSize: 16, color: "var(--ink)" }}>
-                            inPAY — Onlayn to'lov (Click, Payme, Kartalar)
-                          </strong>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#00a0e3", color: "#fff" }}>Click</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#00cccc", color: "#003b3e" }}>Payme</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#1e3a8a", color: "#fff" }}>Uzcard</span>
-                          <span style={{ fontSize: 11, fontWeight: 700, padding: "2px 7px", borderRadius: 4, background: "#ea580c", color: "#fff" }}>Humo</span>
-                        </div>
-                      </div>
-                      <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink2)" }}>
-                        {isEveryPriceFixed && totalAmount >= 1000
-                          ? (lang === "ru"
-                              ? `Сумма заказа (${money(totalAmount, t("sum_currency"))}) оплачивается через безопасную систему inPAY.`
-                              : lang === "en"
-                              ? `Order total (${money(totalAmount, t("sum_currency"))}) is processed via secure inPAY gateway.`
-                              : `Buyurtma summasi (${money(totalAmount, t("sum_currency"))}) inPAY xavfsiz to'lov tizimi orqali to'lanadi.`)
-                          : (lang === "ru"
-                              ? "В корзине есть товары с договорной ценой, доступна оплата при получении."
-                              : lang === "en"
-                              ? "Items with negotiable prices are present, pay on pickup."
-                              : "Savatda narxi kelishiladigan mahsulotlar bo'lgani sababli faqat do'konda to'lash mumkin.")}
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Cash / Store option */}
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 14,
-                      padding: "16px 18px",
-                      borderRadius: 14,
-                      border: paymentMethod === "cash" ? "2px solid #0284c7" : "1.5px solid var(--line)",
-                      background: paymentMethod === "cash" ? "rgba(2, 132, 199, 0.05)" : "var(--card, #fff)",
+                      border: paymentMethod === "Do'konda to'lash (Olib ketishda)" ? "2px solid #0284c7" : "1.5px solid var(--line)",
+                      background: paymentMethod === "Do'konda to'lash (Olib ketishda)" ? "rgba(2, 132, 199, 0.05)" : "var(--card, #fff)",
                       cursor: "pointer",
                       transition: "all 0.2s ease",
                     }}
@@ -747,9 +679,9 @@ export default function Cart() {
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="cash"
-                      checked={paymentMethod === "cash"}
-                      onChange={() => setPaymentMethod("cash")}
+                      value="Do'konda to'lash (Olib ketishda)"
+                      checked={paymentMethod === "Do'konda to'lash (Olib ketishda)"}
+                      onChange={() => setPaymentMethod("Do'konda to'lash (Olib ketishda)")}
                       style={{ marginTop: 4, accentColor: "#0284c7", width: 18, height: 18 }}
                     />
                     <div>
@@ -760,7 +692,42 @@ export default function Cart() {
                         </strong>
                       </div>
                       <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink2)" }}>
-                        Uskunani ko'rib, tekshirib qabul qilgach to'laysiz (Naqd pul, korporativ karta/terminal yoki bank hisob-faktura orqali).
+                        Uskunani ko'rib, tekshirib qabul qilgach to'laysiz (Naqd pul, korporativ karta/terminal orqali).
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Option 2: Bank transfer / B2B */}
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: 14,
+                      padding: "16px 18px",
+                      borderRadius: 14,
+                      border: paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)" ? "2px solid #0284c7" : "1.5px solid var(--line)",
+                      background: paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)" ? "rgba(2, 132, 199, 0.05)" : "var(--card, #fff)",
+                      cursor: "pointer",
+                      transition: "all 0.2s ease",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="Shartnoma asosida (B2B / Bank o'tkazmasi)"
+                      checked={paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)"}
+                      onChange={() => setPaymentMethod("Shartnoma asosida (B2B / Bank o'tkazmasi)")}
+                      style={{ marginTop: 4, accentColor: "#0284c7", width: 18, height: 18 }}
+                    />
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={{ fontSize: 20 }}>📑</span>
+                        <strong style={{ fontSize: 16, color: "var(--ink)" }}>
+                          Shartnoma asosida (B2B / Bank o'tkazmasi)
+                        </strong>
+                      </div>
+                      <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink2)" }}>
+                        Klinika, shifoxona va yuridik tashkilotlar uchun rasmiy shartnoma va hisob-faktura rasmiylashtiriladi.
                       </p>
                     </div>
                   </label>
@@ -872,8 +839,6 @@ export default function Cart() {
                       ? (lang === "ru" ? "Отправка SMS-кода…" : "SMS kod yuborilmoqda…")
                       : !customer && !token && !guestOtpSent
                       ? (lang === "ru" ? "Получить SMS-код и продолжить →" : "SMS kod olish va davom etish →")
-                      : paymentMethod === "inpay"
-                      ? (lang === "ru" ? "💳 Подтвердить и оплатить через inPAY →" : "💳 Tasdiqlash va inPAY to'loviga o'tish →")
                       : (lang === "ru" ? "Подтвердить и отправить заказ ✓" : "Buyurtmani tasdiqlash va yuborish ✓")}
                   </button>
                   <p className="note" style={{ textAlign: "center", marginTop: 12 }}>
@@ -881,13 +846,9 @@ export default function Cart() {
                       ? (lang === "ru"
                           ? "Для подтверждения номера вам будет отправлен бесплатный SMS-код."
                           : "Telefon raqamingizni tasdiqlash uchun bepul SMS tasdiqlash kodi yuboriladi.")
-                      : paymentMethod === "inpay"
-                      ? (lang === "ru"
-                          ? "После подтверждения вы будете перенаправлены на безопасную страницу оплаты inPAY (Click, Payme, Карты)."
-                          : "Tugmani bosgach, to'lov uchun inPAY xavfsiz sahifasiga (Click, Payme, Kartalar) yo'naltirilasiz.")
                       : (lang === "ru"
-                          ? "Нажимая кнопку, вы соглашаетесь с условиями самовывоза из магазина."
-                          : "Tugmani bosish orqali siz do'kondan olib ketish qoidalariga rozilik bildirasiz.")}
+                          ? "Заказ будет рассмотрен администратором. После подтверждения вам поступит SMS и уведомление в приложении."
+                          : "Buyurtma admin tomonidan ko'rib chiqiladi. Tasdiqlanishi bilan sizga SMS va mobil ilovada bildirishnoma boradi.")}
                   </p>
                 </div>
               </form>

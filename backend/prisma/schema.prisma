@@ -127,8 +127,6 @@ model Order {
   totalAmount     Decimal?    @db.Decimal(14, 2)
   isPaid          Boolean     @default(false)
   paidAt          DateTime?
-  inpayOrderId    String?
-  inpayTransId    Int?
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -138,18 +136,36 @@ model Order {
 }
 
 model Customer {
-  id                     Int       @id @default(autoincrement())
-  phone                  String?   @unique
+  id                     Int            @id @default(autoincrement())
+  phone                  String?        @unique
   name                   String
-  organization           String?   @default("")
+  organization           String?        @default("")
   avatar                 String?
   passwordHash           String?
   resetPasswordOtpSentAt DateTime?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  pushToken              String?
+  hasApp                 Boolean        @default(false)
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
   orders                 Order[]
+  notifications          Notification[]
 
   @@index([phone])
+}
+
+model Notification {
+  id         Int       @id @default(autoincrement())
+  customerId Int?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  phone      String?
+  title      String
+  body       String
+  orderId    Int?
+  isRead     Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId, createdAt])
+  @@index([phone, createdAt])
 }
 
 model OrderItem {

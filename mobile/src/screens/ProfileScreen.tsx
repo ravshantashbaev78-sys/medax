@@ -22,6 +22,8 @@ import {
   loginCustomerWithPassword,
   uploadCustomerAvatar,
   getImageUrl,
+  fetchNotifications,
+  markNotificationsRead,
 } from "../api";
 import {
   ShieldIcon,
@@ -46,6 +48,46 @@ export function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Bildirishnomalar holati
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+
+  const loadNotifications = async () => {
+    if (!customer) return;
+    setLoadingNotifications(true);
+    try {
+      const res = await fetchNotifications();
+      if (res && res.notifications) {
+        setNotifications(res.notifications);
+        setUnreadCount(res.unreadCount || 0);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    if (customer) {
+      loadNotifications();
+    } else {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }, [customer]);
+
+  const handleMarkAllRead = async () => {
+    try {
+      await markNotificationsRead();
+      setUnreadCount(0);
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    } catch {
+      // ignore
+    }
+  };
 
   useEffect(() => {
     if (countdown <= 0) return;
@@ -221,6 +263,57 @@ export function ProfileScreen() {
                 <Text style={styles.pillTextGreen}>✓ {t("profile_status_active")}</Text>
               </View>
             </View>
+          </View>
+
+          {/* Bildirishnomalar kartasi */}
+          <View style={[styles.notificationsCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+            <View style={styles.notifHeader}>
+              <View style={styles.notifTitleRow}>
+                <Text style={[styles.infoTitle, { color: colors.text, marginBottom: 0 }]}>🔔 Bildirishnomalar</Text>
+                {unreadCount > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+                  </View>
+                )}
+              </View>
+              {unreadCount > 0 && (
+                <TouchableOpacity onPress={handleMarkAllRead} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <Text style={[styles.markReadText, { color: colors.primary }]}>O'qildi deb belgilash</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {loadingNotifications && notifications.length === 0 ? (
+              <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
+            ) : notifications.length === 0 ? (
+              <Text style={[styles.emptyNotifText, { color: colors.textMuted }]}>
+                Hozircha yangi bildirishnomalar yo'q
+              </Text>
+            ) : (
+              <View style={styles.notifList}>
+                {notifications.slice(0, 5).map((n) => (
+                  <View
+                    key={n.id}
+                    style={[
+                      styles.notifItem,
+                      {
+                        borderBottomColor: colors.border,
+                        backgroundColor: n.isRead ? "transparent" : colors.primary + "14",
+                      },
+                    ]}
+                  >
+                    <View style={styles.notifItemHeader}>
+                      <Text style={[styles.notifItemTitle, { color: colors.text }]}>{n.title}</Text>
+                      {!n.isRead && <View style={[styles.blueDot, { backgroundColor: colors.primary }]} />}
+                    </View>
+                    <Text style={[styles.notifItemBody, { color: colors.textMuted }]}>{n.body}</Text>
+                    <Text style={[styles.notifItemTime, { color: colors.textMuted }]}>
+                      {new Date(n.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.8}>
@@ -606,6 +699,21 @@ const styles = StyleSheet.create({
 
   logoutBtn: { width: "100%", paddingVertical: 12, borderRadius: 12, backgroundColor: "#fee2e2", alignItems: "center" },
   logoutBtnText: { color: "#dc2626", fontSize: 14, fontWeight: "800" },
+
+  notificationsCard: { width: "100%", borderRadius: 16, padding: 14, borderWidth: 1, marginBottom: 16 },
+  notifHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
+  notifTitleRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  unreadBadge: { backgroundColor: "#ef4444", borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1 },
+  unreadBadgeText: { color: "#ffffff", fontSize: 11, fontWeight: "800" },
+  markReadText: { fontSize: 12, fontWeight: "700" },
+  emptyNotifText: { fontSize: 13, textAlign: "center", paddingVertical: 14 },
+  notifList: { gap: 8 },
+  notifItem: { padding: 10, borderRadius: 10, borderBottomWidth: 1 },
+  notifItemHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+  notifItemTitle: { fontSize: 13.5, fontWeight: "700", flex: 1 },
+  blueDot: { width: 8, height: 8, borderRadius: 4, marginLeft: 6 },
+  notifItemBody: { fontSize: 12.5, lineHeight: 17, marginBottom: 4 },
+  notifItemTime: { fontSize: 11, textAlign: "right" },
 
   settingsCard: { borderRadius: 24, padding: 20, borderWidth: 1, elevation: 2, marginBottom: 16 },
   cardTitle: { fontSize: 16, fontWeight: "800", marginBottom: 14 },

@@ -28,7 +28,7 @@ export function CartScreen({ navigation }: any) {
   const [phone, setPhone] = useState(customer?.phone || "+998 ");
   const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"inpay" | "cash">("inpay");
+  const [paymentMethod, setPaymentMethod] = useState<string>("Do'konda to'lash (Olib ketishda)");
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
@@ -105,36 +105,11 @@ export function CartScreen({ navigation }: any) {
       setOtpSent(false);
       setOtpCode("");
 
-      if (res.payUrl) {
-        Alert.alert(
-          "Buyurtma qabul qilindi! 🎉",
-          `Buyurtma kodi: ${res.code || ""}\n\ninPAY xavfsiz to'lov sahifasiga o'tasizmi? (Click, Payme, Uzcard, Humo)`,
-          [
-            {
-              text: "To'lovga o'tish",
-              onPress: async () => {
-                try {
-                  await Linking.openURL(res.payUrl!);
-                } catch {
-                  Alert.alert("Xatolik", "To'lov havolasini ochishda muammo yuz berdi.");
-                }
-                navigation.navigate("Asosiy");
-              },
-            },
-            {
-              text: "Keyinroq",
-              style: "cancel",
-              onPress: () => navigation.navigate("Asosiy"),
-            },
-          ]
-        );
-      } else {
-        Alert.alert(
-          "Buyurtmangiz qabul qilindi! 🎉",
-          `Buyurtma raqami: #${res.code || res.orderId || "yangi"}.\nTez orada mutaxassisimiz siz bilan bog'lanadi.`,
-          [{ text: "Tushunarli", onPress: () => navigation.navigate("Asosiy") }]
-        );
-      }
+      Alert.alert(
+        "Buyurtmangiz qabul qilindi! 🎉",
+        `Buyurtma raqami: #${res.code || res.orderId || "yangi"}.\n\nAdmin buyurtmangizni ko'rib chiqadi. Tasdiqlanishi bilan sizga SMS va mobil ilovada bildirishnoma boradi.`,
+        [{ text: "Tushunarli", onPress: () => navigation.navigate("Asosiy") }]
+      );
     } else {
       Alert.alert("Xatolik", res.error || "Buyurtma yuborishda xatolik yuz berdi");
     }
@@ -281,66 +256,25 @@ export function CartScreen({ navigation }: any) {
           {/* Payment Method Selection */}
           <Text style={[styles.label, { marginTop: 8, marginBottom: 8 }]}>To'lov usuli *</Text>
 
-          {/* Option 1: inPAY */}
+          {/* Option: Cash / Store pickup */}
           <TouchableOpacity
             style={[
               styles.payOption,
-              paymentMethod === "inpay" && !hasUnpriced && styles.payOptionActive,
-              hasUnpriced && styles.payOptionDisabled,
+              styles.payOptionActive,
+              { marginTop: 4 },
             ]}
-            onPress={() => !hasUnpriced && setPaymentMethod("inpay")}
-            activeOpacity={hasUnpriced ? 1 : 0.8}
-          >
-            <View style={styles.radioCircle}>
-              {paymentMethod === "inpay" && !hasUnpriced && <View style={styles.radioDot} />}
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.payOptionHeader}>
-                <Text style={styles.payTitle}>💳 inPAY — Onlayn to'lov</Text>
-              </View>
-              <Text style={styles.payDesc}>
-                {hasUnpriced
-                  ? "Savatda narxi kelishiladigan tovarlar bo'lgani sababli faqat qabul qilishda to'lash mumkin."
-                  : "Click, Payme, Uzcard, Humo kartalari orqali xavfsiz va tezkor onlayn to'lov."}
-              </Text>
-              {!hasUnpriced && (
-                <View style={styles.payBadgesRow}>
-                  <View style={[styles.payPill, { backgroundColor: "#00a0e3" }]}>
-                    <Text style={styles.payPillText}>Click</Text>
-                  </View>
-                  <View style={[styles.payPill, { backgroundColor: "#00cccc" }]}>
-                    <Text style={[styles.payPillText, { color: "#003b3e" }]}>Payme</Text>
-                  </View>
-                  <View style={[styles.payPill, { backgroundColor: "#1e3a8a" }]}>
-                    <Text style={styles.payPillText}>Uzcard</Text>
-                  </View>
-                  <View style={[styles.payPill, { backgroundColor: "#ea580c" }]}>
-                    <Text style={styles.payPillText}>Humo</Text>
-                  </View>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-
-          {/* Option 2: Cash / Store pickup */}
-          <TouchableOpacity
-            style={[
-              styles.payOption,
-              (paymentMethod === "cash" || hasUnpriced) && styles.payOptionActive,
-              { marginTop: 8 },
-            ]}
-            onPress={() => setPaymentMethod("cash")}
+            onPress={() => setPaymentMethod("Do'konda to'lash (Olib ketishda)")}
             activeOpacity={0.8}
           >
             <View style={styles.radioCircle}>
-              {(paymentMethod === "cash" || hasUnpriced) && <View style={styles.radioDot} />}
+              <View style={styles.radioDot} />
             </View>
             <View style={{ flex: 1 }}>
               <View style={styles.payOptionHeader}>
-                <Text style={styles.payTitle}>💵 Qabul qilishda to'lash</Text>
+                <Text style={styles.payTitle}>🏪 Do'konda to'lash (Olib ketishda)</Text>
               </View>
               <Text style={styles.payDesc}>
-                Do'kondan olib ketishda yoki topshirilganda naqd / terminal / bank o'tkazmasi orqali to'lov.
+                Uskunani ko'rib, tekshirib olgach to'laysiz (Naqd pul, karta/terminal yoki hisob-faktura).
               </Text>
             </View>
           </TouchableOpacity>
@@ -412,8 +346,6 @@ export function CartScreen({ navigation }: any) {
                 <Text style={styles.orderBtnText}>
                   {!token && !otpSent
                     ? "SMS kod olish va buyurtma berish →"
-                    : paymentMethod === "inpay" && !hasUnpriced
-                    ? "inPAY orqali to'lash →"
                     : "Buyurtmani tasdiqlash →"}
                 </Text>
               </View>

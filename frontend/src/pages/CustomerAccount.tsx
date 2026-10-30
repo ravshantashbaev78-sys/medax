@@ -41,20 +41,34 @@ export default function CustomerAccount() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab");
 
-  const [tab, setTab] = useState<"orders" | "profile">(
-    tabParam === "profile" ? "profile" : "orders"
+  const [tab, setTab] = useState<"orders" | "notifications" | "profile">(
+    tabParam === "profile" ? "profile" : tabParam === "notifications" ? "notifications" : "orders"
   );
   const [orders, setOrders] = useState<CustomerOrder[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(true);
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     if (tabParam === "profile") setTab("profile");
+    else if (tabParam === "notifications") setTab("notifications");
     else if (tabParam === "orders") setTab("orders");
   }, [tabParam]);
 
-  const switchTab = (newTab: "orders" | "profile") => {
+  const switchTab = (newTab: "orders" | "notifications" | "profile") => {
     setTab(newTab);
     setSearchParams(newTab === "orders" ? {} : { tab: newTab });
+    if (newTab === "notifications" && unreadNotifications > 0) {
+      fetch("/api/customer/notifications/read-all", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token || ""}`,
+          "X-Authorization": `Bearer ${token || ""}`,
+          "X-Customer-Token": token || "",
+        },
+      }).catch(() => {});
+      setUnreadNotifications(0);
+    }
   };
 
   // Profile edit states
@@ -139,8 +153,26 @@ export default function CustomerAccount() {
       .finally(() => setLoadingOrders(false));
   };
 
+  const loadNotifications = () => {
+    if (!token) return;
+    fetch("/api/customer/notifications", {
+      headers: {
+        Authorization: `Bearer ${token || ""}`,
+        "X-Authorization": `Bearer ${token || ""}`,
+        "X-Customer-Token": token || "",
+      },
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setNotifications(data.notifications || []);
+        setUnreadNotifications(data.unreadCount || 0);
+      })
+      .catch(() => {});
+  };
+
   useEffect(() => {
     loadOrders();
+    loadNotifications();
   }, [token]);
 
   const handleCancelOrder = async (orderId: number) => {
@@ -347,6 +379,30 @@ export default function CustomerAccount() {
         </button>
 
         <button
+          className={`tab-btn ${tab === "notifications" ? "active" : ""}`}
+          onClick={() => switchTab("notifications")}
+          style={{ position: "relative" }}
+        >
+          <span style={{ fontSize: 18 }}>🔔</span>
+          <span>Bildirishnomalar</span>
+          {unreadNotifications > 0 && (
+            <span
+              style={{
+                marginLeft: 4,
+                padding: "2px 7px",
+                borderRadius: 10,
+                background: "#ef4444",
+                color: "#fff",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {unreadNotifications}
+            </span>
+          )}
+        </button>
+
+        <button
           className={`tab-btn ${tab === "profile" ? "active" : ""}`}
           onClick={() => switchTab("profile")}
         >
@@ -493,6 +549,48 @@ export default function CustomerAccount() {
         </section>
       )}
 
+      {/* 2. NOTIFICATIONS TAB */}
+      {tab === "notifications" && (
+        <section className="account-orders-section">
+          {notifications.length === 0 ? (
+            <div className="empty-orders-card">
+              <span style={{ fontSize: 44 }}>🔔</span>
+              <h3>Bildirishnomalar mavjud emas</h3>
+              <p className="muted">Buyurtmangiz tasdiqlanganda yoki holati o'zgarganda bu yerda xabar chiqadi.</p>
+            </div>
+          ) : (
+            <div className="orders-list">
+              {notifications.map((n) => (
+                <article
+                  key={n.id}
+                  className="customer-order-card"
+                  style={{
+                    borderLeft: n.isRead ? "3px solid var(--line)" : "4px solid var(--brand, #0284c7)",
+                    background: n.isRead ? "var(--card)" : "rgba(2, 132, 199, 0.04)",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                    <div>
+                      <strong style={{ fontSize: 16, color: "var(--ink)" }}>{n.title}</strong>
+                      <p style={{ margin: "6px 0 0", fontSize: 14, color: "var(--ink2)", lineHeight: 1.5 }}>
+                        {n.body}
+                      </p>
+                    </div>
+                    <span style={{ fontSize: 12, color: "var(--ink2)", whiteSpace: "nowrap" }}>
+                      {new Date(n.createdAt).toLocaleDateString(dateLocale, {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* 3. PROFILE TAB */}
       {tab === "profile" && (

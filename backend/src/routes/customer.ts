@@ -576,3 +576,49 @@ customerRouter.post("/orders/:id/cancel", requireCustomerAuth, async (req, res) 
 
   res.json({ ok: true, order: updated });
 });
+
+// 7. Mobil ilova Push Tokenini saqlash
+customerRouter.post("/auth/push-token", requireCustomerAuth, async (req, res) => {
+  const { pushToken } = z.object({ pushToken: z.string().trim().min(5).max(255) }).parse(req.body);
+  await prisma.customer.update({
+    where: { id: req.customer!.id },
+    data: {
+      pushToken,
+      hasApp: true,
+    },
+  });
+  res.json({ ok: true, message: "Push token saqlandi" });
+});
+
+// 8. Mijozning bildirishnomalari ro'yxati
+customerRouter.get("/notifications", requireCustomerAuth, async (req, res) => {
+  const customerId = req.customer!.id;
+  const phone = req.customer!.phone;
+
+  const notifications = await prisma.notification.findMany({
+    where: {
+      OR: [{ customerId }, ...(phone ? [{ phone }] : [])],
+    },
+    orderBy: { createdAt: "desc" },
+    take: 50,
+  });
+
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
+  res.json({ notifications, unreadCount });
+});
+
+// 9. Barcha bildirishnomalarni o'qilgan deb belgilash
+customerRouter.post("/notifications/read-all", requireCustomerAuth, async (req, res) => {
+  const customerId = req.customer!.id;
+  const phone = req.customer!.phone;
+
+  await prisma.notification.updateMany({
+    where: {
+      OR: [{ customerId }, ...(phone ? [{ phone }] : [])],
+      isRead: false,
+    },
+    data: { isRead: true },
+  });
+
+  res.json({ ok: true });
+});

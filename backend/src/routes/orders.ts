@@ -19,7 +19,6 @@ import {
 } from "../antispam";
 import { optionalCustomerAuth } from "./customer";
 import { getClientIp } from "../ip";
-import { createInpayPayment, getInpayTransactionStatus } from "../inpay";
 
 export const ordersRouter = Router();
 
@@ -158,27 +157,8 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
   const names = new Map(products.map((p) => [p.id, p.name]));
   const prices = new Map(products.map((p) => [p.id, p.priceFrom ? Number(p.priceFrom) : 0]));
 
-  // Narxi kelishiladigan (aniq narxsiz) mahsulotlar bormi?
-  const hasUnpriced = products.some((p) => !p.priceFrom || Number(p.priceFrom) <= 0);
-  if (body.paymentMethod === "inpay" && hasUnpriced) {
-    throw new HttpError(
-      400,
-      "Savatdagi mahsulotlar orasida narxi aniq belgilanmagan tovarlar mavjud. Bunday buyurtmalar faqat 'Do'konda to'lash / Kelishuv asosida' qabul qilinadi."
-    );
-  }
-
   // Jami buyurtma summasini hisoblaymiz
   const totalAmount = items.reduce((sum, item) => sum + (prices.get(item.productId) || 0) * item.quantity, 0);
-
-  // inPAY to'lov talablarini bazaga yozishdan oldin tekshiramiz (osilib qoluvchi buyurtmalar bo'lmasligi uchun)
-  if (body.paymentMethod === "inpay") {
-    if (totalAmount < 1000) {
-      throw new HttpError(400, "inPAY orqali to'lash uchun buyurtma summasi kamida 1 000 so'm bo'lishi kerak.");
-    }
-    if (!config.inpay.merchantId || !config.inpay.merchantToken) {
-      throw new HttpError(503, "inPAY to'lov tizimi sozlanmagan. Iltimos, 'Do'konda to'lash' usulini tanlang yoki do'kon bilan bog'laning.");
-    }
-  }
 
   // Mehmon bo'lsa, OTP kodini tekshiramiz (hech qanday master kodlarsiz!)
   let otpRecordId: number | null = null;
@@ -199,8 +179,7 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
 
   const orderCode = "MDX-" + crypto.randomBytes(3).toString("hex").toUpperCase();
 
-  // 1. LIMITLARNI VA BUYURTMANI AVVAL BAZADA TEKSHIRAMIZ VA SAQLAYMIZ
-  // (Buning natijasida to'lov havolasi limit tekshiruvidan keyin xavfsiz shakllanadi)
+  // LIMITLARNI VA BUYURTMANI BAZADA SAQLAYMIZ
   let createdOrderId: number;
   await prisma.$transaction(async (tx) => {
     // Atomar limit tekshiruvi
@@ -239,7 +218,7 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
         status: "NEW",
         organization: body.organization,
         deliveryAddress: body.deliveryAddress,
-        paymentMethod: body.paymentMethod,
+        paymentMethod: body.paymentMethod || "Do'konda to'lash (Olib ketishda)",
         comment: body.comment,
         ip,
         flags,
@@ -259,110 +238,11 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
     createdOrderId = ord.id;
   });
 
-  let payUrl: string | undefined;
-
-  // 2. Agar inPAY to'lov usuli tanlangan bo'lsa, to'lov havolasini olamiz
-  if (body.paymentMethod === "inpay") {
-    try {
-      const payment = await createInpayPayment({
-        amount: totalAmount,
-        description: `Medax buyurtma #${orderCode}`,
-        phone,
-        clientIp: ip || undefined,
-      });
-      payUrl = payment.payUrl;
-      await prisma.order.update({
-        where: { id: createdOrderId! },
-        data: { inpayOrderId: payment.orderId },
-      });
-    } catch (err: any) {
-      console.error("inPAY yaratishda xatolik:", err);
-      // Agar to'lov havolasi olinmasa, buyurtmani bekor qilamiz
-      await prisma.order.update({
-        where: { id: createdOrderId! },
-        data: {
-          status: "CANCELED",
-          managerNote: `inPAY tizimida to'lov yaratilmadi: ${err?.message || "Xatolik"}`,
-        },
-      });
-      throw new HttpError(502, err.message || "inPAY to'lov hisobini shakllantirishda xatolik yuz berdi.");
-    }
-  }
-
-  res.status(201).json({ ok: true, code: orderCode, orderId: createdOrderId!, payUrl });
+  res.status(201).json({ ok: true, code: orderCode, orderId: createdOrderId! });
 });
 
-// inPAY Webhook bildirishnomasi (Server-to-Server qat'iy tekshiruv bilan)
-ordersRouter.post("/inpay/callback", async (req, res) => {
-  try {
-    const { order_id, transaction_id } = req.body || {};
-    console.log("[inPAY Webhook Received]", { order_id, transaction_id });
-
-    if (!order_id) {
-      return res.status(400).json({ ok: false, message: "order_id topilmadi" });
-    }
-
-    const order = await prisma.order.findFirst({
-      where: { inpayOrderId: String(order_id) },
-    });
-
-    if (!order) {
-      console.warn(`[inPAY Webhook] Buyurtma topilmadi: inpayOrderId=${order_id}`);
-      return res.status(200).json({ ok: true, message: "Buyurtma topilmadi" });
-    }
-
-    if (order.isPaid) {
-      return res.status(200).json({ ok: true, message: "Allaqachon to'langan" });
-    }
-
-    // SERVER-TO-SERVER ISHONCHLI TEKSHIRUV:
-    // Mijoz yuborgan body'ga ISHONILMAYDI! inPAY API'sidan o'zimiz so'rab bilamiz!
-    const inpayStatus = (await getInpayTransactionStatus(order.inpayOrderId!)) as any;
-    console.log(`[inPAY Webhook Verified] #${order.code}:`, inpayStatus);
-
-    if (inpayStatus && inpayStatus.success && inpayStatus.status === "success") {
-      const paidAmount = Number(inpayStatus.amount || 0);
-      const expectedAmount = Number(order.totalAmount || 0);
-
-      // Summa to'liq mos kelishini tekshiramiz
-      if (Math.abs(paidAmount - expectedAmount) > 1) {
-        console.error(
-          `[inPAY Webhook Xavfsizlik Ogohlantirishi] Summa mos kelmadi! Kutilgan: ${expectedAmount}, Kelgan: ${paidAmount}`
-        );
-        return res.status(400).json({ ok: false, error: "To'lov summasi buyurtmaga mos kelmadi" });
-      }
-
-      await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          status: "CONFIRMED",
-          isPaid: true,
-          paidAt: new Date(),
-          inpayTransId: inpayStatus.transaction_id ? Number(inpayStatus.transaction_id) : (transaction_id ? Number(transaction_id) : undefined),
-        },
-      });
-      console.log(`[inPAY Webhook] Buyurtma #${order.code} muvaffaqiyatli to'landi va tasdiqlandi.`);
-    } else if (inpayStatus && (inpayStatus.status === "failed" || inpayStatus.status === "cancelled")) {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: {
-          status: "CANCELED",
-          managerNote: order.managerNote
-            ? `${order.managerNote} | inPAY: to'lov bekor qilindi (${inpayStatus.status})`
-            : `inPAY: to'lov bekor qilindi (${inpayStatus.status})`,
-        },
-      });
-    }
-
-    return res.status(200).json({ ok: true });
-  } catch (err: any) {
-    console.error("[inPAY Webhook Error]:", err);
-    return res.status(200).json({ ok: false, error: err?.message || "Server xatosi" });
-  }
-});
-
-// To'lov holatini tekshirish (Limit bilan himoyalangan va server-tekshiruvli)
-ordersRouter.get("/check-payment/:code", orderIpLimiter, async (req, res) => {
+// Buyurtma holatini ko'rish
+ordersRouter.get("/status/:code", orderIpLimiter, async (req, res) => {
   const code = String(req.params.code);
   const order = await prisma.order.findUnique({
     where: { code },
@@ -372,39 +252,12 @@ ordersRouter.get("/check-payment/:code", orderIpLimiter, async (req, res) => {
       status: true,
       isPaid: true,
       paidAt: true,
-      inpayOrderId: true,
       totalAmount: true,
+      createdAt: true,
     },
   });
 
   if (!order) throw new HttpError(404, "Buyurtma topilmadi");
-
-  // Agar hali to'lanmagan bo'lsa va inpayOrderId bo'lsa, inPAY dan rasmiy so'rab tekshiramiz
-  if (!order.isPaid && order.inpayOrderId) {
-    try {
-      const statusData = (await getInpayTransactionStatus(order.inpayOrderId)) as any;
-      if (statusData && statusData.success && statusData.status === "success") {
-        const paidAmount = Number(statusData.amount || 0);
-        const expectedAmount = Number(order.totalAmount || 0);
-
-        if (Math.abs(paidAmount - expectedAmount) <= 1) {
-          await prisma.order.update({
-            where: { id: order.id },
-            data: {
-              status: "CONFIRMED",
-              isPaid: true,
-              paidAt: new Date(),
-              inpayTransId: statusData.transaction_id ? Number(statusData.transaction_id) : undefined,
-            },
-          });
-          return res.json({ ok: true, isPaid: true, status: "CONFIRMED" });
-        }
-      }
-    } catch (e) {
-      // inPAY vaqtincha javob bermasa e'tiborsiz qoldiramiz
-    }
-  }
-
-  res.json({ ok: true, isPaid: order.isPaid, status: order.status });
+  res.json({ ok: true, order });
 });
 

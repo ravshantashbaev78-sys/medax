@@ -233,11 +233,11 @@ export async function submitOrder(orderData: {
   phone: string;
   deliveryAddress?: string;
   organization?: string;
-  paymentMethod?: "inpay" | "cash" | string;
+  paymentMethod?: string;
   comment?: string;
   code?: string;
   items: { productId: number; quantity: number }[];
-}): Promise<{ ok: boolean; orderId?: number; code?: string; payUrl?: string; error?: string }> {
+}): Promise<{ ok: boolean; orderId?: number; code?: string; error?: string }> {
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -248,9 +248,9 @@ export async function submitOrder(orderData: {
     const payload: Record<string, any> = {
       name: orderData.customerName,
       phone: cleanPhone,
-      deliveryAddress: orderData.deliveryAddress || "Yetkazib berish (Mobil ilova)",
+      deliveryAddress: orderData.deliveryAddress || "Do'kondan olib ketish",
       organization: orderData.organization || "",
-      paymentMethod: orderData.paymentMethod || "inpay",
+      paymentMethod: orderData.paymentMethod || "Do'konda to'lash (Olib ketishda)",
       comment: orderData.comment || "",
       items: orderData.items,
       elapsedMs: 3000,
@@ -271,5 +271,51 @@ export async function submitOrder(orderData: {
     return data;
   } catch (err: any) {
     return { ok: false, error: err.message || "Tarmoqda xatolik yuz berdi" };
+  }
+}
+
+export async function registerPushToken(pushToken: string): Promise<boolean> {
+  try {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+    const res = await fetch(`${API_BASE}/customer/auth/push-token`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ pushToken }),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+export async function fetchNotifications(): Promise<{ notifications: any[]; unreadCount: number }> {
+  try {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    if (!token) return { notifications: [], unreadCount: 0 };
+    const res = await fetch(`${API_BASE}/customer/notifications`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return { notifications: [], unreadCount: 0 };
+    return await res.json();
+  } catch {
+    return { notifications: [], unreadCount: 0 };
+  }
+}
+
+export async function markNotificationsRead(): Promise<boolean> {
+  try {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+    const res = await fetch(`${API_BASE}/customer/notifications/read-all`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.ok;
+  } catch {
+    return false;
   }
 }
