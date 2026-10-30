@@ -71,12 +71,21 @@ export default function Contact() {
         },
       });
 
-      // Agar mijoz tomonida VITE_EMAILJS_* kalitlari kiritilgan bo'lsa, EmailJS ga ham yuborish
-      const viteServiceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID;
-      const viteTemplateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID;
-      const vitePublicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY;
+      // EmailJS orqali to'g'ridan-to'g'ri brauzerdan medaxuz@gmail.com ga xabar jo'natish
+      const viteServiceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID || "service_adkop5n";
+      const viteTemplateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID || "template_ilce5bo";
+      const vitePublicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY || "kfwGWpE7XBQH2_06B";
 
       if (viteServiceId && viteTemplateId && vitePublicKey) {
+        const timeNow = new Date().toLocaleString("uz-UZ", {
+          timeZone: "Asia/Tashkent",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
         fetch("https://api.emailjs.com/api/v1.0/email/send", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -90,8 +99,10 @@ export default function Contact() {
               phone: phone.trim(),
               email: email.trim() || "Keltirilmagan",
               reply_to: email.trim() || officialEmail,
-              subject: subject.trim() || "Saytdan yangi murojaat",
-              message: message.trim(),
+              title: subject.trim() || `Yangi murojaat (${name.trim()})`,
+              subject: subject.trim() || `Yangi murojaat (${name.trim()})`,
+              message: `${message.trim()}\n\n📞 Telefon: ${phone.trim()}${email ? `\n✉️ Email: ${email.trim()}` : ""}\n📅 Sana: ${timeNow}`,
+              time: timeNow,
               to_email: officialEmail,
             },
           }),

@@ -1,7 +1,7 @@
-const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
-const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
+const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "service_adkop5n";
+const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "template_ilce5bo";
 const EMAILJS_ORDER_TEMPLATE_ID = process.env.EMAILJS_ORDER_TEMPLATE_ID || EMAILJS_TEMPLATE_ID;
-const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || process.env.EMAILJS_USER_ID || "";
+const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || process.env.EMAILJS_USER_ID || "kfwGWpE7XBQH2_06B";
 const EMAILJS_PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY || process.env.EMAILJS_ACCESS_TOKEN || "";
 const GMAIL_DESTINATION = process.env.GMAIL_DESTINATION || "medaxuz@gmail.com";
 
@@ -44,6 +44,9 @@ async function sendViaEmailJS(params: SendEmailJsParams): Promise<boolean> {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+        "Origin": "https://medax.uz",
+        "Referer": "https://medax.uz/",
       },
       body: JSON.stringify(payload),
     });
@@ -110,7 +113,7 @@ ${data.message}
       reply_to: data.email || GMAIL_DESTINATION,
       subject: mailSubject,
       title: mailSubject,
-      message: data.message,
+      message: `${data.message}\n\n📞 Telefon: ${data.phone}${data.email ? `\n✉️ Email: ${data.email}` : ""}\n📅 Sana: ${formattedDate}`,
       full_message: fullSummary,
       summary: fullSummary,
       date: formattedDate,
