@@ -13,8 +13,10 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
+import { useI18n } from "../context/I18nContext";
 import { sendCustomerOtp, verifyCustomerOtp, loginCustomerWithPassword } from "../api";
 import { MedaxEmblem } from "../components/Icons";
+import { SuccessModal } from "../components/SuccessModal";
 
 interface AuthGateScreenProps {
   onContinue: () => void;
@@ -23,6 +25,7 @@ interface AuthGateScreenProps {
 export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
   const insets = useSafeAreaInsets();
   const { loginWithToken } = useAuth();
+  const { t } = useI18n();
 
   const [step, setStep] = useState<"phone" | "otp" | "password">("phone");
   const [phone, setPhone] = useState("+998 ");
@@ -31,6 +34,13 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+
+  // Chiroyli muvaffaqiyat modal oynasi
+  const [successInfo, setSuccessInfo] = useState<{ visible: boolean; title: string; message: string; customerName?: string }>({
+    visible: false,
+    title: "",
+    message: "",
+  });
 
   // Countdown timer for SMS resend
   useEffect(() => {
@@ -49,7 +59,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
   const handleSendOtp = async () => {
     const clean = phone.replace(/[^\d+]/g, "");
     if (clean.length < 13) {
-      Alert.alert("Xatolik", "Iltimos, to'liq telefon raqamingizni kiriting (+998 XX XXX XX XX)");
+      Alert.alert(t("error"), "Iltimos, to'liq telefon raqamingizni kiriting (+998 XX XXX XX XX)");
       return;
     }
     setLoading(true);
@@ -59,10 +69,10 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
         setCountdown(res.resendIn || 60);
         setStep("otp");
       } else {
-        Alert.alert("Xatolik", res.error || "SMS yuborishda xatolik yuz berdi");
+        Alert.alert(t("error"), res.error || "SMS yuborishda xatolik yuz berdi");
       }
     } catch {
-      Alert.alert("Xatolik", "Internet aloqasini tekshiring");
+      Alert.alert(t("error"), "Internet aloqasini tekshiring");
     } finally {
       setLoading(false);
     }
@@ -70,7 +80,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
 
   const handleVerifyOtp = async () => {
     if (code.trim().length !== 6) {
-      Alert.alert("Xatolik", "Iltimos, 6 xonali tasdiqlash kodini to'liq kiriting");
+      Alert.alert(t("error"), "Iltimos, 6 xonali tasdiqlash kodini to'liq kiriting");
       return;
     }
     setLoading(true);
@@ -78,13 +88,16 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
       const res = await verifyCustomerOtp(phone, code, name);
       if (res.ok && res.token && res.customer) {
         await loginWithToken(res.token, res.customer);
-        Alert.alert("Muvaffaqiyatli!", `Xush kelibsiz, ${res.customer.name}!`);
-        onContinue();
+        setSuccessInfo({
+          visible: true,
+          title: t("auth_success_title"),
+          message: `${t("auth_welcome")}, ${res.customer.name}!`,
+        });
       } else {
-        Alert.alert("Xatolik", res.error || "Kiritilgan kod noto'g'ri");
+        Alert.alert(t("error"), res.error || "Kiritilgan kod noto'g'ri");
       }
     } catch {
-      Alert.alert("Xatolik", "Tarmoqda xatolik yuz berdi");
+      Alert.alert(t("error"), "Tarmoqda xatolik yuz berdi");
     } finally {
       setLoading(false);
     }
@@ -92,7 +105,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
 
   const handlePasswordLogin = async () => {
     if (!password.trim()) {
-      Alert.alert("Xatolik", "Parolni kiriting");
+      Alert.alert(t("error"), "Parolni kiriting");
       return;
     }
     setLoading(true);
@@ -100,13 +113,16 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
       const res = await loginCustomerWithPassword(phone, password);
       if (res.ok && res.token && res.customer) {
         await loginWithToken(res.token, res.customer);
-        Alert.alert("Muvaffaqiyatli!", `Xush kelibsiz, ${res.customer.name}!`);
-        onContinue();
+        setSuccessInfo({
+          visible: true,
+          title: t("auth_success_title"),
+          message: `${t("auth_welcome")}, ${res.customer.name}!`,
+        });
       } else {
-        Alert.alert("Xatolik", res.error || "Telefon raqam yoki parol noto'g'ri");
+        Alert.alert(t("error"), res.error || "Telefon raqam yoki parol noto'g'ri");
       }
     } catch {
-      Alert.alert("Xatolik", "Tarmoqda xatolik yuz berdi");
+      Alert.alert(t("error"), "Tarmoqda xatolik yuz berdi");
     } finally {
       setLoading(false);
     }
@@ -293,6 +309,18 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Chiroyli muvaffaqiyat modal oynasi */}
+      <SuccessModal
+        visible={successInfo.visible}
+        title={successInfo.title}
+        message={successInfo.message}
+        buttonText={t("btn_continue")}
+        onClose={() => {
+          setSuccessInfo((prev) => ({ ...prev, visible: false }));
+          onContinue();
+        }}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -302,8 +330,8 @@ const styles = StyleSheet.create({
   topSection: { alignItems: "center", marginTop: 10, marginBottom: 16 },
   brandTitleWrap: { flexDirection: "row", marginTop: 10 },
   brandMed: { fontSize: 28, fontWeight: "900", color: "#0284c7" },
-  brandAx: { fontSize: 28, fontWeight: "900", color: "#0f172a" },
-  tagline: { fontSize: 9, fontWeight: "800", color: "#64748b", letterSpacing: 1, marginTop: 2 },
+  brandAx: { fontSize: 28, fontWeight: "900", color: "#16a34a" },
+  tagline: { fontSize: 9, fontWeight: "900", color: "#0f172a", letterSpacing: 1, marginTop: 2 },
 
   card: {
     backgroundColor: "#ffffff",

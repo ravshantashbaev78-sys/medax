@@ -96,6 +96,54 @@ const translations: Record<Language, Record<string, string>> = {
     onboarding_next: "Keyingisi →",
     onboarding_start: "Boshlash ✓",
     onboarding_slogan: "TIBBIY USKUNALAR",
+
+    // Notifications
+    notif_title: "Bildirishnomalar",
+    notif_mark_read: "O'qildi deb belgilash",
+    notif_empty: "Hozircha yangi bildirishnomalar yo'q",
+
+    // Home Extra
+    home_cabinet: "Kabinet 👤",
+    home_popular_sub: "Klinikalar va shifokorlar tanlovi",
+    home_no_products: "Hozircha mahsulotlar yuklanmadi",
+    home_questions_title: "Savollaringiz bormi?",
+    home_questions_sub: "Malakali muhandis va mutaxassislarimiz uskuna tanlashda yordam beradi.",
+    home_work_hours: "Du-Sha: 09:00 - 18:00",
+    trust_delivery: "Tezkor yetkazish",
+    trust_delivery_sub: "Butun O'zbekiston",
+    trust_warranty: "Rasmiy kafolat",
+    trust_warranty_sub: "Zavod servisi",
+    trust_cert: "Sertifikat",
+    trust_cert_sub: "100% asl uskunalar",
+    trust_eng: "24/7 Muhandis",
+    trust_eng_sub: "O'rnatib berish",
+    prod_add_cart: "Savatchaga",
+    prod_added: "Qo'shildi",
+    home_catalog_btn: "Katalog →",
+
+    // Cart Extra
+    cart_pay_cash_title: "🏪 Do'konda to'lash (Olib ketishda)",
+    cart_pay_cash_desc: "Uskunani ko'rib, tekshirib olgach to'laysiz (Naqd pul, karta/terminal yoki hisob-faktura).",
+    cart_sec_note: "Barcha to'lovlar va ma'lumotlar 256-bit shifrlangan",
+    cart_otp_title: "SMS tasdiqlash kodi *",
+    cart_otp_sub: "raqamiga yuborilgan 6 xonali kodni kiriting",
+    cart_resend_code: "Kodni qayta yuborish",
+    cart_get_code_btn: "SMS kod olish va buyurtma berish →",
+    cart_confirm_btn: "Buyurtmani tasdiqlash →",
+
+    // Auth & Modal
+    auth_success_title: "Muvaffaqiyatli! 🎉",
+    auth_welcome: "Xush kelibsiz",
+    btn_continue: "Davom etish →",
+    order_success_title: "Buyurtmangiz qabul qilindi! 🎉",
+    order_success_sub: "Buyurtma raqami: #{code}.\nAdmin buyurtmangizni ko'rib chiqadi va sizga SMS xabarnoma boradi.",
+    auth_phone_label: "Telefon raqamingiz",
+    auth_name_label: "Ism-familiyangiz (ixtiyoriy)",
+    auth_get_code: "SMS kodni olish →",
+    auth_password_link: "Parol orqali kirish",
+    auth_otp_title: "SMS kod (6 xonali)",
+    auth_verify_btn: "Tasdiqlash va kirish ✓",
+    auth_change_phone: "Raqamni o'zgartirish",
   },
   ru: {
     // Nav
@@ -189,6 +237,54 @@ const translations: Record<Language, Record<string, string>> = {
     onboarding_next: "Далее →",
     onboarding_start: "Начать ✓",
     onboarding_slogan: "МЕДИЦИНСКАЯ ТЕХНИКА",
+
+    // Notifications
+    notif_title: "Уведомления",
+    notif_mark_read: "Отметить прочитанным",
+    notif_empty: "Новых уведомлений пока нет",
+
+    // Home Extra
+    home_cabinet: "Кабинет 👤",
+    home_popular_sub: "Выбор клиник и врачей",
+    home_no_products: "Товары пока не загружены",
+    home_questions_title: "Есть вопросы?",
+    home_questions_sub: "Наши инженеры и специалисты помогут с выбором оборудования.",
+    home_work_hours: "Пн-Сб: 09:00 - 18:00",
+    trust_delivery: "Быстрая доставка",
+    trust_delivery_sub: "По всему Узбекистану",
+    trust_warranty: "Официальная гарантия",
+    trust_warranty_sub: "Заводской сервис",
+    trust_cert: "Сертификаты",
+    trust_cert_sub: "100% подлинное",
+    trust_eng: "24/7 Инженер",
+    trust_eng_sub: "Установка и наладка",
+    prod_add_cart: "В корзину",
+    prod_added: "Добавлено",
+    home_catalog_btn: "В каталог →",
+
+    // Cart Extra
+    cart_pay_cash_title: "🏪 Оплата в магазине (Самовывоз)",
+    cart_pay_cash_desc: "Оплата после осмотра оборудования (Наличные, карта или перечисление).",
+    cart_sec_note: "Все платежи и данные защищены 256-битным шифрованием",
+    cart_otp_title: "Код подтверждения из SMS *",
+    cart_otp_sub: "введите 6-значный код, отправленный на номер",
+    cart_resend_code: "Отправить код повторно",
+    cart_get_code_btn: "Получить SMS код и заказать →",
+    cart_confirm_btn: "Подтвердить заказ →",
+
+    // Auth & Modal
+    auth_success_title: "Успешно! 🎉",
+    auth_welcome: "Добро пожаловать",
+    btn_continue: "Продолжить →",
+    order_success_title: "Ваш заказ принят! 🎉",
+    order_success_sub: "Номер заказа: #{code}.\nАдминистратор обработает заказ, и вам поступит SMS уведомление.",
+    auth_phone_label: "Номер телефона",
+    auth_name_label: "Ваше имя (необязательно)",
+    auth_get_code: "Получить SMS код →",
+    auth_password_link: "Войти по паролю",
+    auth_otp_title: "SMS код (6 цифр)",
+    auth_verify_btn: "Подтвердить и войти ✓",
+    auth_change_phone: "Изменить номер",
   },
   en: {
     // Nav
@@ -282,6 +378,54 @@ const translations: Record<Language, Record<string, string>> = {
     onboarding_next: "Next →",
     onboarding_start: "Get Started ✓",
     onboarding_slogan: "MEDICAL EQUIPMENT",
+
+    // Notifications
+    notif_title: "Notifications",
+    notif_mark_read: "Mark all as read",
+    notif_empty: "No new notifications yet",
+
+    // Home Extra
+    home_cabinet: "Account 👤",
+    home_popular_sub: "Top choice of clinics & doctors",
+    home_no_products: "No products loaded yet",
+    home_questions_title: "Have questions?",
+    home_questions_sub: "Our certified engineers and specialists will assist you in selecting equipment.",
+    home_work_hours: "Mon-Sat: 09:00 - 18:00",
+    trust_delivery: "Fast Delivery",
+    trust_delivery_sub: "Across Uzbekistan",
+    trust_warranty: "Official Warranty",
+    trust_warranty_sub: "Factory Service",
+    trust_cert: "Certified",
+    trust_cert_sub: "100% Original",
+    trust_eng: "24/7 Engineers",
+    trust_eng_sub: "Installation & Setup",
+    prod_add_cart: "Add to cart",
+    prod_added: "Added",
+    home_catalog_btn: "Catalog →",
+
+    // Cart Extra
+    cart_pay_cash_title: "🏪 Pay at Store (Pickup)",
+    cart_pay_cash_desc: "Pay after inspecting the equipment (Cash, card or bank transfer).",
+    cart_sec_note: "All data and transactions are 256-bit encrypted",
+    cart_otp_title: "SMS Verification Code *",
+    cart_otp_sub: "enter the 6-digit code sent to",
+    cart_resend_code: "Resend Code",
+    cart_get_code_btn: "Get SMS Code & Checkout →",
+    cart_confirm_btn: "Confirm Order →",
+
+    // Auth & Modal
+    auth_success_title: "Success! 🎉",
+    auth_welcome: "Welcome",
+    btn_continue: "Continue →",
+    order_success_title: "Order Received! 🎉",
+    order_success_sub: "Order number: #{code}.\nAdmin will review your order and you will receive an SMS confirmation.",
+    auth_phone_label: "Phone Number",
+    auth_name_label: "Your Name (optional)",
+    auth_get_code: "Get SMS Code →",
+    auth_password_link: "Log in with password",
+    auth_otp_title: "SMS Code (6 digits)",
+    auth_verify_btn: "Verify & Log in ✓",
+    auth_change_phone: "Change phone number",
   },
 };
 

@@ -10,6 +10,8 @@ import {
   ScrollView,
   Image,
   TextInput,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -32,6 +34,7 @@ import {
   BoltIcon,
   CertificateIcon,
 } from "../components/Icons";
+import { SuccessModal } from "../components/SuccessModal";
 
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -48,6 +51,13 @@ export function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  // Chiroyli muvaffaqiyat modal oynasi
+  const [successModal, setSuccessModal] = useState<{ visible: boolean; title: string; message: string }>({
+    visible: false,
+    title: "",
+    message: "",
+  });
 
   // Bildirishnomalar holati
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -134,7 +144,11 @@ export function ProfileScreen() {
       const res = await verifyCustomerOtp(phone, otpCode, name);
       if (res.ok && res.token && res.customer) {
         await loginWithToken(res.token, res.customer);
-        Alert.alert("Muvaffaqiyatli! 🎉", `Xush kelibsiz, ${res.customer.name}!`);
+        setSuccessModal({
+          visible: true,
+          title: t("auth_success_title"),
+          message: `${t("auth_welcome")}, ${res.customer.name}!`,
+        });
         setAuthMode("phone");
         setOtpCode("");
       } else {
@@ -157,7 +171,11 @@ export function ProfileScreen() {
       const res = await loginCustomerWithPassword(phone, password);
       if (res.ok && res.token && res.customer) {
         await loginWithToken(res.token, res.customer);
-        Alert.alert("Muvaffaqiyatli! 🎉", `Xush kelibsiz, ${res.customer.name}!`);
+        setSuccessModal({
+          visible: true,
+          title: t("auth_success_title"),
+          message: `${t("auth_welcome")}, ${res.customer.name}!`,
+        });
         setAuthMode("phone");
         setPassword("");
       } else {
@@ -205,12 +223,16 @@ export function ProfileScreen() {
   const avatarLetter = displayName.charAt(0).toUpperCase();
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colors.bg }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + 14 }]}
-      showsVerticalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
+      <ScrollView
+        style={[styles.container, { backgroundColor: colors.bg }]}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + 14 }]}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+      >
       {customer ? (
         /* Foydalanuvchi tizimga kirgan holat */
         <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -269,7 +291,7 @@ export function ProfileScreen() {
           <View style={[styles.notificationsCard, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
             <View style={styles.notifHeader}>
               <View style={styles.notifTitleRow}>
-                <Text style={[styles.infoTitle, { color: colors.text, marginBottom: 0 }]}>🔔 Bildirishnomalar</Text>
+                <Text style={[styles.infoTitle, { color: colors.text, marginBottom: 0 }]}>🔔 {t("notif_title")}</Text>
                 {unreadCount > 0 && (
                   <View style={styles.unreadBadge}>
                     <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
@@ -278,7 +300,7 @@ export function ProfileScreen() {
               </View>
               {unreadCount > 0 && (
                 <TouchableOpacity onPress={handleMarkAllRead} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                  <Text style={[styles.markReadText, { color: colors.primary }]}>O'qildi deb belgilash</Text>
+                  <Text style={[styles.markReadText, { color: colors.primary }]}>{t("notif_mark_read")}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -287,7 +309,7 @@ export function ProfileScreen() {
               <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 12 }} />
             ) : notifications.length === 0 ? (
               <Text style={[styles.emptyNotifText, { color: colors.textMuted }]}>
-                Hozircha yangi bildirishnomalar yo'q
+                {t("notif_empty")}
               </Text>
             ) : (
               <View style={styles.notifList}>
@@ -325,6 +347,13 @@ export function ProfileScreen() {
         <View style={[styles.loginCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.emblemWrap}>
             <MedaxEmblem size={56} />
+            <View style={{ flexDirection: "row", marginTop: 8 }}>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: "#0284c7" }}>Med</Text>
+              <Text style={{ fontSize: 24, fontWeight: "900", color: "#16a34a" }}>ax</Text>
+            </View>
+            <Text style={{ fontSize: 8.5, fontWeight: "900", color: "#0f172a", letterSpacing: 0.8, marginTop: 1 }}>
+              MEDTEXNIKA MARKAZI
+            </Text>
           </View>
           <Text style={[styles.loginTitle, { color: colors.text }]}>{t("profile_title")}</Text>
           <Text style={[styles.loginSub, { color: colors.textMuted }]}>
@@ -337,7 +366,7 @@ export function ProfileScreen() {
 
           {authMode === "phone" && (
             <View style={styles.formWidth}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Telefon raqamingiz</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_phone_label")}</Text>
               <TextInput
                 style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                 value={phone}
@@ -347,7 +376,7 @@ export function ProfileScreen() {
                 placeholderTextColor={colors.textMuted}
               />
 
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Ism-familiyangiz (ixtiyoriy)</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_name_label")}</Text>
               <TextInput
                 style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                 value={name}
@@ -365,7 +394,7 @@ export function ProfileScreen() {
                 {loading ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.submitBtnText}>{t("profile_tg_btn")} →</Text>
+                  <Text style={styles.submitBtnText}>{t("auth_get_code")}</Text>
                 )}
               </TouchableOpacity>
 
@@ -373,14 +402,14 @@ export function ProfileScreen() {
                 style={styles.switchLink}
                 onPress={() => setAuthMode("password")}
               >
-                <Text style={[styles.switchLinkText, { color: colors.primary }]}>Parol orqali kirish</Text>
+                <Text style={[styles.switchLinkText, { color: colors.primary }]}>{t("auth_password_link")}</Text>
               </TouchableOpacity>
             </View>
           )}
 
           {authMode === "otp" && (
             <View style={styles.formWidth}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>SMS kod (6 xonali)</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_otp_title")}</Text>
               <TextInput
                 style={[
                   styles.inputField,
@@ -405,7 +434,7 @@ export function ProfileScreen() {
                 {loading ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.submitBtnText}>Tasdiqlash va kirish ✓</Text>
+                  <Text style={styles.submitBtnText}>{t("auth_verify_btn")}</Text>
                 )}
               </TouchableOpacity>
 
@@ -414,11 +443,11 @@ export function ProfileScreen() {
                   <Text style={[styles.timerText, { color: colors.textMuted }]}>Qayta yuborish: {countdown}s</Text>
                 ) : (
                   <TouchableOpacity onPress={handleSendOtp}>
-                    <Text style={[styles.resendText, { color: colors.primary }]}>Kodni qayta yuborish</Text>
+                    <Text style={[styles.resendText, { color: colors.primary }]}>{t("cart_resend_code")}</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity onPress={() => setAuthMode("phone")}>
-                  <Text style={[styles.backText, { color: colors.textMuted }]}>Raqamni o'zgartirish</Text>
+                  <Text style={[styles.backText, { color: colors.textMuted }]}>{t("auth_change_phone")}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -426,7 +455,7 @@ export function ProfileScreen() {
 
           {authMode === "password" && (
             <View style={styles.formWidth}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Telefon raqamingiz</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_phone_label")}</Text>
               <TextInput
                 style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                 value={phone}
@@ -607,6 +636,16 @@ export function ProfileScreen() {
         </View>
       </View>
     </ScrollView>
+
+    {/* Chiroyli muvaffaqiyat modal oynasi */}
+    <SuccessModal
+      visible={successModal.visible}
+      title={successModal.title}
+      message={successModal.message}
+      buttonText={t("btn_continue")}
+      onClose={() => setSuccessModal({ visible: false, title: "", message: "" })}
+    />
+  </KeyboardAvoidingView>
   );
 }
 

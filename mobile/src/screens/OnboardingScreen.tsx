@@ -404,23 +404,8 @@ export function OnboardingScreen({ onFinish }: OnboardingScreenProps) {
           </View>
         </View>
 
-        {/* Right Header: Language Pills & Skip Button */}
+        {/* Right Header: Skip Button */}
         <View style={styles.headerRight}>
-          <View style={styles.langSwitchWrap}>
-            {(["uz", "ru", "en"] as const).map((l) => (
-              <TouchableOpacity
-                key={l}
-                style={[styles.langPill, lang === l && styles.langPillActive]}
-                onPress={() => setLang(l)}
-                activeOpacity={0.7}
-              >
-                <Text style={[styles.langText, lang === l && styles.langTextActive]}>
-                  {l.toUpperCase()}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
           {currentIndex < SLIDES.length - 1 ? (
             <TouchableOpacity onPress={handleComplete} style={styles.skipBtn} activeOpacity={0.7}>
               <Text style={styles.skipText}>{t("onboarding_skip")}</Text>
@@ -580,8 +565,8 @@ const styles = StyleSheet.create({
   },
   logoRow: { flexDirection: "row", alignItems: "center" },
   logoMed: { fontSize: 19, fontWeight: "900", color: "#0284c7" },
-  logoAx: { fontSize: 19, fontWeight: "900", color: "#0f172a" },
-  logoSub: { fontSize: 7.5, fontWeight: "800", color: "#64748b", letterSpacing: 0.7 },
+  logoAx: { fontSize: 19, fontWeight: "900", color: "#16a34a" },
+  logoSub: { fontSize: 7.5, fontWeight: "800", color: "#0f172a", letterSpacing: 0.7 },
   headerRight: {
     flexDirection: "row",
     alignItems: "center",

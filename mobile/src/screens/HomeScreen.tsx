@@ -12,7 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Category, fetchCategories, fetchProducts, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
-import { useI18n, localizeCategoryName, localizeProductName } from "../context/I18nContext";
+import { useI18n, localizeCategoryName, localizeProductName, Language } from "../context/I18nContext";
 import {
   MedaxHeaderBrand,
   SearchIcon,
@@ -26,56 +26,59 @@ import {
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // Web saytdagi 4 ta asosiy banner rasmlari va matnlari
-const BANNER_SLIDES = [
-  {
-    id: 1,
-    tag: "NOGIRONLAR ARAVACHALARI",
-    title1: "Pultli nogironlar",
-    title2: "aravachasi Medax’da",
-    desc: "Yengil akkumulyatorli, qulay va xavfsiz boshqaruv",
-    badges: ["✓ Original", "🛡 1 yil kafolat"],
-    img: "https://medax.uz/banners/wheelchair-remote.png",
-    bg: "#0f172a",
-    accent: "#38bdf8",
-  },
-  {
-    id: 2,
-    tag: "DIAGNOSTIKA & UZI",
-    title1: "Zamonaviy UZI",
-    title2: "apparatlari Medax’da",
-    desc: "Yuqori aniqlikdagi 4D datchiklar va rangli doppler",
-    badges: ["✓ Original", "🛡 Rasmiy servis"],
-    img: "https://medax.uz/banners/medical-diag.jpg",
-    bg: "#0369a1",
-    accent: "#bae6fd",
-  },
-  {
-    id: 3,
-    tag: "REANIMATSIYA & IVL",
-    title1: "Reanimatsiya va",
-    title2: "IVL jihozlari Medax’da",
-    desc: "O'pkani sun'iy shamollatish va hayotiy monitoring",
-    badges: ["✓ Sertifikatlangan", "🛡 24/7 servis"],
-    img: "https://medax.uz/banners/medical-surgery.jpg",
-    bg: "#065f46",
-    accent: "#6ee7b7",
-  },
-  {
-    id: 4,
-    tag: "TIBBIY MEBEL",
-    title1: "Funksional tibbiy",
-    title2: "kravatlar Medax’da",
-    desc: "Elektroprivodli boshqaruv va bemor uchun maksimal qulaylik",
-    badges: ["✓ Kafolatlangan", "🛡 1 yil kafolat"],
-    img: "https://medax.uz/banners/medical-bed.jpg",
-    bg: "#1e1b4b",
-    accent: "#c7d2fe",
-  },
-];
+function getBannerSlides(lang: Language) {
+  return [
+    {
+      id: 1,
+      tag: lang === "ru" ? "ИНВАЛИДНЫЕ КОЛЯСКИ" : lang === "en" ? "WHEELCHAIRS" : "NOGIRONLAR ARAVACHALARI",
+      title1: lang === "ru" ? "Электроколяски" : lang === "en" ? "Electric Wheelchairs" : "Pultli nogironlar",
+      title2: lang === "ru" ? "в наличии в Medax" : lang === "en" ? "available at Medax" : "aravachasi Medax’da",
+      desc: lang === "ru" ? "Легкие аккумуляторные, удобное и безопасное управление" : lang === "en" ? "Lightweight battery-powered, convenient and safe control" : "Yengil akkumulyatorli, qulay va xavfsiz boshqaruv",
+      badges: lang === "ru" ? ["✓ Оригинал", "🛡 1 год гарантии"] : lang === "en" ? ["✓ Original", "🛡 1 Year Warranty"] : ["✓ Original", "🛡 1 yil kafolat"],
+      img: "https://medax.uz/banners/wheelchair-remote.png",
+      bg: "#0f172a",
+      accent: "#38bdf8",
+    },
+    {
+      id: 2,
+      tag: "DIAGNOSTIKA & UZI",
+      title1: lang === "ru" ? "Современные УЗИ" : lang === "en" ? "Advanced Ultrasound" : "Zamonaviy UZI",
+      title2: lang === "ru" ? "аппараты в Medax" : lang === "en" ? "scanners at Medax" : "apparatlari Medax’da",
+      desc: lang === "ru" ? "Высокоточные 4D датчики и цветной допплер" : lang === "en" ? "High-precision 4D probes and color Doppler" : "Yuqori aniqlikdagi 4D datchiklar va rangli doppler",
+      badges: lang === "ru" ? ["✓ Оригинал", "🛡 Официальный сервис"] : lang === "en" ? ["✓ Original", "🛡 Official Service"] : ["✓ Original", "🛡 Rasmiy servis"],
+      img: "https://medax.uz/banners/medical-diag.jpg",
+      bg: "#0369a1",
+      accent: "#bae6fd",
+    },
+    {
+      id: 3,
+      tag: lang === "ru" ? "РЕАНИМАЦИЯ И ИВЛ" : lang === "en" ? "ICU & VENTILATORS" : "REANIMATSIYA & IVL",
+      title1: lang === "ru" ? "Реанимация и" : lang === "en" ? "ICU and" : "Reanimatsiya va",
+      title2: lang === "ru" ? "аппараты ИВЛ в Medax" : lang === "en" ? "Ventilators at Medax" : "IVL jihozlari Medax’da",
+      desc: lang === "ru" ? "Искусственная вентиляция легких и мониторинг" : lang === "en" ? "Artificial lung ventilation and vital monitoring" : "O'pkani sun'iy shamollatish va hayotiy monitoring",
+      badges: lang === "ru" ? ["✓ Сертифицировано", "🛡 24/7 сервис"] : lang === "en" ? ["✓ Certified", "🛡 24/7 Service"] : ["✓ Sertifikatlangan", "🛡 24/7 servis"],
+      img: "https://medax.uz/banners/medical-surgery.jpg",
+      bg: "#065f46",
+      accent: "#6ee7b7",
+    },
+    {
+      id: 4,
+      tag: lang === "ru" ? "МЕДИЦИНСКАЯ МЕБЕЛЬ" : lang === "en" ? "MEDICAL FURNITURE" : "TIBBIY MEBEL",
+      title1: lang === "ru" ? "Функциональные" : lang === "en" ? "Functional Medical" : "Funksional tibbiy",
+      title2: lang === "ru" ? "кровати в Medax" : lang === "en" ? "Beds at Medax" : "kravatlar Medax’da",
+      desc: lang === "ru" ? "Электропривод и максимальный комфорт для пациента" : lang === "en" ? "Electric drive and maximum patient comfort" : "Elektroprivodli boshqaruv va bemor uchun maksimal qulaylik",
+      badges: lang === "ru" ? ["✓ С гарантией", "🛡 1 год гарантии"] : lang === "en" ? ["✓ Guaranteed", "🛡 1 Year Warranty"] : ["✓ Kafolatlangan", "🛡 1 yil kafolat"],
+      img: "https://medax.uz/banners/medical-bed.jpg",
+      bg: "#1e1b4b",
+      accent: "#c7d2fe",
+    },
+  ];
+}
 
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { lang, t } = useI18n();
+  const bannerSlides = getBannerSlides(lang);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,10 +100,10 @@ export function HomeScreen({ navigation }: any) {
   // Banner avto-o'tishi
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentSlide((prev) => (prev + 1) % BANNER_SLIDES.length);
+      setCurrentSlide((prev) => (prev + 1) % bannerSlides.length);
     }, 4500);
     return () => clearInterval(timer);
-  }, []);
+  }, [bannerSlides.length]);
 
   useEffect(() => {
     Promise.all([fetchCategories(), fetchProducts()]).then(([cats, prods]) => {
@@ -116,7 +119,7 @@ export function HomeScreen({ navigation }: any) {
     setTimeout(() => setAddedId(null), 1200);
   };
 
-  const activeSlide = BANNER_SLIDES[currentSlide];
+  const activeSlide = bannerSlides[currentSlide] || bannerSlides[0];
 
   return (
     <View style={styles.screen}>
@@ -128,7 +131,7 @@ export function HomeScreen({ navigation }: any) {
           style={styles.headerPhoneBtn}
           onPress={() => navigation.navigate("Profil")}
         >
-          <Text style={{ fontSize: 12.5, color: "#0284c7", fontWeight: "800" }}>Kabinet 👤</Text>
+          <Text style={{ fontSize: 12.5, color: "#0284c7", fontWeight: "800" }}>{t("home_cabinet")}</Text>
         </TouchableOpacity>
       </View>
 
@@ -179,7 +182,7 @@ export function HomeScreen({ navigation }: any) {
                   onPress={() => navigation.navigate("Katalog")}
                 >
                   <Text style={[styles.bannerBtnText, { color: activeSlide.bg }]}>
-                    Katalog →
+                    {t("home_catalog_btn")}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -197,7 +200,7 @@ export function HomeScreen({ navigation }: any) {
 
           {/* Dots Indicator */}
           <View style={styles.dotsRow}>
-            {BANNER_SLIDES.map((_, idx) => (
+            {bannerSlides.map((_, idx) => (
               <TouchableOpacity
                 key={idx}
                 onPress={() => setCurrentSlide(idx)}
@@ -216,29 +219,29 @@ export function HomeScreen({ navigation }: any) {
             <View style={styles.trustIconWrap}>
               <TruckIcon size={19} color="#0284c7" />
             </View>
-            <Text style={styles.trustTitle}>Tezkor yetkazish</Text>
-            <Text style={styles.trustSub}>Butun O'zbekiston</Text>
+            <Text style={styles.trustTitle}>{t("trust_delivery")}</Text>
+            <Text style={styles.trustSub}>{t("trust_delivery_sub")}</Text>
           </View>
           <View style={styles.trustItem}>
             <View style={styles.trustIconWrap}>
               <ShieldIcon size={19} color="#0d9488" />
             </View>
-            <Text style={styles.trustTitle}>Rasmiy kafolat</Text>
-            <Text style={styles.trustSub}>Zavod servisi</Text>
+            <Text style={styles.trustTitle}>{t("trust_warranty")}</Text>
+            <Text style={styles.trustSub}>{t("trust_warranty_sub")}</Text>
           </View>
           <View style={styles.trustItem}>
             <View style={styles.trustIconWrap}>
               <CertificateIcon size={19} color="#4f46e5" />
             </View>
-            <Text style={styles.trustTitle}>Sertifikat</Text>
-            <Text style={styles.trustSub}>100% asl uskunalar</Text>
+            <Text style={styles.trustTitle}>{t("trust_cert")}</Text>
+            <Text style={styles.trustSub}>{t("trust_cert_sub")}</Text>
           </View>
           <View style={styles.trustItem}>
             <View style={styles.trustIconWrap}>
               <BoltIcon size={19} color="#eab308" />
             </View>
-            <Text style={styles.trustTitle}>24/7 Muhandis</Text>
-            <Text style={styles.trustSub}>O'rnatib berish</Text>
+            <Text style={styles.trustTitle}>{t("trust_eng")}</Text>
+            <Text style={styles.trustSub}>{t("trust_eng_sub")}</Text>
           </View>
         </View>
 
@@ -275,7 +278,7 @@ export function HomeScreen({ navigation }: any) {
         <View style={styles.sectionHeaderWrap}>
           <View>
             <Text style={styles.sectionTitle}>{t("home_popular")}</Text>
-            <Text style={styles.sectionSub}>Klinikalar va shifokorlar tanlovi</Text>
+            <Text style={styles.sectionSub}>{t("home_popular_sub")}</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate("Katalog")}>
             <Text style={styles.sectionSeeAll}>{t("cat_all_count")} →</Text>
@@ -286,7 +289,7 @@ export function HomeScreen({ navigation }: any) {
           <ActivityIndicator size="large" color="#0284c7" style={{ marginTop: 24 }} />
         ) : products.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>Hozircha mahsulotlar yuklanmadi</Text>
+            <Text style={styles.emptyText}>{t("home_no_products")}</Text>
           </View>
         ) : (
           <View style={styles.productGrid}>
@@ -369,7 +372,7 @@ export function HomeScreen({ navigation }: any) {
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
                           <CartIcon size={14} color={isAdded ? "#ffffff" : "#0284c7"} />
                           <Text style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}>
-                            {isAdded ? "Qo'shildi" : "Savatchaga"}
+                            {isAdded ? t("prod_added") : t("prod_add_cart")}
                           </Text>
                         </View>
                       </TouchableOpacity>
@@ -383,13 +386,13 @@ export function HomeScreen({ navigation }: any) {
 
         {/* 7. Callout Aloqa banneri */}
         <View style={styles.contactCallout}>
-          <Text style={styles.contactCalloutTitle}>Savollaringiz bormi?</Text>
+          <Text style={styles.contactCalloutTitle}>{t("home_questions_title")}</Text>
           <Text style={styles.contactCalloutDesc}>
-            Malakali muhandis va mutaxassislarimiz uskuna tanlashda yordam beradi.
+            {t("home_questions_sub")}
           </Text>
           <View style={styles.contactRow}>
             <Text style={styles.contactPhone}>📞 +998 91 186-66-61</Text>
-            <Text style={styles.contactHours}>Du-Sha: 09:00 - 18:00</Text>
+            <Text style={styles.contactHours}>{t("home_work_hours")}</Text>
           </View>
         </View>
       </ScrollView>
@@ -422,7 +425,7 @@ const styles = StyleSheet.create({
   },
 
   // Search
-  searchContainer: { backgroundColor: "#ffffff", paddingHorizontal: 16, paddingBottom: 10 },
+  searchContainer: { backgroundColor: "#ffffff", paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12 },
   searchBar: {
     backgroundColor: "#f1f5f9",
     borderRadius: 14,

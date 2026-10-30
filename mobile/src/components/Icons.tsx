@@ -414,6 +414,6 @@ const brandStyles = StyleSheet.create({
   wrap: { flexDirection: "row", alignItems: "center", gap: 10 },
   textWrap: { flexDirection: "column" },
   brandMed: { fontSize: 20, fontWeight: "900", color: "#0284c7", letterSpacing: -0.5 },
-  brandAx: { fontSize: 20, fontWeight: "900", color: "#0f172a", letterSpacing: -0.5 },
-  tagline: { fontSize: 7.5, fontWeight: "800", color: "#64748b", letterSpacing: 0.8, marginTop: -2 },
+  brandAx: { fontSize: 20, fontWeight: "900", color: "#16a34a", letterSpacing: -0.5 },
+  tagline: { fontSize: 7.5, fontWeight: "900", color: "#0f172a", letterSpacing: 0.8, marginTop: -2 },
 });

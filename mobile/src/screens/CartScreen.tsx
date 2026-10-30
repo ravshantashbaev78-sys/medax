@@ -10,6 +10,8 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
@@ -17,6 +19,7 @@ import { useAuth } from "../context/AuthContext";
 import { submitOrder, sendOrderOtp, getImageUrl, formatPrice } from "../api";
 import { useI18n, localizeProductName } from "../context/I18nContext";
 import { CartIcon, CloseIcon, ShieldIcon, BoltIcon } from "../components/Icons";
+import { SuccessModal } from "../components/SuccessModal";
 
 export function CartScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
@@ -33,6 +36,10 @@ export function CartScreen({ navigation }: any) {
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
+  const [orderSuccessModal, setOrderSuccessModal] = useState<{ visible: boolean; orderCode: string }>({
+    visible: false,
+    orderCode: "",
+  });
 
   useEffect(() => {
     let t: any;
@@ -104,12 +111,10 @@ export function CartScreen({ navigation }: any) {
       clearCart();
       setOtpSent(false);
       setOtpCode("");
-
-      Alert.alert(
-        "Buyurtmangiz qabul qilindi! 🎉",
-        `Buyurtma raqami: #${res.code || res.orderId || "yangi"}.\n\nAdmin buyurtmangizni ko'rib chiqadi. Tasdiqlanishi bilan sizga SMS va mobil ilovada bildirishnoma boradi.`,
-        [{ text: "Tushunarli", onPress: () => navigation.navigate("Asosiy") }]
-      );
+      setOrderSuccessModal({
+        visible: true,
+        orderCode: String(res.code || res.orderId || "yangi"),
+      });
     } else {
       Alert.alert("Xatolik", res.error || "Buyurtma yuborishda xatolik yuz berdi");
     }
@@ -121,16 +126,16 @@ export function CartScreen({ navigation }: any) {
         <View style={styles.emptyIconCircle}>
           <CartIcon size={46} color="#0284c7" />
         </View>
-        <Text style={styles.emptyTitle}>Savatchangiz bo'sh</Text>
+        <Text style={styles.emptyTitle}>{t("cart_empty_title")}</Text>
         <Text style={styles.emptyDesc}>
-          Katalogimizdan tibbiyot uskunalari va asbob-uskunalarni tanlang
+          {t("cart_empty_sub")}
         </Text>
         <TouchableOpacity
           style={styles.shopBtn}
           onPress={() => navigation.navigate("Katalog")}
           activeOpacity={0.85}
         >
-          <Text style={styles.shopBtnText}>Katalogni ko'rish →</Text>
+          <Text style={styles.shopBtnText}>{t("cart_go_catalog")}</Text>
         </TouchableOpacity>
       </View>
     );
@@ -142,232 +147,249 @@ export function CartScreen({ navigation }: any) {
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
           <CartIcon size={22} color="#0284c7" />
-          <Text style={styles.headerTitle}>Savat ({totalItems})</Text>
+          <Text style={styles.headerTitle}>{t("nav_cart")} ({totalItems})</Text>
         </View>
         <TouchableOpacity onPress={clearCart} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-          <Text style={styles.clearAll}>Tozalash</Text>
+          <Text style={styles.clearAll}>{t("cart_clear")}</Text>
         </TouchableOpacity>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {/* Cart Items */}
-        <View style={styles.itemList}>
-          {items.map(({ product, quantity }) => {
-            const imgUrl = getImageUrl(product.images?.[0]?.url);
-            const price = product.priceFrom ? Number(product.priceFrom) : 0;
-            return (
-              <View key={product.id} style={styles.card}>
-                <Image source={{ uri: imgUrl }} style={styles.cardImg} resizeMode="contain" />
-                <View style={styles.cardInfo}>
-                  <Text style={styles.cardName} numberOfLines={2}>
-                    {localizeProductName(product, lang)}
-                  </Text>
-                  <Text style={styles.cardPrice}>
-                    {price ? `${(price * quantity).toLocaleString()} UZS` : "Kelishuv asosida"}
-                  </Text>
-                  {product.stock !== undefined && (
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        color: (product.stock ?? 0) > 0 ? "#0284c7" : "#ef4444",
-                        fontWeight: "600",
-                        marginTop: 2,
-                      }}
-                    >
-                      {(product.stock ?? 0) > 0
-                        ? t("stock_in").replace("{n}", String(product.stock))
-                        : t("stock_cart_empty")}
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
+        >
+          {/* Cart Items */}
+          <View style={styles.itemList}>
+            {items.map(({ product, quantity }) => {
+              const imgUrl = getImageUrl(product.images?.[0]?.url);
+              const price = product.priceFrom ? Number(product.priceFrom) : 0;
+              return (
+                <View key={product.id} style={styles.card}>
+                  <Image source={{ uri: imgUrl }} style={styles.cardImg} resizeMode="contain" />
+                  <View style={styles.cardInfo}>
+                    <Text style={styles.cardName} numberOfLines={2}>
+                      {localizeProductName(product, lang)}
                     </Text>
-                  )}
+                    <Text style={styles.cardPrice}>
+                      {price ? `${(price * quantity).toLocaleString()} UZS` : "Kelishuv asosida"}
+                    </Text>
+                    {product.stock !== undefined && (
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: (product.stock ?? 0) > 0 ? "#0284c7" : "#ef4444",
+                          fontWeight: "600",
+                          marginTop: 2,
+                        }}
+                      >
+                        {(product.stock ?? 0) > 0
+                          ? t("stock_in").replace("{n}", String(product.stock))
+                          : t("stock_cart_empty")}
+                      </Text>
+                    )}
 
-                  <View style={styles.cardActions}>
-                    <View style={styles.qtyBox}>
+                    <View style={styles.cardActions}>
+                      <View style={styles.qtyBox}>
+                        <TouchableOpacity
+                          style={styles.qtyBtn}
+                          onPress={() => updateQuantity(product.id, quantity - 1)}
+                        >
+                          <Text style={styles.qtyBtnText}>−</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.qtyNumber}>{quantity}</Text>
+                        <TouchableOpacity
+                          style={styles.qtyBtn}
+                          disabled={product.stock !== undefined && quantity >= product.stock}
+                          onPress={() => updateQuantity(product.id, Math.min(product.stock ?? 100, quantity + 1))}
+                        >
+                          <Text style={styles.qtyBtnText}>+</Text>
+                        </TouchableOpacity>
+                      </View>
+
                       <TouchableOpacity
-                        style={styles.qtyBtn}
-                        onPress={() => updateQuantity(product.id, quantity - 1)}
+                        onPress={() => removeFromCart(product.id)}
+                        style={styles.removeBtn}
                       >
-                        <Text style={styles.qtyBtnText}>−</Text>
-                      </TouchableOpacity>
-                      <Text style={styles.qtyNumber}>{quantity}</Text>
-                      <TouchableOpacity
-                        style={styles.qtyBtn}
-                        disabled={product.stock !== undefined && quantity >= product.stock}
-                        onPress={() => updateQuantity(product.id, Math.min(product.stock ?? 100, quantity + 1))}
-                      >
-                        <Text style={styles.qtyBtnText}>+</Text>
+                        <CloseIcon size={14} color="#ef4444" />
+                        <Text style={styles.removeText}>{t("cart_clear") || "O'chirish"}</Text>
                       </TouchableOpacity>
                     </View>
-
-                    <TouchableOpacity
-                      onPress={() => removeFromCart(product.id)}
-                      style={styles.removeBtn}
-                    >
-                      <CloseIcon size={14} color="#ef4444" />
-                      <Text style={styles.removeText}>O'chirish</Text>
-                    </TouchableOpacity>
                   </View>
                 </View>
-              </View>
-            );
-          })}
-        </View>
-
-        {/* SMS Verified info or guest tip */}
-        {customer ? (
-          <View style={styles.authBadge}>
-            <ShieldIcon size={18} color="#0284c7" />
-            <Text style={styles.authBadgeText}>
-              SMS tasdiqlangan hisob: <Text style={{ fontWeight: "800", color: "#0f172a" }}>{customer.name}</Text>
-            </Text>
+              );
+            })}
           </View>
-        ) : null}
 
-        {/* Checkout Form */}
-        <View style={styles.checkoutBox}>
-          <Text style={styles.checkoutTitle}>Buyurtmani rasmiylashtirish</Text>
-          <Text style={styles.checkoutSub}>Ma'lumotlarni to'ldiring va to'lov usulini tanlang</Text>
-
-          <Text style={styles.label}>Ism va Familiya *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Masalan: Azizbek Karimov"
-            value={customerName}
-            onChangeText={setCustomerName}
-            placeholderTextColor="#94a3b8"
-          />
-
-          <Text style={styles.label}>Telefon raqamingiz *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="+998 90 123 45 67"
-            value={phone}
-            onChangeText={setPhone}
-            keyboardType="phone-pad"
-            placeholderTextColor="#94a3b8"
-          />
-
-          <Text style={styles.label}>Yetkazib berish / Olib ketish manzili *</Text>
-          <TextInput
-            style={styles.input}
-            placeholder="Viloyat, shahar, ko'cha, klinika yoki bino"
-            value={address}
-            onChangeText={setAddress}
-            placeholderTextColor="#94a3b8"
-          />
-
-          <Text style={styles.label}>Qo'shimcha izoh (ixtiyoriy)</Text>
-          <TextInput
-            style={[styles.input, { height: 64, textAlignVertical: "top" }]}
-            placeholder="Klinika nomi, o'rnatish yoki yetkazish vaqti"
-            value={comment}
-            onChangeText={setComment}
-            multiline
-            placeholderTextColor="#94a3b8"
-          />
-
-          {/* Payment Method Selection */}
-          <Text style={[styles.label, { marginTop: 8, marginBottom: 8 }]}>To'lov usuli *</Text>
-
-          {/* Option: Cash / Store pickup */}
-          <TouchableOpacity
-            style={[
-              styles.payOption,
-              styles.payOptionActive,
-              { marginTop: 4 },
-            ]}
-            onPress={() => setPaymentMethod("Do'konda to'lash (Olib ketishda)")}
-            activeOpacity={0.8}
-          >
-            <View style={styles.radioCircle}>
-              <View style={styles.radioDot} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <View style={styles.payOptionHeader}>
-                <Text style={styles.payTitle}>🏪 Do'konda to'lash (Olib ketishda)</Text>
-              </View>
-              <Text style={styles.payDesc}>
-                Uskunani ko'rib, tekshirib olgach to'laysiz (Naqd pul, karta/terminal yoki hisob-faktura).
+          {/* SMS Verified info or guest tip */}
+          {customer ? (
+            <View style={styles.authBadge}>
+              <ShieldIcon size={18} color="#0284c7" />
+              <Text style={styles.authBadgeText}>
+                SMS tasdiqlangan hisob: <Text style={{ fontWeight: "800", color: "#0f172a" }}>{customer.name}</Text>
               </Text>
             </View>
-          </TouchableOpacity>
+          ) : null}
 
-          {/* Total Row */}
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Jami to'lov:</Text>
-            <Text style={styles.totalValue}>
-              {totalPrice > 0 ? `${totalPrice.toLocaleString()} UZS` : "Kelishuv asosida"}
-            </Text>
-          </View>
+          {/* Checkout Form */}
+          <View style={styles.checkoutBox}>
+            <Text style={styles.checkoutTitle}>{t("cart_checkout_title")}</Text>
+            <Text style={styles.checkoutSub}>{t("cart_checkout_sub")}</Text>
 
-          {/* Security note */}
-          <View style={styles.secNote}>
-            <ShieldIcon size={14} color="#059669" />
-            <Text style={styles.secNoteText}>
-              Barcha to'lovlar va ma'lumotlar 256-bit shifrlangan
-            </Text>
-          </View>
+            <Text style={styles.label}>{t("cart_name_label")}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Masalan: Azizbek Karimov"
+              value={customerName}
+              onChangeText={setCustomerName}
+              placeholderTextColor="#94a3b8"
+            />
 
-          {/* Mehmonlar uchun OTP Kod kiritish maydoni */}
-          {!token && otpSent && (
-            <View style={styles.otpCard}>
-              <Text style={styles.otpTitle}>SMS tasdiqlash kodi *</Text>
-              <Text style={styles.otpSubtitle}>
-                {phone} raqamiga yuborilgan 6 xonali kodni kiriting
+            <Text style={styles.label}>{t("cart_phone_label")}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="+998 90 123 45 67"
+              value={phone}
+              onChangeText={setPhone}
+              keyboardType="phone-pad"
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.label}>{t("cart_address_label")}</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="Viloyat, shahar, ko'cha, klinika yoki bino"
+              value={address}
+              onChangeText={setAddress}
+              placeholderTextColor="#94a3b8"
+            />
+
+            <Text style={styles.label}>{t("cart_comment_label")}</Text>
+            <TextInput
+              style={[styles.input, { height: 64, textAlignVertical: "top" }]}
+              placeholder="Klinika nomi, o'rnatish yoki yetkazish vaqti"
+              value={comment}
+              onChangeText={setComment}
+              multiline
+              placeholderTextColor="#94a3b8"
+            />
+
+            {/* Payment Method Selection */}
+            <Text style={[styles.label, { marginTop: 8, marginBottom: 8 }]}>{t("cart_pay_method")}</Text>
+
+            {/* Option: Cash / Store pickup */}
+            <TouchableOpacity
+              style={[
+                styles.payOption,
+                styles.payOptionActive,
+                { marginTop: 4 },
+              ]}
+              onPress={() => setPaymentMethod("Do'konda to'lash (Olib ketishda)")}
+              activeOpacity={0.8}
+            >
+              <View style={styles.radioCircle}>
+                <View style={styles.radioDot} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={styles.payOptionHeader}>
+                  <Text style={styles.payTitle}>{t("cart_pay_cash_title")}</Text>
+                </View>
+                <Text style={styles.payDesc}>
+                  {t("cart_pay_cash_desc")}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            {/* Total Row */}
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>{t("cart_total_label")}</Text>
+              <Text style={styles.totalValue}>
+                {totalPrice > 0 ? `${totalPrice.toLocaleString()} UZS` : "Kelishuv asosida"}
               </Text>
-              <TextInput
-                style={styles.otpInput}
-                placeholder="123456"
-                value={otpCode}
-                onChangeText={setOtpCode}
-                keyboardType="number-pad"
-                maxLength={6}
-                placeholderTextColor="#94a3b8"
-              />
-              <TouchableOpacity
-                disabled={resendTimer > 0 || loading}
-                onPress={async () => {
-                  setLoading(true);
-                  const r = await sendOrderOtp(phone.trim());
-                  setLoading(false);
-                  if (r.ok) {
-                    setResendTimer(r.resendIn || 60);
-                    Alert.alert("SMS qayta yuborildi", "Yangi tasdiqlash kodi yuborildi.");
-                  } else {
-                    Alert.alert("Xatolik", r.error || "SMS yuborilmadi.");
-                  }
-                }}
-                style={styles.resendBtn}
-              >
-                <Text style={[styles.resendText, resendTimer > 0 && { color: "#94a3b8" }]}>
-                  {resendTimer > 0 ? `Kodni qayta yuborish (${resendTimer}s)` : "Kodni qayta yuborish"}
-                </Text>
-              </TouchableOpacity>
             </View>
-          )}
 
-          <TouchableOpacity
-            style={[styles.orderBtn, loading && { opacity: 0.7 }]}
-            onPress={handleCheckout}
-            disabled={loading}
-            activeOpacity={0.88}
-          >
-            {loading ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <Text style={styles.orderBtnText}>
-                  {!token && !otpSent
-                    ? "SMS kod olish va buyurtma berish →"
-                    : "Buyurtmani tasdiqlash →"}
+            {/* Security note */}
+            <View style={styles.secNote}>
+              <ShieldIcon size={14} color="#059669" />
+              <Text style={styles.secNoteText}>
+                {t("cart_sec_note")}
+              </Text>
+            </View>
+
+            {/* Mehmonlar uchun OTP Kod kiritish maydoni */}
+            {!token && otpSent && (
+              <View style={styles.otpCard}>
+                <Text style={styles.otpTitle}>{t("cart_otp_title")}</Text>
+                <Text style={styles.otpSubtitle}>
+                  {phone} {t("cart_otp_sub")}
                 </Text>
+                <TextInput
+                  style={styles.otpInput}
+                  placeholder="123456"
+                  value={otpCode}
+                  onChangeText={setOtpCode}
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  placeholderTextColor="#94a3b8"
+                />
+                <TouchableOpacity
+                  disabled={resendTimer > 0 || loading}
+                  onPress={async () => {
+                    setLoading(true);
+                    const r = await sendOrderOtp(phone.trim());
+                    setLoading(false);
+                    if (r.ok) {
+                      setResendTimer(r.resendIn || 60);
+                      Alert.alert("SMS qayta yuborildi", "Yangi tasdiqlash kodi yuborildi.");
+                    } else {
+                      Alert.alert("Xatolik", r.error || "SMS yuborilmadi.");
+                    }
+                  }}
+                  style={styles.resendBtn}
+                >
+                  <Text style={[styles.resendText, resendTimer > 0 && { color: "#94a3b8" }]}>
+                    {resendTimer > 0 ? `${t("cart_resend_code")} (${resendTimer}s)` : t("cart_resend_code")}
+                  </Text>
+                </TouchableOpacity>
               </View>
             )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+
+            <TouchableOpacity
+              style={[styles.orderBtn, loading && { opacity: 0.7 }]}
+              onPress={handleCheckout}
+              disabled={loading}
+              activeOpacity={0.88}
+            >
+              {loading ? (
+                <ActivityIndicator color="#ffffff" />
+              ) : (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={styles.orderBtnText}>
+                    {!token && !otpSent
+                      ? t("cart_get_code_btn")
+                      : t("cart_confirm_btn")}
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      <SuccessModal
+        visible={orderSuccessModal.visible}
+        title={t("order_success_title")}
+        message={t("order_success_sub").replace("{code}", orderSuccessModal.orderCode)}
+        buttonText={t("btn_continue")}
+        onClose={() => {
+          setOrderSuccessModal({ visible: false, orderCode: "" });
+          navigation.navigate("Asosiy");
+        }}
+      />
     </View>
   );
 }

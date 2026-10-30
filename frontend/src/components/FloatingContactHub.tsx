@@ -49,11 +49,14 @@ export function FloatingContactHub() {
         </div>
 
         <div className="floating-hub-items">
-          {/* 1. Telefon */}
+          {/* 1. Telefon qo'ng'iroq */}
           <a
             href={`tel:${phoneNum.replace(/\s+/g, "")}`}
             className="floating-hub-item hub-item-phone"
-            onClick={() => setOpen(false)}
+            onClick={() => {
+              window.location.href = `tel:${phoneNum.replace(/\s+/g, "")}`;
+              setTimeout(() => setOpen(false), 300);
+            }}
           >
             <div className="hub-item-icon">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -61,17 +64,33 @@ export function FloatingContactHub() {
               </svg>
             </div>
             <div className="hub-item-text">
-              <span className="hub-item-title">{t("float_call_btn")}</span>
-              <span className="hub-item-meta">{t("float_call_sub")}</span>
+              <span className="hub-item-title">{lang === "ru" ? "Позвонить" : lang === "en" ? "Call Us" : "Qo'ng'iroq qilish"}</span>
+              <span className="hub-item-meta">{phoneNum}</span>
             </div>
             <span className="hub-item-arrow" aria-hidden="true">→</span>
           </a>
 
-          {/* 2. Gmail */}
+          {/* 2. Murojaat qoldirish (Contact sahifasiga kirish) */}
+          <Link
+            to="/contact"
+            className="floating-hub-item hub-item-message"
+            onClick={() => setOpen(false)}
+          >
+            <div className="hub-item-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <div className="hub-item-text">
+              <span className="hub-item-title">{lang === "ru" ? "Оставить обращение" : lang === "en" ? "Send Inquiry" : "Murojaat qoldirish"}</span>
+              <span className="hub-item-meta">{lang === "ru" ? "Форма на сайте" : lang === "en" ? "Online form" : "Sayt orqali yozish"}</span>
+            </div>
+            <span className="hub-item-arrow" aria-hidden="true">→</span>
+          </Link>
+
+          {/* 3. Gmail pochta */}
           <a
-            href={gmailUrl}
-            target="_blank"
-            rel="noreferrer"
+            href={`mailto:${SITE_CONFIG.email}`}
             className="floating-hub-item hub-item-gmail"
             onClick={() => setOpen(false)}
           >
@@ -81,8 +100,8 @@ export function FloatingContactHub() {
               </svg>
             </div>
             <div className="hub-item-text">
-              <span className="hub-item-title">{t("float_gmail_btn")}</span>
-              <span className="hub-item-meta">{t("float_gmail_sub")}</span>
+              <span className="hub-item-title">{lang === "ru" ? "Написать на почту" : lang === "en" ? "Send Email" : "Gmail orqali yozish"}</span>
+              <span className="hub-item-meta">{SITE_CONFIG.email}</span>
             </div>
             <span className="hub-item-arrow" aria-hidden="true">→</span>
           </a>
@@ -100,8 +119,8 @@ export function FloatingContactHub() {
               </svg>
             </div>
             <div className="hub-item-text">
-              <span className="hub-item-title">{t("float_map_btn")}</span>
-              <span className="hub-item-meta">{t("float_map_sub")}</span>
+              <span className="hub-item-title">{lang === "ru" ? "Адрес и локация" : lang === "en" ? "Address & Map" : "Ofis manzili va xarita"}</span>
+              <span className="hub-item-meta">{lang === "ru" ? "г. Ташкент, Чиланзар" : lang === "en" ? "Tashkent, Chilanzar" : "Toshkent sh., Chilonzor"}</span>
             </div>
             <span className="hub-item-arrow" aria-hidden="true">→</span>
           </Link>
