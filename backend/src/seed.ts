@@ -71,6 +71,18 @@ export async function seedDatabase() {
     });
   }
 
+  // 4. Mahsulotlar ID ketma-ketligini (Sequence) sozlash:
+  // Agar bazada 0 ta mahsulot bo'lsa, keyingi qo'shiladigan mahsulot 1-ID dan boshlanadi.
+  const productCount = await prisma.product.count();
+  if (productCount === 0) {
+    try {
+      await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Product_id_seq" RESTART WITH 1;`);
+      console.log("[Seed] Mahsulotlar ID hisoblagichi 1 ga qaytarildi (restart with 1).");
+    } catch (e: any) {
+      console.warn("[Seed] Sequence qayta sozlashda e'tibor:", e?.message);
+    }
+  }
+
   // Mahsulotlar 0 ta saqlanadi: do'kon egasi o'zi admin panel orqali 0 dan kiritadi
   console.log("[Seed] Tizim tayyor: Mahsulotlar to'liq do'kon egasi tomonidan boshqariladi.");
 }
