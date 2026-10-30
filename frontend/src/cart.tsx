@@ -9,6 +9,7 @@ export interface CartItem {
   nameEn?: string | null;
   thumb?: string;
   priceFrom?: string | null;
+  stock?: number;
   quantity: number;
 }
 
@@ -77,7 +78,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
         });
         setItems((cur) => {
           const found = cur.find((i) => i.productId === p.id);
-          if (found) return cur.map((i) => (i.productId === p.id ? { ...i, quantity: Math.min(100, i.quantity + qty) } : i));
+          const maxStock = p.stock !== undefined && p.stock !== null ? p.stock : 100;
+          if (found) {
+            return cur.map((i) =>
+              i.productId === p.id
+                ? { ...i, stock: p.stock, quantity: Math.min(maxStock, i.quantity + qty) }
+                : i
+            );
+          }
           if (cur.length >= 20) return cur;
           return [
             ...cur,
@@ -87,15 +95,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
               name: p.name,
               nameRu: p.nameRu,
               nameEn: p.nameEn,
-              thumb: p.images[0]?.thumbUrl,
+              thumb: p.images?.[0]?.thumbUrl,
               priceFrom: p.priceFrom || null,
-              quantity: Math.min(100, qty),
+              stock: p.stock,
+              quantity: Math.min(maxStock, Math.max(1, qty)),
             },
           ];
         });
       },
       setQty: (productId, qty) =>
-        setItems((cur) => cur.map((i) => (i.productId === productId ? { ...i, quantity: Math.max(1, Math.min(100, qty || 1)) } : i))),
+        setItems((cur) =>
+          cur.map((i) => {
+            if (i.productId !== productId) return i;
+            const maxStock = i.stock !== undefined && i.stock !== null ? i.stock : 100;
+            return { ...i, quantity: Math.max(1, Math.min(maxStock, qty || 1)) };
+          })
+        ),
       remove: (productId) => setItems((cur) => cur.filter((i) => i.productId !== productId)),
       clear: () => setItems([]),
     }),

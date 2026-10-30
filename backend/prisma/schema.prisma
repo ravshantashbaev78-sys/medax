@@ -69,6 +69,7 @@ model Product {
   discountPercent Int?
   unit            String?           @default("dona")
   packageQty      Int?              @default(1)
+  stock           Int               @default(0)
   mfdDate         String?
   expDate         String?
   isHit           Boolean           @default(false)
@@ -127,6 +128,7 @@ model Order {
   totalAmount     Decimal?    @db.Decimal(14, 2)
   isPaid          Boolean     @default(false)
   paidAt          DateTime?
+  stockDeducted   Boolean     @default(false)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 

@@ -168,6 +168,18 @@ export function CartScreen({ navigation }: any) {
                   <Text style={styles.cardPrice}>
                     {price ? `${(price * quantity).toLocaleString()} UZS` : "Kelishuv asosida"}
                   </Text>
+                  {product.stock !== undefined && (
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: (product.stock ?? 0) > 0 ? "#0284c7" : "#ef4444",
+                        fontWeight: "600",
+                        marginTop: 2,
+                      }}
+                    >
+                      {(product.stock ?? 0) > 0 ? `Omborda: ${product.stock} dona` : "Omborda tugagan"}
+                    </Text>
+                  )}
 
                   <View style={styles.cardActions}>
                     <View style={styles.qtyBox}>
@@ -180,7 +192,8 @@ export function CartScreen({ navigation }: any) {
                       <Text style={styles.qtyNumber}>{quantity}</Text>
                       <TouchableOpacity
                         style={styles.qtyBtn}
-                        onPress={() => updateQuantity(product.id, quantity + 1)}
+                        disabled={product.stock !== undefined && quantity >= product.stock}
+                        onPress={() => updateQuantity(product.id, Math.min(product.stock ?? 100, quantity + 1))}
                       >
                         <Text style={styles.qtyBtnText}>+</Text>
                       </TouchableOpacity>

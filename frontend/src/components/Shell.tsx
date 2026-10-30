@@ -561,6 +561,19 @@ export function ProductCard({ p }: { p: Product }) {
 
         <div className="pr card-bottom-bar">
           <div className="price-block">
+            {p.stock !== undefined && (
+              <span
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 700,
+                  color: (p.stock ?? 0) > 0 ? "#0284c7" : "#dc2626",
+                  marginBottom: 2,
+                }}
+              >
+                {(p.stock ?? 0) > 0 ? `Omborda: ${p.stock} dona` : "Omborda tugagan"}
+              </span>
+            )}
             {hasDiscount && (
               <span className="price-old">
                 {Number(p.oldPrice).toLocaleString("ru-RU").replace(/,/g, " ")} {t("sum_currency")}
@@ -572,20 +585,35 @@ export function ProductCard({ p }: { p: Product }) {
             </span>
           </div>
 
-          <button
-            type="button"
-            className={`btn-quick-cart ${added ? "added" : ""}`}
-            onClick={onAddToCart}
-            aria-label={added ? addedLabel : t("pd_add_to_cart")}
-            title={added ? addedLabel : t("pd_add_to_cart")}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="9" cy="21" r="1" />
-              <circle cx="20" cy="21" r="1" />
-              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-            </svg>
-            <span>{added ? addedLabel : btnLabel}</span>
-          </button>
+          {p.stock !== undefined && p.stock <= 0 ? (
+            <span
+              style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: "#dc2626",
+                background: "#fef2f2",
+                padding: "6px 10px",
+                borderRadius: 8,
+              }}
+            >
+              Tugagan
+            </span>
+          ) : (
+            <button
+              type="button"
+              className={`btn-quick-cart ${added ? "added" : ""}`}
+              onClick={onAddToCart}
+              aria-label={added ? addedLabel : t("pd_add_to_cart")}
+              title={added ? addedLabel : t("pd_add_to_cart")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="9" cy="21" r="1" />
+                <circle cx="20" cy="21" r="1" />
+                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+              </svg>
+              <span>{added ? addedLabel : btnLabel}</span>
+            </button>
+          )}
         </div>
       </div>
     </article>

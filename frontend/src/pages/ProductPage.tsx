@@ -44,7 +44,7 @@ export default function ProductPage() {
   if (!p) return <main className="wrap"><p className="muted" style={{ padding: 40 }}>{lang === "ru" ? "Загрузка..." : lang === "en" ? "Loading..." : "Yuklanmoqda…"}</p></main>;
 
   const img = p.images[idx];
-  const setQ = (n: number) => setQty(Math.max(1, Math.min(100, n || 1)));
+  const setQ = (n: number) => setQty(Math.max(1, Math.min(p?.stock ?? 100, n || 1)));
 
   return (
     <main className="wrap">
@@ -91,8 +91,20 @@ export default function ProductPage() {
         <div>
           <div className="meta">
             <span className="stock-badge">
-              <span className="tel-pulse-dot" />
-              {t("in_stock")} · {t("hero_delivery_metric")}
+              <span className="tel-pulse-dot" style={{ backgroundColor: (p.stock ?? 1) > 0 ? "#10b981" : "#ef4444" }} />
+              {p.stock !== undefined && p.stock !== null ? (
+                p.stock > 0 ? (
+                  <>
+                    {lang === "ru" ? `В наличии: ${p.stock} шт` : lang === "en" ? `In stock: ${p.stock} pcs` : `Omborda: ${p.stock} dona mavjud`}
+                  </>
+                ) : (
+                  <span style={{ color: "#dc2626", fontWeight: 700 }}>
+                    {lang === "ru" ? "Нет в наличии" : lang === "en" ? "Out of stock" : "Omborda qolmagan (Tugagan)"}
+                  </span>
+                )
+              ) : (
+                <>{t("in_stock")} · {t("hero_delivery_metric")}</>
+              )}
             </span>
             {p.discountPercent && <span className="pill discount-pill">-{p.discountPercent}% AKSIYA</span>}
             {p.isNew && <span className="pill n">{lang === "ru" ? "Новая модель" : lang === "en" ? "New Model" : "Yangi model"}</span>}
@@ -140,26 +152,32 @@ export default function ProductPage() {
             )}
           </div>
 
-          <div className="buy">
-            <div className="qty">
-              <button onClick={() => setQ(qty - 1)} aria-label="Kamaytirish">−</button>
-              <input type="number" min={1} max={100} value={qty} onChange={(e) => setQ(Number(e.target.value))} aria-label="Soni" />
-              <button onClick={() => setQ(qty + 1)} aria-label="Ko'paytirish">+</button>
+          {p.stock !== undefined && p.stock <= 0 ? (
+            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "14px 18px", margin: "14px 0", color: "#991b1b", fontWeight: 700 }}>
+              ❌ {lang === "ru" ? "Данный товар временно закончился на складе." : lang === "en" ? "This product is temporarily out of stock." : "Ushbu mahsulot omborda tugagan."}
             </div>
-            <button className="btn btn-primary-sheen" onClick={() => { cart.add(p, qty); setAdded(true); }}>
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="21" r="1" />
-                <circle cx="20" cy="21" r="1" />
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-              </svg>
-              {t("pd_add_to_cart")}
-            </button>
-            {added && (
-              <button className="btn ghost pulse-btn" onClick={() => nav("/cart")}>
-                {t("nav_cart")} →
+          ) : (
+            <div className="buy">
+              <div className="qty">
+                <button onClick={() => setQ(qty - 1)} aria-label="Kamaytirish">−</button>
+                <input type="number" min={1} max={p?.stock ?? 100} value={qty} onChange={(e) => setQ(Number(e.target.value))} aria-label="Soni" />
+                <button onClick={() => setQ(qty + 1)} aria-label="Ko'paytirish">+</button>
+              </div>
+              <button className="btn btn-primary-sheen" onClick={() => { cart.add(p, qty); setAdded(true); }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="9" cy="21" r="1" />
+                  <circle cx="20" cy="21" r="1" />
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                </svg>
+                {t("pd_add_to_cart")}
               </button>
-            )}
-          </div>
+              {added && (
+                <button className="btn ghost pulse-btn" onClick={() => nav("/cart")}>
+                  {t("nav_cart")} →
+                </button>
+              )}
+            </div>
+          )}
           {added && (
             <div className="cart-feedback-banner">
               <span className="check-circle">✓</span>

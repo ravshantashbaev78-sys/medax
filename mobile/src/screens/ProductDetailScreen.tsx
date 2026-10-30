@@ -82,6 +82,18 @@ export function ProductDetailScreen({ route, navigation }: any) {
             )}
           </View>
 
+          <View style={styles.stockRow}>
+            <Text style={[styles.stockText, { color: (product.stock ?? 1) > 0 ? "#0284c7" : "#dc2626" }]}>
+              {product.stock !== undefined && product.stock !== null ? (
+                product.stock > 0
+                  ? `📦 Omborda: ${product.stock} dona mavjud`
+                  : "❌ Omborda qolmagan (Tugagan)"
+              ) : (
+                "📦 Omborda mavjud"
+              )}
+            </Text>
+          </View>
+
           {/* Description */}
           {product.description || product.descriptionRu || product.descriptionEn ? (
             <View style={styles.section}>
@@ -124,34 +136,44 @@ export function ProductDetailScreen({ route, navigation }: any) {
 
       {/* Bottom Bar: Quantity & Add to Cart */}
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-        <View style={styles.qtyControl}>
-          <TouchableOpacity
-            style={styles.qtyBtn}
-            onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-          >
-            <Text style={styles.qtyBtnText}>-</Text>
-          </TouchableOpacity>
-          <Text style={styles.qtyText}>{quantity}</Text>
-          <TouchableOpacity
-            style={styles.qtyBtn}
-            onPress={() => setQuantity((q) => q + 1)}
-          >
-            <Text style={styles.qtyBtnText}>+</Text>
-          </TouchableOpacity>
-        </View>
-
-        <TouchableOpacity
-          style={styles.addToCartBtn}
-          onPress={() => {
-            addToCart(product, quantity);
-            navigation.navigate("Savatcha");
-          }}
-        >
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <CartIcon size={18} color="#ffffff" />
-            <Text style={styles.addToCartText}>Savatchaga qo'shish</Text>
+        {product.stock !== undefined && product.stock <= 0 ? (
+          <View style={[styles.addToCartBtn, { backgroundColor: "#fee2e2", flex: 1, elevation: 0 }]}>
+            <Text style={{ color: "#dc2626", fontWeight: "800", fontSize: 15 }}>
+              Omborda tugagan
+            </Text>
           </View>
-        </TouchableOpacity>
+        ) : (
+          <>
+            <View style={styles.qtyControl}>
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+              >
+                <Text style={styles.qtyBtnText}>-</Text>
+              </TouchableOpacity>
+              <Text style={styles.qtyText}>{quantity}</Text>
+              <TouchableOpacity
+                style={styles.qtyBtn}
+                onPress={() => setQuantity((q) => Math.min(product.stock ?? 100, q + 1))}
+              >
+                <Text style={styles.qtyBtnText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={styles.addToCartBtn}
+              onPress={() => {
+                addToCart(product, quantity);
+                navigation.navigate("Savatcha");
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <CartIcon size={18} color="#ffffff" />
+                <Text style={styles.addToCartText}>Savatchaga qo'shish</Text>
+              </View>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
     </View>
   );
@@ -187,7 +209,9 @@ const styles = StyleSheet.create({
   body: { padding: 18 },
   catName: { fontSize: 11.5, fontWeight: "800", color: "#0284c7", textTransform: "uppercase", marginBottom: 6 },
   title: { fontSize: 20, fontWeight: "800", color: "#0f172a", lineHeight: 28, marginBottom: 12 },
-  priceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
+  priceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
+  stockRow: { marginBottom: 16 },
+  stockText: { fontSize: 13, fontWeight: "700" },
   price: { fontSize: 22, fontWeight: "900", color: "#0284c7" },
   countryBadge: { backgroundColor: "#f1f5f9", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
   countryText: { fontSize: 12, fontWeight: "600", color: "#334155" },

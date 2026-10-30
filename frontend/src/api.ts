@@ -82,6 +82,7 @@ export interface Product {
   discountPercent?: number | null;
   unit?: string | null;
   packageQty?: number | null;
+  stock?: number;
   mfdDate?: string | null;
   expDate?: string | null;
   isHit: boolean;

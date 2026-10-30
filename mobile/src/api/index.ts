@@ -19,6 +19,7 @@ export interface Product {
   oldPrice?: number | string | null;
   discountPercent?: number | null;
   unit?: string | null;
+  stock?: number;
   images?: { url: string; thumbUrl: string }[];
   category?: Category;
   description?: string;

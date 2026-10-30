@@ -402,6 +402,13 @@ export default function Cart() {
                             <span className="negotiated-tag">{lang === "ru" ? "Цена по запросу" : lang === "en" ? "Price on request" : "Narx so'rov bo'yicha"}</span>
                           )}
                         </div>
+                        {i.stock !== undefined && (
+                          <div style={{ fontSize: 12, marginTop: 4, fontWeight: 600, color: (i.stock ?? 0) > 0 ? "#0284c7" : "#dc2626" }}>
+                            {(i.stock ?? 0) > 0
+                              ? `Omborda: ${i.stock} dona mavjud`
+                              : "⚠️ Omborda tugagan"}
+                          </div>
+                        )}
                       </div>
 
                       <div className="acts cart-item-actions">
@@ -411,12 +418,22 @@ export default function Cart() {
                             <input
                               type="number"
                               min={1}
-                              max={100}
+                              max={i.stock ?? 100}
                               value={i.quantity}
-                              onChange={(e) => cart.setQty(i.productId, Number(e.target.value))}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                const maxStock = i.stock ?? 100;
+                                cart.setQty(i.productId, Math.min(maxStock, Math.max(1, val)));
+                              }}
                               aria-label="Soni"
                             />
-                            <button onClick={() => cart.setQty(i.productId, i.quantity + 1)} aria-label="Ko'paytirish">+</button>
+                            <button
+                              disabled={i.stock !== undefined && i.quantity >= i.stock}
+                              onClick={() => cart.setQty(i.productId, i.quantity + 1)}
+                              aria-label="Ko'paytirish"
+                            >
+                              +
+                            </button>
                           </div>
 
                           {itemTotal !== null && (

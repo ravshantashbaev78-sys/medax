@@ -99,6 +99,7 @@ const productSchema = z.object({
   discountPercent: z.coerce.number().int().min(1).max(99).nullish(),
   unit: z.string().trim().max(30).nullish().transform((v) => v || "dona"),
   packageQty: z.coerce.number().int().positive().default(1),
+  stock: z.coerce.number().int().min(0).default(0),
   mfdDate: z.string().trim().max(40).nullish(),
   expDate: z.string().trim().max(40).nullish(),
   isHit: z.boolean().default(false),
@@ -130,11 +131,12 @@ function productData(d: z.infer<typeof productSchema>) {
     discountPercent: disc,
     unit: d.unit || "dona",
     packageQty: d.packageQty ?? 1,
+    stock: d.stock ?? 0,
     mfdDate: d.mfdDate || null,
     expDate: d.expDate || null,
     isHit: d.isHit,
     isNew: d.isNew,
-    isActive: d.isActive,
+    isActive: (d.stock !== undefined && d.stock <= 0) ? false : d.isActive,
     categoryId: d.categoryId,
     brandId: d.brandId ?? null,
   };
@@ -174,10 +176,11 @@ adminRouter.get("/products/import/template", async (_req, res) => {
     { header: "Brend", key: "brand", width: 20 },
     { header: "Davlat", key: "country", width: 16 },
     { header: "Narx", key: "price", width: 16 },
+    { header: "Soni (Qoldiq)", key: "stock", width: 16 },
     { header: "Artikul", key: "sku", width: 16 },
     { header: "Tavsif", key: "description", width: 50 },
   ];
-  ws.addRow({ name: "Bemor monitori BeneVision N17", category: "Reanimatsiya", brand: "Mindray", country: "Xitoy", price: 3800000, sku: "MR-N17", description: "17 dyuymli monitor" });
+  ws.addRow({ name: "Bemor monitori BeneVision N17", category: "Reanimatsiya", brand: "Mindray", country: "Xitoy", price: 3800000, stock: 50, sku: "MR-N17", description: "17 dyuymli monitor" });
   ws.getRow(1).font = { bold: true };
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", 'attachment; filename="mahsulotlar-shablon.xlsx"');
@@ -328,6 +331,7 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
   const cBrand = col("brend", "brand");
   const cCountry = col("davlat", "country");
   const cPrice = col("narx", "price");
+  const cStock = col("soni", "qoldiq", "stock", "miqdor");
   const cSku = col("artikul", "sku");
   const cDesc = col("tavsif", "description");
 
@@ -362,8 +366,20 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
       const priceRaw = text(row, cPrice).replace(/[\s,]/g, "");
       const price = priceRaw ? Number(priceRaw) : null;
       if (price !== null && Number.isNaN(price)) throw new Error("Narx raqam emas");
+      const stockRaw = text(row, cStock).replace(/[\s,]/g, "");
+      const stock = stockRaw ? Math.max(0, parseInt(stockRaw, 10)) : 50;
       const sku = text(row, cSku) || null;
-      const data = { name, categoryId, brandId, country: text(row, cCountry) || null, priceFrom: price, sku, description: text(row, cDesc) };
+      const data = {
+        name,
+        categoryId,
+        brandId,
+        country: text(row, cCountry) || null,
+        priceFrom: price,
+        stock,
+        isActive: stock > 0,
+        sku,
+        description: text(row, cDesc),
+      };
 
       const existing = sku ? await prisma.product.findUnique({ where: { sku } }) : null;
       if (existing) {
@@ -414,6 +430,7 @@ adminRouter.get("/orders", async (req, res) => {
                 slug: true,
                 priceFrom: true,
                 isActive: true,
+                stock: true,
                 images: { orderBy: { sortOrder: "asc" }, take: 1, select: { thumbUrl: true, url: true } },
               },
             },
@@ -457,6 +474,55 @@ adminRouter.patch("/orders/:id", async (req, res) => {
     prevOrder.status !== "READY"
   ) {
     await notifyOrderConfirmed(order);
+  }
+
+  // 4. Ombordagi qoldiqni boshqarish:
+  // Admin buyurtmani tasdiqlaganda (CONFIRMED), tayyorlaganda (READY) yoki topshirganda (DONE)
+  // mahsulotlar sonidan buyurtma miqdori ayirib tashlanadi (qoldiq kamayadi).
+  // Agar mahsulot soni 0 ga tushsa, u avtomatik tarzda mijozlar sayti va ilovasidan olib tashlanadi (isActive: false)!
+  if (
+    (d.status === "CONFIRMED" || d.status === "READY" || d.status === "DONE") &&
+    !prevOrder.stockDeducted
+  ) {
+    for (const item of order.items) {
+      if (item.productId) {
+        const prod = await prisma.product.findUnique({ where: { id: item.productId } });
+        if (prod) {
+          const newStock = Math.max(0, prod.stock - item.quantity);
+          await prisma.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: newStock,
+              // Agar qoldiq 0 bo'lsa, sayt va ilovadan avtomatik o'chiriladi (yashiriladi)
+              ...(newStock === 0 ? { isActive: false } : {}),
+            },
+          });
+        }
+      }
+    }
+    await prisma.order.update({ where: { id: order.id }, data: { stockDeducted: true } });
+    order.stockDeducted = true;
+  }
+
+  // 5. Agar buyurtma bekor qilinsa (CANCELED yoki FAKE), avval yechilgan qoldiq omborga qaytariladi:
+  if ((d.status === "CANCELED" || d.status === "FAKE") && prevOrder.stockDeducted) {
+    for (const item of order.items) {
+      if (item.productId) {
+        const prod = await prisma.product.findUnique({ where: { id: item.productId } });
+        if (prod) {
+          const newStock = prod.stock + item.quantity;
+          await prisma.product.update({
+            where: { id: item.productId },
+            data: {
+              stock: newStock,
+              isActive: true, // qayta faollashtiriladi
+            },
+          });
+        }
+      }
+    }
+    await prisma.order.update({ where: { id: order.id }, data: { stockDeducted: false } });
+    order.stockDeducted = false;
   }
 
   res.json({ order, blocked });

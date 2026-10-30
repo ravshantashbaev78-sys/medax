@@ -257,6 +257,7 @@ export function ProductList() {
               <th>{aT("name")}</th>
               <th>{aT("category")}</th>
               <th>{aT("price")}</th>
+              <th>Qoldiq (dona)</th>
               <th>{aT("status")}</th>
               <th>{aT("actions")}</th>
             </tr>
@@ -291,6 +292,21 @@ export function ProductList() {
                 <td>{p.category?.name}</td>
                 <td>{p.priceFrom ? money(p.priceFrom) : "—"}</td>
                 <td>
+                  {p.stock !== undefined && p.stock !== null ? (
+                    p.stock > 0 ? (
+                      <span style={{ fontWeight: 700, color: p.stock <= 5 ? "#d97706" : "#0284c7" }}>
+                        {p.stock} dona {p.stock <= 5 ? "⚠️" : ""}
+                      </span>
+                    ) : (
+                      <span style={{ fontWeight: 800, color: "#dc2626", background: "#fef2f2", padding: "2px 8px", borderRadius: 6, fontSize: 12 }}>
+                        0 dona (Tugagan)
+                      </span>
+                    )
+                  ) : (
+                    "—"
+                  )}
+                </td>
+                <td>
                   <button
                     className="btn ghost sm"
                     style={{
@@ -313,7 +329,7 @@ export function ProductList() {
             ))}
             {data && data.items.length === 0 && (
               <tr>
-                <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 32 }}>
+                <td colSpan={8} className="muted" style={{ textAlign: "center", padding: 32 }}>
                   {aT("not_found")}
                 </td>
               </tr>
@@ -474,7 +490,7 @@ const DEFAULT_CATEGORY_RULE: CategoryRule = {
 const empty = {
   name: "", nameRu: "", nameEn: "", sku: "", description: "", descriptionRu: "", descriptionEn: "", country: "", priceFrom: "" as string | number,
   oldPrice: "" as string | number, discountPercent: "" as string | number,
-  unit: "dona", packageQty: 1 as string | number,
+  unit: "dona", packageQty: 1 as string | number, stock: 50 as string | number,
   mfdDate: "", expDate: "",
   isHit: false, isNew: false, isActive: true, categoryId: "" as string | number, brandId: "" as string | number,
   specs: [] as { name: string; value: string }[],
@@ -518,6 +534,7 @@ export function ProductForm() {
         discountPercent: p.discountPercent ?? "",
         unit: p.unit || "dona",
         packageQty: p.packageQty || 1,
+        stock: p.stock !== undefined ? p.stock : 0,
         mfdDate: p.mfdDate || "",
         expDate: p.expDate || "",
         isHit: p.isHit, isNew: p.isNew, isActive: p.isActive,
@@ -583,6 +600,7 @@ export function ProductForm() {
       oldPrice: f.oldPrice === "" ? null : Number(f.oldPrice),
       discountPercent: f.discountPercent === "" ? null : Number(f.discountPercent),
       packageQty: catRule.showPackageQty ? (f.packageQty === "" ? 1 : Number(f.packageQty)) : 1,
+      stock: f.stock === "" ? 0 : Math.max(0, Number(f.stock)),
       unit: f.unit || catRule.defaultUnit,
       mfdDate: catRule.showDates ? (f.mfdDate || null) : null,
       expDate: catRule.showDates ? (f.expDate || null) : null,
@@ -807,6 +825,24 @@ export function ProductForm() {
               placeholder="Masalan: 120 000 (agar chegirma bo'lsa)"
               value={f.oldPrice}
               onChange={(e) => set("oldPrice", e.target.value)}
+            />
+          </div>
+
+          {/* Ombordagi qoldiq / Soni */}
+          <div className="field">
+            <label htmlFor="stock">
+              Ombordagi qoldiq (dona) *
+              <span style={{ fontSize: 11, color: "var(--ink2)", marginLeft: 6 }}>
+                (Mijozlar buyurtma berganda avtomatik kamayadi, 0 bo'lsa saytdan yashiriladi)
+              </span>
+            </label>
+            <input
+              id="stock"
+              type="number"
+              min={0}
+              placeholder="Masalan: 50"
+              value={f.stock}
+              onChange={(e) => set("stock", e.target.value)}
             />
           </div>
 

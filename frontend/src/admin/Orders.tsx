@@ -32,6 +32,7 @@ interface Order {
       slug?: string | null;
       priceFrom?: number | string | null;
       isActive?: boolean;
+      stock?: number;
       images?: { thumbUrl: string; url: string }[];
     } | null;
   }[];
@@ -366,6 +367,20 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                     {i.product?.isActive !== undefined && (
                       <span style={{ fontSize: 11, fontWeight: 700, color: i.product.isActive ? "#16a34a" : "#dc2626" }}>
                         {i.product.isActive ? "● Omborda bor" : "○ Saytdan yashirilgan"}
+                      </span>
+                    )}
+                    {i.product?.stock !== undefined && (
+                      <span
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: (i.product?.stock ?? 0) > 0 ? "#0284c7" : "#dc2626",
+                          background: (i.product?.stock ?? 0) > 0 ? "#f0f9ff" : "#fef2f2",
+                          padding: "1px 6px",
+                          borderRadius: 4,
+                        }}
+                      >
+                        Qoldiq: {i.product?.stock} dona
                       </span>
                     )}
                   </div>

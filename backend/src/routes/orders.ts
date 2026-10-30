@@ -148,12 +148,29 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
   for (const i of body.items) merged.set(i.productId, Math.min(100, (merged.get(i.productId) || 0) + i.quantity));
   const items = [...merged].map(([productId, quantity]) => ({ productId, quantity }));
 
-  // Mahsulotlar mavjudligini tekshiramiz (narxlari bilan birga)
+  // Mahsulotlar mavjudligini tekshiramiz (narxlari va ombordagi qoldiqlari bilan birga)
   const products = await prisma.product.findMany({
     where: { id: { in: items.map((i) => i.productId) }, isActive: true },
-    select: { id: true, name: true, priceFrom: true },
+    select: { id: true, name: true, priceFrom: true, stock: true },
   });
   if (products.length !== items.length) throw new HttpError(400, "Baʻzi mahsulotlar endi mavjud emas. Roʻyxatni yangilang.");
+
+  // Ombordagi qoldiq yetarliligini tekshiramiz (masalan, 2 kishi 1 ta mahsulotga buyurtma berganda)
+  for (const item of items) {
+    const prod = products.find((p) => p.id === item.productId);
+    if (!prod) continue;
+    if (prod.stock < item.quantity) {
+      if (prod.stock <= 0) {
+        throw new HttpError(400, `"${prod.name}" mahsuloti omborda qolmagan (tugagan).`);
+      } else {
+        throw new HttpError(
+          400,
+          `"${prod.name}" mahsulotidan omborda faqat ${prod.stock} dona mavjud. Iltimos, buyurtma miqdorini kamaytiring.`
+        );
+      }
+    }
+  }
+
   const names = new Map(products.map((p) => [p.id, p.name]));
   const prices = new Map(products.map((p) => [p.id, p.priceFrom ? Number(p.priceFrom) : 0]));
 
