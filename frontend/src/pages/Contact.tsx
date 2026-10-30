@@ -54,7 +54,7 @@ export default function Contact() {
     });
   };
 
-  // 1. Murojaatni to'g'ridan-to'g'ri tizimga (bazaga) yuborish
+  // 1. Murojaatni tizimga (bazaga) va EmailJS orqali yuborish
   const handleSubmitMessage = async (e: FormEvent) => {
     e.preventDefault();
     setErrorMsg("");
@@ -70,6 +70,33 @@ export default function Contact() {
           website,
         },
       });
+
+      // Agar mijoz tomonida VITE_EMAILJS_* kalitlari kiritilgan bo'lsa, EmailJS ga ham yuborish
+      const viteServiceId = (import.meta as any).env?.VITE_EMAILJS_SERVICE_ID;
+      const viteTemplateId = (import.meta as any).env?.VITE_EMAILJS_TEMPLATE_ID;
+      const vitePublicKey = (import.meta as any).env?.VITE_EMAILJS_PUBLIC_KEY;
+
+      if (viteServiceId && viteTemplateId && vitePublicKey) {
+        fetch("https://api.emailjs.com/api/v1.0/email/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            service_id: viteServiceId,
+            template_id: viteTemplateId,
+            user_id: vitePublicKey,
+            template_params: {
+              name: name.trim(),
+              from_name: name.trim(),
+              phone: phone.trim(),
+              email: email.trim() || "Keltirilmagan",
+              reply_to: email.trim() || officialEmail,
+              subject: subject.trim() || "Saytdan yangi murojaat",
+              message: message.trim(),
+              to_email: officialEmail,
+            },
+          }),
+        }).catch((e) => console.warn("Client EmailJS error:", e));
+      }
 
       setSentSuccess(true);
       setName("");

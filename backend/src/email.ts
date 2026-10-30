@@ -1,27 +1,66 @@
-import nodemailer, { Transporter } from "nodemailer";
-
+const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "";
+const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "";
+const EMAILJS_ORDER_TEMPLATE_ID = process.env.EMAILJS_ORDER_TEMPLATE_ID || EMAILJS_TEMPLATE_ID;
+const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || process.env.EMAILJS_USER_ID || "";
+const EMAILJS_PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY || process.env.EMAILJS_ACCESS_TOKEN || "";
 const GMAIL_DESTINATION = process.env.GMAIL_DESTINATION || "medaxuz@gmail.com";
-const GMAIL_USER = process.env.GMAIL_USER || "medaxuz@gmail.com";
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || process.env.SMTP_PASSWORD || "";
 
-let transporter: Transporter | null = null;
+interface SendEmailJsParams {
+  serviceId?: string;
+  templateId?: string;
+  templateParams: Record<string, any>;
+}
 
-function getTransporter(): Transporter | null {
-  if (transporter) return transporter;
-  if (!GMAIL_APP_PASSWORD) {
-    console.log("[Email] GMAIL_APP_PASSWORD o'rnatilmagan. Xabarlar bazada saqlanadi.");
-    return null;
+/**
+ * EmailJS REST API orqali elektron xat jo'natish
+ * Endpoint: POST https://api.emailjs.com/api/v1.0/email/send
+ */
+async function sendViaEmailJS(params: SendEmailJsParams): Promise<boolean> {
+  const serviceId = params.serviceId || EMAILJS_SERVICE_ID;
+  const templateId = params.templateId || EMAILJS_TEMPLATE_ID;
+  const publicKey = EMAILJS_PUBLIC_KEY;
+  const privateKey = EMAILJS_PRIVATE_KEY;
+
+  if (!serviceId || !templateId || !publicKey) {
+    console.log(
+      `[EmailJS] Sozlamalar to'liq emas (EMAILJS_SERVICE_ID: "${serviceId}", EMAILJS_TEMPLATE_ID: "${templateId}", EMAILJS_PUBLIC_KEY: "${publicKey ? "mavjud" : "yo'q"}"). Xabar bazada saqlanadi.`
+    );
+    return false;
   }
 
-  transporter = nodemailer.createTransport({
-    service: "gmail",
-    auth: {
-      user: GMAIL_USER,
-      pass: GMAIL_APP_PASSWORD,
-    },
-  });
+  const payload: Record<string, any> = {
+    service_id: serviceId,
+    template_id: templateId,
+    user_id: publicKey,
+    template_params: params.templateParams,
+  };
 
-  return transporter;
+  if (privateKey) {
+    payload.accessToken = privateKey;
+  }
+
+  try {
+    const res = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`[EmailJS] Xatolik yuz berdi (HTTP ${res.status}):`, errText);
+      return false;
+    }
+
+    const resText = await res.text();
+    console.log(`[EmailJS] Xabar muvaffaqiyatli jo'natildi (${GMAIL_DESTINATION}):`, resText);
+    return true;
+  } catch (err) {
+    console.error("[EmailJS] Tarmoq yoki so'rov xatoligi:", err);
+    return false;
+  }
 }
 
 export interface ContactEmailData {
@@ -34,11 +73,9 @@ export interface ContactEmailData {
 }
 
 /**
- * Sayt yoki mobil ilovadan kelgan murojaatni medaxuz@gmail.com pochtasiga yuborish
+ * Sayt yoki ilovadan kelgan murojaatni EmailJS orqali medaxuz@gmail.com ga jo'natish
  */
 export async function sendContactEmail(data: ContactEmailData): Promise<boolean> {
-  const mailTransporter = getTransporter();
-
   const formattedDate = new Date().toLocaleString("uz-UZ", {
     timeZone: "Asia/Tashkent",
     year: "numeric",
@@ -50,7 +87,7 @@ export async function sendContactEmail(data: ContactEmailData): Promise<boolean>
 
   const mailSubject = `🔔 Medax Murojaat: ${data.subject || "Saytdan yangi xabar"} (${data.name})`;
 
-  const textBody = `
+  const fullSummary = `
 Yangi murojaat qabul qilindi:
 ----------------------------------------
 Ismi: ${data.name}
@@ -59,95 +96,30 @@ ${data.email ? `Email: ${data.email}\n` : ""}Mavzu: ${data.subject || "Ko'rsatil
 Sana: ${formattedDate}
 IP: ${data.ip || "Noma'lum"}
 
-Xabar matni:
+Xabar:
 ${data.message}
 ----------------------------------------
   `.trim();
 
-  const htmlBody = `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
-  <div style="background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%); padding: 24px; color: #ffffff;">
-    <h1 style="margin: 0; font-size: 20px; font-weight: 800; letter-spacing: 0.5px;">🏥 MEDAX · Yangi Murojaat</h1>
-    <p style="margin: 6px 0 0; opacity: 0.9; font-size: 13px;">Sayt yoki mobil ilova orqali mijoz xabar qoldirdi</p>
-  </div>
-  
-  <div style="padding: 24px;">
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-      <tr>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 13px; width: 140px;">Mijoz ismi:</td>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-weight: 700; font-size: 14px;">${data.name}</td>
-      </tr>
-      <tr>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 13px;">Telefon raqami:</td>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-weight: 700; font-size: 14px;">
-          <a href="tel:${data.phone}" style="color: #0284c7; text-decoration: none;">${data.phone}</a>
-        </td>
-      </tr>
-      ${
-        data.email
-          ? `<tr>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 13px;">Elektron pochta:</td>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-weight: 600; font-size: 14px;">
-          <a href="mailto:${data.email}" style="color: #0284c7; text-decoration: none;">${data.email}</a>
-        </td>
-      </tr>`
-          : ""
-      }
-      <tr>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 13px;">Mavzu:</td>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #0f172a; font-weight: 600; font-size: 14px;">${data.subject || "Ko'rsatilmagan"}</td>
-      </tr>
-      <tr>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #64748b; font-size: 13px;">Yuborilgan vaqti:</td>
-        <td style="padding: 10px 0; border-bottom: 1px solid #f1f5f9; color: #475569; font-size: 13px;">${formattedDate}</td>
-      </tr>
-    </table>
-
-    <div style="background: #f8fafc; border-left: 4px solid #0284c7; padding: 16px; border-radius: 8px; margin-bottom: 24px;">
-      <strong style="display: block; font-size: 13px; color: #0f172a; margin-bottom: 8px;">Xabar mazmuni:</strong>
-      <div style="color: #334155; font-size: 14px; line-height: 1.6; white-space: pre-wrap;">${data.message}</div>
-    </div>
-
-    <div style="text-align: center;">
-      <a href="tel:${data.phone}" style="display: inline-block; background: #0284c7; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 700; font-size: 14px; margin-right: 10px;">
-        📞 Mijozga qo'ng'iroq qilish
-      </a>
-      ${
-        data.email
-          ? `<a href="mailto:${data.email}?subject=Re:%20${encodeURIComponent(data.subject || "Medax murojaat")}" style="display: inline-block; background: #f1f5f9; color: #334155; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 700; font-size: 14px;">
-        ✉️ Javob yozish
-      </a>`
-          : ""
-      }
-    </div>
-  </div>
-
-  <div style="background: #f8fafc; padding: 14px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
-    Medax Tibbiyot Uskunalari Savdo Tizimi · Rasmiy Pochta: medaxuz@gmail.com
-  </div>
-</div>
-  `.trim();
-
-  if (!mailTransporter) {
-    console.log(`[Email Mock] ${GMAIL_DESTINATION} ga xabar tayyorlandi (GMAIL_APP_PASSWORD o'rnatilsa jo'natiladi):\n`, textBody);
-    return false;
-  }
-
-  try {
-    const info = await mailTransporter.sendMail({
-      from: `"Medax Sayti" <${GMAIL_USER}>`,
-      to: GMAIL_DESTINATION,
-      replyTo: data.email || undefined,
+  return sendViaEmailJS({
+    templateParams: {
+      name: data.name,
+      from_name: data.name,
+      phone: data.phone,
+      email: data.email || "Keltirilmagan",
+      reply_to: data.email || GMAIL_DESTINATION,
       subject: mailSubject,
-      text: textBody,
-      html: htmlBody,
-    });
-    console.log(`[Email] Murojaat muvaffaqiyatli ${GMAIL_DESTINATION} ga yuborildi:`, info.messageId);
-    return true;
-  } catch (err) {
-    console.error("[Email] Xabar yuborishda xatolik:", err);
-    return false;
-  }
+      title: mailSubject,
+      message: data.message,
+      full_message: fullSummary,
+      summary: fullSummary,
+      date: formattedDate,
+      time: formattedDate,
+      ip: data.ip || "",
+      to_email: GMAIL_DESTINATION,
+      recipient: GMAIL_DESTINATION,
+    },
+  });
 }
 
 export interface OrderEmailData {
@@ -162,11 +134,9 @@ export interface OrderEmailData {
 }
 
 /**
- * Yangi buyurtma tushganda medaxuz@gmail.com ga xabar jo'natish
+ * Yangi buyurtma tushganda EmailJS orqali medaxuz@gmail.com ga bildirishnoma jo'natish
  */
 export async function sendNewOrderEmail(order: OrderEmailData): Promise<boolean> {
-  const mailTransporter = getTransporter();
-
   const formattedDate = new Date().toLocaleString("uz-UZ", {
     timeZone: "Asia/Tashkent",
     year: "numeric",
@@ -182,110 +152,45 @@ export async function sendNewOrderEmail(order: OrderEmailData): Promise<boolean>
     .map((i) => `• ${i.productName} — ${i.quantity} dona ${i.price ? `(${Number(i.price).toLocaleString()} so'm)` : ""}`)
     .join("\n");
 
-  const textBody = `
+  const fullSummary = `
 Yangi buyurtma qabul qilindi:
 ----------------------------------------
 Buyurtma kodi: #${order.code} (№${order.id})
 Mijoz: ${order.customerName}
 Telefon: ${order.phone}
-${order.organization ? `Tashkilot: ${order.organization}\n` : ""}${order.deliveryAddress ? `Manzil: ${order.deliveryAddress}\n` : ""}Sana: ${formattedDate}
+${order.organization ? `Tashkilot: ${order.organization}\n` : ""}${order.deliveryAddress ? `Yetkazish manzili: ${order.deliveryAddress}\n` : ""}Sana: ${formattedDate}
 
 Mahsulotlar:
 ${itemsList}
 
 Jami summa: ${order.totalAmount ? Number(order.totalAmount).toLocaleString() + " so'm" : "Kelishuv asosida"}
 ----------------------------------------
-Admin panelda ko'rish: https://medax.uz/admin/orders
+Admin panel: https://medax.uz/admin/orders
   `.trim();
 
-  const htmlBody = `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 14px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,0.06);">
-  <div style="background: linear-gradient(135deg, #059669 0%, #047857 100%); padding: 24px; color: #ffffff;">
-    <h1 style="margin: 0; font-size: 20px; font-weight: 800;">🛒 MEDAX · Yangi Buyurtma #${order.code}</h1>
-    <p style="margin: 6px 0 0; opacity: 0.9; font-size: 13px;">Sayt yoki ilovadan yangi buyurtma kelib tushdi</p>
-  </div>
-  
-  <div style="padding: 24px;">
-    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-      <tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 13px; width: 140px;">Mijoz:</td>
-        <td style="padding: 8px 0; color: #0f172a; font-weight: 700; font-size: 14px;">${order.customerName}</td>
-      </tr>
-      <tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Telefon:</td>
-        <td style="padding: 8px 0; color: #0f172a; font-weight: 700; font-size: 14px;">
-          <a href="tel:${order.phone}" style="color: #0284c7; text-decoration: none;">${order.phone}</a>
-        </td>
-      </tr>
-      ${
-        order.organization
-          ? `<tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Tashkilot:</td>
-        <td style="padding: 8px 0; color: #0f172a; font-weight: 600; font-size: 14px;">${order.organization}</td>
-      </tr>`
-          : ""
-      }
-      ${
-        order.deliveryAddress
-          ? `<tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Yetkazish manzili:</td>
-        <td style="padding: 8px 0; color: #0f172a; font-size: 14px;">${order.deliveryAddress}</td>
-      </tr>`
-          : ""
-      }
-      <tr>
-        <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Vaqti:</td>
-        <td style="padding: 8px 0; color: #475569; font-size: 13px;">${formattedDate}</td>
-      </tr>
-    </table>
-
-    <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 16px; margin-bottom: 20px;">
-      <strong style="display: block; font-size: 13px; color: #0f172a; margin-bottom: 10px;">Buyurtma qilingan mahsulotlar:</strong>
-      ${order.items
-        .map(
-          (item) => `
-        <div style="display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px dashed #e2e8f0; font-size: 13.5px;">
-          <span style="color: #1e293b; font-weight: 600;">${item.productName} × ${item.quantity} dona</span>
-          <span style="color: #64748b;">${item.price ? (Number(item.price) * item.quantity).toLocaleString() + " so'm" : "Kelishuv"}</span>
-        </div>
-      `
-        )
-        .join("")}
-      <div style="margin-top: 12px; text-align: right; font-size: 15px; font-weight: 800; color: #0f172a;">
-        Jami: ${order.totalAmount ? Number(order.totalAmount).toLocaleString() + " so'm" : "Kelishuv asosida"}
-      </div>
-    </div>
-
-    <div style="text-align: center;">
-      <a href="https://medax.uz/admin/orders" style="display: inline-block; background: #059669; color: #ffffff; text-decoration: none; padding: 12px 28px; border-radius: 10px; font-weight: 800; font-size: 14px;">
-        Admin panelda ochish va tasdiqlash →
-      </a>
-    </div>
-  </div>
-
-  <div style="background: #f8fafc; padding: 14px; text-align: center; border-top: 1px solid #e2e8f0; font-size: 12px; color: #94a3b8;">
-    Medax Buyurtma Tizimi · Rasmiy Pochta: medaxuz@gmail.com
-  </div>
-</div>
-  `.trim();
-
-  if (!mailTransporter) {
-    console.log(`[Email Mock] ${GMAIL_DESTINATION} ga yangi buyurtma xabari tayyorlandi:\n`, textBody);
-    return false;
-  }
-
-  try {
-    const info = await mailTransporter.sendMail({
-      from: `"Medax Buyurtmalar" <${GMAIL_USER}>`,
-      to: GMAIL_DESTINATION,
+  return sendViaEmailJS({
+    templateId: EMAILJS_ORDER_TEMPLATE_ID || EMAILJS_TEMPLATE_ID,
+    templateParams: {
+      name: order.customerName,
+      from_name: order.customerName,
+      phone: order.phone,
+      reply_to: GMAIL_DESTINATION,
       subject: mailSubject,
-      text: textBody,
-      html: htmlBody,
-    });
-    console.log(`[Email] Buyurtma xabari ${GMAIL_DESTINATION} ga yuborildi:`, info.messageId);
-    return true;
-  } catch (err) {
-    console.error("[Email] Buyurtma xabarini yuborishda xatolik:", err);
-    return false;
-  }
+      title: mailSubject,
+      order_code: order.code,
+      order_id: String(order.id),
+      organization: order.organization || "Jismoniy shaxs",
+      delivery_address: order.deliveryAddress || "Ko'rsatilmagan",
+      items: itemsList,
+      total_amount: order.totalAmount ? Number(order.totalAmount).toLocaleString() + " so'm" : "Kelishuv asosida",
+      message: fullSummary,
+      full_message: fullSummary,
+      summary: fullSummary,
+      date: formattedDate,
+      time: formattedDate,
+      to_email: GMAIL_DESTINATION,
+      recipient: GMAIL_DESTINATION,
+      admin_link: "https://medax.uz/admin/orders",
+    },
+  });
 }
