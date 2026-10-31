@@ -68,6 +68,20 @@ export function AuthModal() {
     return () => clearInterval(interval);
   }, [resendTimer]);
 
+  // Har rejim o'zgarganda yoki modal ochilganda kod va xatoni tozalash
+  useEffect(() => {
+    setCode("");
+    setError("");
+  }, [mode]);
+
+  useEffect(() => {
+    if (isAuthModalOpen) {
+      setCode("");
+      setError("");
+      setInfoMessage("");
+    }
+  }, [isAuthModalOpen]);
+
   if (!isAuthModalOpen) return null;
 
   const handleClose = () => {
@@ -617,7 +631,7 @@ export function AuthModal() {
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="123456"
+                placeholder="------"
                 required
                 autoFocus
                 style={{
@@ -631,6 +645,7 @@ export function AuthModal() {
                   border: "1.5px solid var(--teal, #0d9488)",
                   outline: "none",
                   boxSizing: "border-box",
+                  opacity: code ? 1 : 0.85,
                 }}
               />
             </div>
@@ -866,7 +881,7 @@ export function AuthModal() {
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="123456"
+                placeholder="------"
                 required
                 autoFocus
                 style={{
@@ -880,6 +895,7 @@ export function AuthModal() {
                   border: "1.5px solid var(--teal, #0d9488)",
                   outline: "none",
                   boxSizing: "border-box",
+                  opacity: code ? 1 : 0.85,
                 }}
               />
             </div>

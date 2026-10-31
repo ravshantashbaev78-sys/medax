@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Keyboard,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
@@ -27,13 +28,30 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
   const { loginWithToken } = useAuth();
   const { t } = useI18n();
 
-  const [step, setStep] = useState<"phone" | "otp" | "password">("phone");
+  const [step, setStep] = useState<"phone" | "otp" | "password" | "set_password">("phone");
   const [phone, setPhone] = useState("+998 ");
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Keyboard listener
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // Chiroyli muvaffaqiyat modal oynasi
   const [successInfo, setSuccessInfo] = useState<{ visible: boolean; title: string; message: string; customerName?: string }>({
@@ -70,7 +88,12 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
         setCode("");
         setStep("otp");
       } else {
-        Alert.alert(t("error"), res.error || "SMS yuborishda xatolik yuz berdi");
+        if (res.error && res.error.includes("allaqachon ro'yxatdan o'tgan")) {
+          Alert.alert("Ro'yxatdan o'tilgan", "Ushbu raqam allaqachon ro'yxatdan o'tgan. Parolingiz bilan kiring.");
+          setStep("password");
+        } else {
+          Alert.alert(t("error"), res.error || "SMS yuborishda xatolik yuz berdi");
+        }
       }
     } catch {
       Alert.alert(t("error"), "Internet aloqasini tekshiring");
@@ -84,9 +107,25 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
       Alert.alert(t("error"), "Iltimos, 6 xonali tasdiqlash kodini to'liq kiriting");
       return;
     }
+    // Parol o'rnatish bosqichiga o'tamiz
+    setStep("set_password");
+  };
+
+  const handleSetPasswordAndFinish = async (skipPassword = false) => {
+    if (!skipPassword) {
+      if (newPassword.length < 6) {
+        Alert.alert(t("error"), "Parol kamida 6 ta belgidan iborat bo'lishi kerak");
+        return;
+      }
+      if (newPassword !== confirmPassword) {
+        Alert.alert(t("error"), "Kiritilgan parollar bir-biriga mos kelmadi");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
-      const res = await verifyCustomerOtp(phone, code, name);
+      const res = await verifyCustomerOtp(phone, code, name, skipPassword ? undefined : newPassword);
       if (res.ok && res.token && res.customer) {
         await loginWithToken(res.token, res.customer);
         setSuccessInfo({
@@ -95,7 +134,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
           message: `${t("auth_welcome")}, ${res.customer.name}!`,
         });
       } else {
-        Alert.alert(t("error"), res.error || "Kiritilgan kod noto'g'ri");
+        Alert.alert(t("error"), res.error || "Xatolik yuz berdi");
       }
     } catch {
       Alert.alert(t("error"), "Tarmoqda xatolik yuz berdi");
@@ -137,9 +176,15 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
       <ScrollView
         contentContainerStyle={[
           styles.container,
-          { paddingTop: insets.top + 20, paddingBottom: Math.max(insets.bottom, 20) },
+          {
+            paddingTop: insets.top + 16,
+            paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : Math.max(insets.bottom, 24),
+            justifyContent: keyboardHeight > 0 ? "flex-start" : "space-between",
+          },
         ]}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        showsVerticalScrollIndicator={false}
       >
         {/* Brand Header */}
         <View style={styles.topSection}>
@@ -156,6 +201,8 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
           <Text style={styles.cardTitle}>
             {step === "otp"
               ? "Tasdiqlash kodi"
+              : step === "set_password"
+              ? "Parol o'rnatish"
               : step === "password"
               ? "Parol bilan kirish"
               : "Shaxsiy kabinetga kirish"}
@@ -163,6 +210,8 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
           <Text style={styles.cardDesc}>
             {step === "otp"
               ? `${phone} raqamiga yuborilgan 6 xonali SMS kodni kiriting`
+              : step === "set_password"
+              ? "Akkauntingizga keyingi safar parolingiz bilan tezkor kirish uchun parol belgilang"
               : step === "password"
               ? "Oldin o'rnatilgan parolingiz orqali tizimga kiring"
               : "Buyurtmalarni kuzatish va hujjatlarni yuklab olish uchun telefon raqamingizni kiriting"}
@@ -234,7 +283,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                 {loading ? (
                   <ActivityIndicator color="#ffffff" />
                 ) : (
-                  <Text style={styles.primaryBtnText}>Tasdiqlash va kirish ✓</Text>
+                  <Text style={styles.primaryBtnText}>Tasdiqlash va davom etish →</Text>
                 )}
               </TouchableOpacity>
 
@@ -255,6 +304,52 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                   <Text style={styles.backLinkText}>Raqamni o'zgartirish</Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          )}
+
+          {step === "set_password" && (
+            <View style={styles.form}>
+              <Text style={styles.inputLabel}>Yangi parol (kamida 6 belgi) *</Text>
+              <TextInput
+                style={styles.input}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                placeholder="Kamida 6 ta belgi"
+                placeholderTextColor="rgba(148, 163, 184, 0.45)"
+              />
+
+              <Text style={styles.inputLabel}>Parolni qayta kiriting (tasdiqlash) *</Text>
+              <TextInput
+                style={styles.input}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                placeholder="Parolni takrorlang"
+                placeholderTextColor="rgba(148, 163, 184, 0.45)"
+              />
+
+              <TouchableOpacity
+                style={styles.primaryBtn}
+                onPress={() => handleSetPasswordAndFinish(false)}
+                disabled={loading}
+                activeOpacity={0.88}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Parolni saqlash va kirish ✓</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.switchLink}
+                onPress={() => handleSetPasswordAndFinish(true)}
+              >
+                <Text style={[styles.switchLinkText, { color: "#64748b" }]}>
+                  Parolsiz davom etish (Keyinroq o'rnatish) →
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
 

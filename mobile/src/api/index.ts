@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Platform } from "react-native";
 
 export const API_BASE = "https://medax.uz/api";
 export const TOKEN_KEY = "@medax_customer_token";
@@ -111,13 +112,18 @@ export async function sendCustomerOtp(phone: string): Promise<{ ok: boolean; res
   }
 }
 
-export async function verifyCustomerOtp(phone: string, code: string, name?: string): Promise<{ ok: boolean; token?: string; customer?: Customer; error?: string }> {
+export async function verifyCustomerOtp(phone: string, code: string, name?: string, password?: string): Promise<{ ok: boolean; token?: string; customer?: Customer; error?: string }> {
   try {
     const cleanPhone = phone.replace(/[^\d+]/g, "");
     const res = await fetch(`${API_BASE}/customer/auth/verify-otp`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone: cleanPhone, code: code.trim(), name: name?.trim() }),
+      body: JSON.stringify({
+        phone: cleanPhone,
+        code: code.trim(),
+        name: name?.trim(),
+        password: password?.trim() || undefined,
+      }),
     });
     const data = await res.json();
     if (!res.ok) return { ok: false, error: data.error || "Tasdiqlash kodi noto'g'ri" };
@@ -171,11 +177,17 @@ export async function uploadCustomerAvatar(imageUri: string): Promise<{ ok: bool
     const type = match ? `image/${match[1]}` : `image/jpeg`;
 
     const formData = new FormData();
-    formData.append("avatar", {
-      uri: imageUri,
-      name: filename,
-      type,
-    } as any);
+    try {
+      const imgRes = await fetch(imageUri);
+      const blob = await imgRes.blob();
+      formData.append("avatar", blob, filename);
+    } catch {
+      formData.append("avatar", {
+        uri: Platform.OS === "android" ? imageUri : imageUri.replace("file://", ""),
+        name: filename,
+        type,
+      } as any);
+    }
 
     const res = await fetch(`${API_BASE}/customer/auth/avatar`, {
       method: "POST",
@@ -188,6 +200,40 @@ export async function uploadCustomerAvatar(imageUri: string): Promise<{ ok: bool
     return data;
   } catch (err: any) {
     return { ok: false, error: err.message || "Rasm yuklashda xatolik" };
+  }
+}
+
+export async function fetchCustomerOrders(): Promise<any[]> {
+  try {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    if (!token) return [];
+    const res = await fetch(`${API_BASE}/customer/orders`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.orders || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function setCustomerPassword(newPassword: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+  try {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    if (!token) return { ok: false, error: "Tizimga kirilmagan" };
+    const res = await fetch(`${API_BASE}/customer/auth/password`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ newPassword }),
+    });
+    const data = await res.json();
+    return data;
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Parolni saqlashda xatolik" };
   }
 }
 

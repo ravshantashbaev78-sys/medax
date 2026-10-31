@@ -437,7 +437,7 @@ export const translations: Record<Lang, Translations> = {
     trust_4_title: "To'liq hujjatlar",
     trust_4_desc: "Pasport, sertifikat va kafolat",
 
-    categories_title: "Kategoriya bo'yicha tanlang",
+    categories_title: "Toifalar bo'yicha tanlang",
     categories_sub: "Kasalxona va klinikalar uchun yo'nalishlar bo'yicha to'liq uskunalar",
     items_count: "ta uskuna",
 
@@ -477,7 +477,7 @@ export const translations: Record<Lang, Translations> = {
     official_warranty: "Rasmiy kafolat",
 
     catalog_title: "Tibbiy uskunalar katalogi",
-    filter_categories: "Kategoriyalar",
+    filter_categories: "Toifalar",
     filter_brands: "Brendlar",
     filter_all: "Hammasi",
     sort_default: "Standart tartib",
@@ -503,7 +503,7 @@ export const translations: Record<Lang, Translations> = {
 
     pd_sku: "Artikul",
     pd_brand: "Ishlab chiqaruvchi",
-    pd_category: "Kategoriya",
+    pd_category: "Toifa",
     pd_country: "Mamlakat",
     pd_warranty: "Rasmiy kafolat",
     pd_delivery: "Yetkazib berish",
@@ -517,7 +517,7 @@ export const translations: Record<Lang, Translations> = {
     dashboard: "Bosh panel",
     orders: "Buyurtmalar",
     products: "Mahsulotlar",
-    taxonomy: "Kategoriya va brend",
+    taxonomy: "Toifalar va brendlar",
     import_excel: "Excel import",
     blocklist: "Bloklanganlar",
     users: "Xodimlar",
@@ -540,7 +540,7 @@ export const translations: Record<Lang, Translations> = {
 
     quick_actions: "Tezkor amallar",
     action_add_product: "Yangi uskuna qo'shish",
-    action_add_category: "Yangi kategoriya",
+    action_add_category: "Yangi toifa",
     action_view_orders: "Buyurtmalar tahlili",
     action_excel_import: "Excel orqali yuklash",
     recent_orders: "So'nggi buyurtmalar",

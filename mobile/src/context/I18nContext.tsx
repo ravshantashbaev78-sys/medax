@@ -52,7 +52,8 @@ const translations: Record<Language, Record<string, string>> = {
     contact_sub: "Savollar, takliflar yoki servis xizmati uchun biz bilan bog'laning:",
     contact_phone: "Aloqa telefoni",
     contact_email: "Rasmiy Gmail pochta",
-    contact_store: "Do'kon va ombor",
+    contact_store: "Bizning manzil",
+    contact_address: "Namangan viloyati, Namangan sh., Ozod MFY, Abu Rayhon Beruniy ko'chasi, 2-uy",
     stock_in: "Omborda: {n} dona mavjud",
     stock_out: "Omborda qolmagan (Tugagan)",
     stock_cart_empty: "Omborda tugagan",
@@ -62,10 +63,15 @@ const translations: Record<Language, Record<string, string>> = {
     home_banner_title: "Medax Tibbiyot Markazi",
     home_banner_sub: "Tibbiyot uskunalari va jihozlarining keng assortimenti",
     home_popular: "Ommabop uskunalar",
-    home_all_cat: "Barcha kategoriyalar",
+    home_all_cat: "Barcha toifalar",
     home_badges_warranty: "Rasmiy kafolat",
     home_badges_delivery: "Tezkor yetkazish",
     home_badges_certified: "Sertifikatlangan",
+
+    // Orders
+    my_orders_title: "Mening buyurtmalarim",
+    my_orders_empty: "Hozircha buyurtmalar berilmagan",
+    my_orders_total: "Jami",
 
     // Cart
     cart_empty_title: "Savatchangiz bo'sh",
@@ -88,7 +94,7 @@ const translations: Record<Language, Record<string, string>> = {
     cat_title: "Katalog",
     cat_search_ph: "Uskunalar nomi bo'yicha qidirish...",
     cat_not_found: "Uskuna topilmadi",
-    cat_not_found_sub: "Boshqa kategoriya yoki kalit so'z bilan qidirib ko'ring",
+    cat_not_found_sub: "Boshqa toifa yoki kalit so'z bilan qidirib ko'ring",
     cat_all_count: "Barchasi",
 
     // Onboarding
@@ -193,7 +199,8 @@ const translations: Record<Language, Record<string, string>> = {
     contact_sub: "Свяжитесь с нами по любым вопросам, сервису или заказам:",
     contact_phone: "Телефон для связи",
     contact_email: "Официальная почта Gmail",
-    contact_store: "Магазин и склад",
+    contact_store: "Наш адрес",
+    contact_address: "Наманганская область, г. Наманган, сгм Озод, улица Абу Райхона Беруни, дом 2",
     stock_in: "В наличии: {n} шт",
     stock_out: "Нет в наличии (Закончился)",
     stock_cart_empty: "Закончился",
@@ -207,6 +214,11 @@ const translations: Record<Language, Record<string, string>> = {
     home_badges_warranty: "Официальная гарантия",
     home_badges_delivery: "Быстрая доставка",
     home_badges_certified: "Сертифицировано",
+
+    // Orders
+    my_orders_title: "Мои заказы",
+    my_orders_empty: "Заказов пока нет",
+    my_orders_total: "Итого",
 
     // Cart
     cart_empty_title: "Ваша корзина пуста",
@@ -334,7 +346,8 @@ const translations: Record<Language, Record<string, string>> = {
     contact_sub: "Get in touch with us for equipment inquiry, service or orders:",
     contact_phone: "Contact phone",
     contact_email: "Official Gmail Email",
-    contact_store: "Store and warehouse",
+    contact_store: "Our address",
+    contact_address: "Namangan region, Namangan city, Ozod MCC, Abu Rayhon Beruniy street, 2",
     stock_in: "In stock: {n} pcs",
     stock_out: "Out of stock",
     stock_cart_empty: "Out of stock",
@@ -344,10 +357,15 @@ const translations: Record<Language, Record<string, string>> = {
     home_banner_title: "Medax Medical Center",
     home_banner_sub: "Wide range of professional medical equipment and devices",
     home_popular: "Popular Equipment",
-    home_all_cat: "All categories",
+    home_all_cat: "All Categories",
     home_badges_warranty: "Official Warranty",
     home_badges_delivery: "Fast Delivery",
     home_badges_certified: "Certified Quality",
+
+    // Orders
+    my_orders_title: "My Orders",
+    my_orders_empty: "No orders yet",
+    my_orders_total: "Total",
 
     // Cart
     cart_empty_title: "Your cart is empty",

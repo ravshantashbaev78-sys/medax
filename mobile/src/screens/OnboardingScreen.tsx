@@ -112,7 +112,7 @@ const SLIDES: MultilingualSlide[] = [
           en: "Smart Search & Filtering",
         },
         desc: {
-          uz: "Kategoriya, brend va texnik parametrlar bo'yicha darhol topish",
+          uz: "Toifa, brend va texnik parametrlar bo'yicha darhol topish",
           ru: "Быстрый поиск по направлениям, брендам и техническим параметрам",
           en: "Instant filtering by clinical specialty, brand, and technical specs",
         },

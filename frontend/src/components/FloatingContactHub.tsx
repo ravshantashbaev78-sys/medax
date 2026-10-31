@@ -120,7 +120,13 @@ export function FloatingContactHub() {
             </div>
             <div className="hub-item-text">
               <span className="hub-item-title">{lang === "ru" ? "Адрес и локация" : lang === "en" ? "Address & Map" : "Ofis manzili va xarita"}</span>
-              <span className="hub-item-meta">{lang === "ru" ? "г. Ташкент, Чиланзар" : lang === "en" ? "Tashkent, Chilanzar" : "Toshkent sh., Chilonzor"}</span>
+              <span className="hub-item-meta">
+                {lang === "ru"
+                  ? "г. Наманган, ул. Беруни, 2"
+                  : lang === "en"
+                  ? "Namangan city, Beruniy st., 2"
+                  : "Namangan sh., Beruniy ko'chasi, 2-uy"}
+              </span>
             </div>
             <span className="hub-item-arrow" aria-hidden="true">→</span>
           </Link>
