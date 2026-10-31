@@ -10,14 +10,43 @@ export const ADMIN_TEXTS = {
   orders: { uz: "Buyurtmalar", ru: "Заказы", en: "Orders" },
   products: { uz: "Mahsulotlar", ru: "Товары", en: "Products" },
   customers: { uz: "Mijozlar", ru: "Клиенты", en: "Customers" },
+  customers_list: { uz: "Mijozlar ro'yxati", ru: "Список клиентов", en: "Customers List" },
   taxonomy: { uz: "Katalog tuzilmasi", ru: "Структура каталога", en: "Catalog Taxonomy" },
   categories: { uz: "Kategoriyalar", ru: "Категории", en: "Categories" },
   brands: { uz: "Brendlar", ru: "Бренды", en: "Brands" },
   users: { uz: "Xodimlar va Ega", ru: "Сотрудники и Владелец", en: "Staff & Owner" },
   contacts: { uz: "Xabarlar", ru: "Сообщения", en: "Messages" },
+  contact_inquiries: { uz: "Murojaatlar", ru: "Обращения", en: "Inquiries" },
   blocklist: { uz: "Bloklanganlar", ru: "Черный список", en: "Blocklist" },
   logout: { uz: "Chiqish", ru: "Выйти", en: "Logout" },
   admin_panel: { uz: "Medax Admin", ru: "Medax Панель", en: "Medax Admin" },
+  import_excel: { uz: "Excel orqali yuklash", ru: "Загрузка через Excel", en: "Import via Excel" },
+  view_site: { uz: "Saytni ko'rish", ru: "Перейти на сайт", en: "View Site" },
+
+  // Contact Inquiries Page
+  inquiries_title: { uz: "Mijozlar Murojaatlari", ru: "Обращения клиентов", en: "Customer Inquiries" },
+  inquiries_sub: {
+    uz: "Saytdagi aloqa formasi orqali yuborilgan rasmiy so'rovlar va takliflar.",
+    ru: "Официальные запросы и предложения через форму обратной связи на сайте.",
+    en: "Official inquiries and feedback submitted via the website contact form.",
+  },
+  filter_all: { uz: "Barchasi", ru: "Все", en: "All" },
+  filter_unread: { uz: "Yangi (o'qilmagan)", ru: "Новые (непрочитанные)", en: "New (unread)" },
+  filter_read: { uz: "Ko'rib chiqilgan", ru: "Просмотренные", en: "Reviewed" },
+  col_status: { uz: "Holat", ru: "Статус", en: "Status" },
+  col_customer: { uz: "Mijoz", ru: "Клиент", en: "Customer" },
+  col_phone: { uz: "Telefon", ru: "Телефон", en: "Phone" },
+  col_subject_msg: { uz: "Mavzu & Xabar", ru: "Тема и Сообщение", en: "Subject & Message" },
+  col_date: { uz: "Sana", ru: "Дата", en: "Date" },
+  col_actions: { uz: "Amallar", ru: "Действия", en: "Actions" },
+  st_unread: { uz: "Yangi", ru: "Новый", en: "New" },
+  st_read: { uz: "O'qilgan", ru: "Прочитано", en: "Read" },
+  action_mark_unread: { uz: "O'qilmagan qilish", ru: "Сделать непрочитанным", en: "Mark as unread" },
+  action_mark_read: { uz: "O'qildi ✓", ru: "Прочитано ✓", en: "Mark read ✓" },
+  no_inquiries: { uz: "Murojaatlar mavjud emas.", ru: "Обращений пока нет.", en: "No inquiries found." },
+  confirm_delete_inquiry: { uz: "Ushbu murojaatni o'chirmoqchimisiz?", ru: "Удалить это обращение?", en: "Delete this message?" },
+  prev_page: { uz: "← Oldingi", ru: "← Назад", en: "← Previous" },
+  next_page: { uz: "Keyingi →", ru: "Вперед →", en: "Next →" },
 
   // Buttons & Actions
   add_new: { uz: "Qo'shish", ru: "Добавить", en: "Add New" },
@@ -89,5 +118,11 @@ export function useAdminI18n() {
   const aT = (k: AdminTextKey): string => {
     return ADMIN_TEXTS[k]?.[i18n.lang] || ADMIN_TEXTS[k]?.uz || String(k);
   };
-  return { ...i18n, aT };
+  const t = (k: any): string => {
+    if (k in ADMIN_TEXTS) {
+      return ADMIN_TEXTS[k as AdminTextKey]?.[i18n.lang] || ADMIN_TEXTS[k as AdminTextKey]?.uz || String(k);
+    }
+    return (i18n.t as any)(k);
+  };
+  return { ...i18n, aT, t };
 }

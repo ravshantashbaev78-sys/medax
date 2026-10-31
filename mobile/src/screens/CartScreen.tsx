@@ -76,6 +76,7 @@ export function CartScreen({ navigation }: any) {
         return;
       }
       setOtpSent(true);
+      setOtpCode("");
       setResendTimer(otpRes.resendIn || 60);
       Alert.alert("SMS yuborildi 📩", "Telefoningizga 6 xonali tasdiqlash kodi yuborildi. Kodni kiriting.");
       return;
@@ -329,12 +330,12 @@ export function CartScreen({ navigation }: any) {
                 </Text>
                 <TextInput
                   style={styles.otpInput}
-                  placeholder="123456"
+                  placeholder="------"
                   value={otpCode}
                   onChangeText={setOtpCode}
                   keyboardType="number-pad"
                   maxLength={6}
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor="rgba(148, 163, 184, 0.35)"
                 />
                 <TouchableOpacity
                   disabled={resendTimer > 0 || loading}

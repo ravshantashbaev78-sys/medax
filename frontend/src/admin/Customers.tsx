@@ -83,13 +83,15 @@ export default function AdminCustomersPage() {
             placeholder={
               lang === "ru"
                 ? "Поиск по имени, номеру или организации..."
+                : lang === "en"
+                ? "Search by name, phone or organization..."
                 : "Ism, telefon yoki tashkilot bo'yicha qidirish..."
             }
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
           <button className="btn sm">
-            {lang === "ru" ? "Поиск" : "Qidirish"}
+            {lang === "ru" ? "Поиск" : lang === "en" ? "Search" : "Qidirish"}
           </button>
         </form>
       </div>
@@ -110,13 +112,13 @@ export default function AdminCustomersPage() {
             {loading ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: "center", padding: 36 }} className="muted">
-                  {lang === "ru" ? "Загрузка..." : "Yuklanmoqda..."}
+                  {lang === "ru" ? "Загрузка..." : lang === "en" ? "Loading..." : "Yuklanmoqda..."}
                 </td>
               </tr>
             ) : customers.length === 0 ? (
               <tr>
                 <td colSpan={6} style={{ textAlign: "center", padding: 36 }} className="muted">
-                  {lang === "ru" ? "Клиенты не найдены." : "Mijozlar topilmadi."}
+                  {lang === "ru" ? "Клиенты не найдены." : lang === "en" ? "No customers found." : "Mijozlar topilmadi."}
                 </td>
               </tr>
             ) : (

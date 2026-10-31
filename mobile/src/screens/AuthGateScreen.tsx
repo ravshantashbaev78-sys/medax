@@ -67,6 +67,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
       const res = await sendCustomerOtp(clean);
       if (res.ok) {
         setCountdown(res.resendIn || 60);
+        setCode("");
         setStep("otp");
       } else {
         Alert.alert(t("error"), res.error || "SMS yuborishda xatolik yuz berdi");
@@ -219,8 +220,8 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                 onChangeText={setCode}
                 keyboardType="number-pad"
                 maxLength={6}
-                placeholder="• • • • • •"
-                placeholderTextColor="#94a3b8"
+                placeholder="------"
+                placeholderTextColor="rgba(148, 163, 184, 0.35)"
                 autoFocus
               />
 
@@ -245,7 +246,12 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                     <Text style={styles.resendText}>Kodni qayta yuborish</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={() => setStep("phone")}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setCode("");
+                    setStep("phone");
+                  }}
+                >
                   <Text style={styles.backLinkText}>Raqamni o'zgartirish</Text>
                 </TouchableOpacity>
               </View>

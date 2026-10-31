@@ -1,5 +1,6 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, ApiError, getToken } from "../api";
+import { useAdminI18n } from "./i18n";
 
 /* ------------------------------ Blocklist ------------------------------ */
 
@@ -196,6 +197,7 @@ interface ContactMsg {
 }
 
 export function ContactMessagesPage() {
+  const { lang, t } = useAdminI18n();
   const [rows, setRows] = useState<ContactMsg[]>([]);
   const [filter, setFilter] = useState<"ALL" | "UNREAD" | "READ">("ALL");
   const [page, setPage] = useState(1);
@@ -235,7 +237,7 @@ export function ContactMessagesPage() {
   };
 
   const remove = async (id: number) => {
-    if (!confirm("Ushbu murojaatni o'chirmoqchimisiz?")) return;
+    if (!confirm(t("confirm_delete_inquiry"))) return;
     try {
       await api(`/admin/contact-messages/${id}`, { method: "DELETE", admin: true });
       load();
@@ -248,13 +250,13 @@ export function ContactMessagesPage() {
     <>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 12 }}>
         <div>
-          <h1 style={{ margin: "0 0 4px" }}>Mijozlar Murojaatlari</h1>
-          <p className="muted" style={{ margin: 0 }}>Saytdagi aloqa formasi orqali yuborilgan rasmiy so'rovlar va takliflar.</p>
+          <h1 style={{ margin: "0 0 4px" }}>{t("inquiries_title")}</h1>
+          <p className="muted" style={{ margin: 0 }}>{t("inquiries_sub")}</p>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <button className={`btn ${filter === "ALL" ? "" : "ghost"} sm`} onClick={() => setFilterMode("ALL")}>Barchasi</button>
-          <button className={`btn ${filter === "UNREAD" ? "" : "ghost"} sm`} onClick={() => setFilterMode("UNREAD")}>Yangi (o'qilmagan)</button>
-          <button className={`btn ${filter === "READ" ? "" : "ghost"} sm`} onClick={() => setFilterMode("READ")}>Ko'rib chiqilgan</button>
+          <button className={`btn ${filter === "ALL" ? "" : "ghost"} sm`} onClick={() => setFilterMode("ALL")}>{t("filter_all")}</button>
+          <button className={`btn ${filter === "UNREAD" ? "" : "ghost"} sm`} onClick={() => setFilterMode("UNREAD")}>{t("filter_unread")}</button>
+          <button className={`btn ${filter === "READ" ? "" : "ghost"} sm`} onClick={() => setFilterMode("READ")}>{t("filter_read")}</button>
         </div>
       </div>
 
@@ -264,12 +266,12 @@ export function ContactMessagesPage() {
         <table className="tbl">
           <thead>
             <tr>
-              <th>Holat</th>
-              <th>Mijoz</th>
-              <th>Telefon</th>
-              <th>Mavzu & Xabar</th>
-              <th>Sana</th>
-              <th>Amallar</th>
+              <th>{t("col_status")}</th>
+              <th>{t("col_customer")}</th>
+              <th>{t("col_phone")}</th>
+              <th>{t("col_subject_msg")}</th>
+              <th>{t("col_date")}</th>
+              <th>{t("col_actions")}</th>
             </tr>
           </thead>
           <tbody>
@@ -277,7 +279,7 @@ export function ContactMessagesPage() {
               <tr key={m.id} style={!m.isRead ? { background: "var(--sea, rgba(2, 132, 199, 0.05))" } : undefined}>
                 <td>
                   <span className={`st ${!m.isRead ? "NEW" : "DONE"}`}>
-                    {!m.isRead ? "Yangi" : "O'qilgan"}
+                    {!m.isRead ? t("st_unread") : t("st_read")}
                   </span>
                 </td>
                 <td style={{ fontWeight: 600 }}>{m.name}</td>
@@ -291,20 +293,21 @@ export function ContactMessagesPage() {
                   <span style={{ fontSize: 13, color: "inherit", whiteSpace: "pre-wrap" }}>{m.message}</span>
                 </td>
                 <td style={{ fontSize: 13 }}>
-                  {new Date(m.createdAt).toLocaleDateString("uz-UZ", {
-                    day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
-                  })}
+                  {new Date(m.createdAt).toLocaleDateString(
+                    lang === "ru" ? "ru-RU" : lang === "en" ? "en-US" : "uz-UZ",
+                    { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }
+                  )}
                 </td>
                 <td>
                   <div style={{ display: "flex", gap: 6 }}>
                     <button className="btn ghost sm" onClick={() => toggleRead(m.id, m.isRead)}>
-                      {m.isRead ? "O'qilmagan qilish" : "O'qildi ✓"}
+                      {m.isRead ? t("action_mark_unread") : t("action_mark_read")}
                     </button>
                     <button
                       className="btn ghost sm"
                       style={{ color: "var(--crimson, #ef4444)" }}
                       aria-label="Murojaatni o'chirish"
-                      title="O'chirish"
+                      title={t("delete")}
                       onClick={() => remove(m.id)}
                     >
                       ✕
@@ -316,7 +319,7 @@ export function ContactMessagesPage() {
             {!loading && rows.length === 0 && (
               <tr>
                 <td colSpan={6} className="muted" style={{ textAlign: "center", padding: 32 }}>
-                  Murojaatlar mavjud emas.
+                  {t("no_inquiries")}
                 </td>
               </tr>
             )}
@@ -327,13 +330,13 @@ export function ContactMessagesPage() {
       {totalPages > 1 && (
         <div className="pager" style={{ marginTop: 16 }}>
           <button className="btn ghost sm" disabled={page <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
-            ← Oldingi
+            {t("prev_page")}
           </button>
           <span className="muted" style={{ padding: "0 12px", fontSize: 14 }}>
             {page} / {totalPages}
           </span>
           <button className="btn ghost sm" disabled={page >= totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
-            Keyingi →
+            {t("next_page")}
           </button>
         </div>
       )}

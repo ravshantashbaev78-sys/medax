@@ -123,6 +123,7 @@ export function ProfileScreen() {
       const res = await sendCustomerOtp(clean);
       if (res.ok) {
         setCountdown(res.resendIn || 60);
+        setOtpCode("");
         setAuthMode("otp");
       } else {
         Alert.alert(t("error"), res.error || "SMS yuborishda xatolik yuz berdi");
@@ -217,6 +218,15 @@ export function ProfileScreen() {
       setUploadingAvatar(false);
       Alert.alert("Xatolik", err.message || "Rasm tanlashda xatolik");
     }
+  };
+
+  const handleLogout = async () => {
+    setPhone("+998 ");
+    setName("");
+    setOtpCode("");
+    setPassword("");
+    setAuthMode("phone");
+    await logout();
   };
 
   const displayName = customer?.name && customer.name !== "*" ? customer.name : "Mijoz";
@@ -338,7 +348,7 @@ export function ProfileScreen() {
             )}
           </View>
 
-          <TouchableOpacity style={styles.logoutBtn} onPress={logout} activeOpacity={0.8}>
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
             <Text style={styles.logoutBtnText}>{t("profile_logout")}</Text>
           </TouchableOpacity>
         </View>
@@ -400,7 +410,10 @@ export function ProfileScreen() {
 
               <TouchableOpacity
                 style={styles.switchLink}
-                onPress={() => setAuthMode("password")}
+                onPress={() => {
+                  setOtpCode("");
+                  setAuthMode("password");
+                }}
               >
                 <Text style={[styles.switchLinkText, { color: colors.primary }]}>{t("auth_password_link")}</Text>
               </TouchableOpacity>
@@ -420,8 +433,8 @@ export function ProfileScreen() {
                 onChangeText={setOtpCode}
                 keyboardType="number-pad"
                 maxLength={6}
-                placeholder="• • • • • •"
-                placeholderTextColor={colors.textMuted}
+                placeholder="------"
+                placeholderTextColor="rgba(148, 163, 184, 0.35)"
                 autoFocus
               />
 
@@ -446,7 +459,12 @@ export function ProfileScreen() {
                     <Text style={[styles.resendText, { color: colors.primary }]}>{t("cart_resend_code")}</Text>
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity onPress={() => setAuthMode("phone")}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setOtpCode("");
+                    setAuthMode("phone");
+                  }}
+                >
                   <Text style={[styles.backText, { color: colors.textMuted }]}>{t("auth_change_phone")}</Text>
                 </TouchableOpacity>
               </View>
