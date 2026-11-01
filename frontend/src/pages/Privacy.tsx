@@ -73,6 +73,50 @@ export default function Privacy() {
             </p>
           </section>
         </article>
+      ) : lang === "en" ? (
+        <article style={{ lineHeight: 1.8, fontSize: 15 }}>
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>1. General Provisions</h2>
+            <p>
+              This Privacy Policy defines the principles and procedures for collecting, processing, and safeguarding personal data of users of the <strong>Medax</strong> mobile application and the <strong>medax.uz</strong> web platform. We treat the privacy and protection of your data with the utmost responsibility.
+            </p>
+          </section>
+
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>2. Data We Collect</h2>
+            <ul style={{ paddingLeft: 20 }}>
+              <li><strong>Phone Number:</strong> Used for secure authentication via SMS OTP and order confirmation.</li>
+              <li><strong>Full Name and Clinic/Organization Name:</strong> For issuing contracts, warranty certificates, invoices, and accounting documentation.</li>
+              <li><strong>Delivery Address:</strong> To ensure accurate and safe transportation of medical equipment.</li>
+              <li><strong>Order History:</strong> To track supply statuses, warranties, and provide engineering maintenance services.</li>
+            </ul>
+          </section>
+
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>3. Purposes of Data Processing</h2>
+            <p>Collected personal data is used strictly for the following purposes:</p>
+            <ul style={{ paddingLeft: 20 }}>
+              <li>Authenticating users in their personal account;</li>
+              <li>Processing medical orders and delivering healthcare equipment;</li>
+              <li>Providing certified engineering, warranty, and post-warranty maintenance;</li>
+              <li>Prompt communication with clients regarding order and delivery specifications.</li>
+            </ul>
+          </section>
+
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>4. Data Security and Protection</h2>
+            <p>
+              We implement industry-standard SSL/TLS encryption protocols to secure all transmitted information. Your personal data is never sold, leased, or disclosed to third parties, except as explicitly required by the applicable laws of the Republic of Uzbekistan.
+            </p>
+          </section>
+
+          <section style={{ marginBottom: 28 }}>
+            <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>5. Account Deletion and Contact Information</h2>
+            <p>
+              Users have the right to request the permanent deletion of their account and all associated personal data at any time. To submit a deletion request, please email us at: <strong>info@medax.uz</strong> or contact us by phone: <strong>+998 91 186 66 61</strong>.
+            </p>
+          </section>
+        </article>
       ) : (
         <article style={{ lineHeight: 1.8, fontSize: 15 }}>
           <section style={{ marginBottom: 28 }}>

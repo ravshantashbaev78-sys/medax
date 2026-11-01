@@ -882,7 +882,21 @@ export function ProfileScreen() {
               {t("contact_address")}
             </Text>
             <Text style={{ fontSize: 11.5, color: colors.primary, fontWeight: "700", marginTop: 4 }}>
-              Xaritada ko'rish ↗
+              {t("view_on_map")}
+            </Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.contactItemRow, { borderTopColor: colors.border }]}
+          onPress={() => Linking.openURL("https://medax.uz/privacy")}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.contactItemIcon}>🔒</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_privacy")}</Text>
+            <Text style={[styles.contactItemValue, { color: colors.primary }]}>
+              medax.uz/privacy ↗
             </Text>
           </View>
         </TouchableOpacity>
