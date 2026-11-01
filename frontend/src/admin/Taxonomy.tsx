@@ -1,9 +1,11 @@
 import { FormEvent, useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "../api";
+import { useAdminI18n } from "./i18n";
 
 interface Item { id: number; name: string; count: number; sortOrder?: number; country?: string | null }
 
 function Block({ title, path, withCountry }: { title: string; path: "categories" | "brands"; withCountry?: boolean }) {
+  const { t } = useAdminI18n();
   const [items, setItems] = useState<Item[]>([]);
   const [name, setName] = useState("");
   const [extra, setExtra] = useState("");
@@ -36,7 +38,7 @@ function Block({ title, path, withCountry }: { title: string; path: "categories"
   };
 
   const remove = async (i: Item) => {
-    if (!confirm(`"${i.name}" o'chirilsinmi?`)) return;
+    if (!confirm(`"${i.name}" ${t("confirm_del_taxonomy")}`)) return;
     try { await api(`/admin/${path}/${i.id}`, { method: "DELETE", admin: true }); load(); }
     catch (err) { setError((err as ApiError).message); }
   };
@@ -46,31 +48,38 @@ function Block({ title, path, withCountry }: { title: string; path: "categories"
       <h2 style={{ fontSize: 22, marginBottom: 12 }}>{title}</h2>
       {error && <p className="err">{error}</p>}
       <form className="row" onSubmit={add}>
-        <input type="text" style={{ flex: 2, minWidth: 180 }} placeholder="Nomi" value={name} onChange={(e) => setName(e.target.value)} required aria-label="Nomi" />
-        <input type={withCountry ? "text" : "number"} style={{ flex: 1, minWidth: 120 }} placeholder={withCountry ? "Davlat" : "Tartib raqami"} value={extra} onChange={(e) => setExtra(e.target.value)} aria-label={withCountry ? "Davlat" : "Tartib raqami"} />
-        <button className="btn">Qo'shish</button>
+        <input type="text" style={{ flex: 2, minWidth: 180 }} placeholder={t("col_name")} value={name} onChange={(e) => setName(e.target.value)} required aria-label={t("col_name")} />
+        <input type={withCountry ? "text" : "number"} style={{ flex: 1, minWidth: 120 }} placeholder={withCountry ? t("col_country") : t("col_sort_num")} value={extra} onChange={(e) => setExtra(e.target.value)} aria-label={withCountry ? t("col_country") : t("col_sort_num")} />
+        <button className="btn">{t("add_new")}</button>
       </form>
       <div className="tbl-wrap">
         <table className="tbl">
-          <thead><tr><th>Nomi</th><th>{withCountry ? "Davlat" : "Tartib"}</th><th>Mahsulotlar</th><th></th></tr></thead>
+          <thead>
+            <tr>
+              <th>{t("col_name")}</th>
+              <th>{withCountry ? t("col_country") : t("col_sort")}</th>
+              <th>{t("col_products_count")}</th>
+              <th></th>
+            </tr>
+          </thead>
           <tbody>
             {items.map((i) => (
               <tr key={i.id}>
                 {editing?.id === i.id ? (
                   <>
-                    <td><input type="text" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} aria-label="Nomi" /></td>
+                    <td><input type="text" value={editing.name} onChange={(e) => setEditing({ ...editing, name: e.target.value })} aria-label={t("col_name")} /></td>
                     <td>{withCountry
-                      ? <input type="text" value={editing.country || ""} onChange={(e) => setEditing({ ...editing, country: e.target.value })} aria-label="Davlat" />
-                      : <input type="number" value={editing.sortOrder ?? 0} onChange={(e) => setEditing({ ...editing, sortOrder: Number(e.target.value) })} aria-label="Tartib" />}</td>
+                      ? <input type="text" value={editing.country || ""} onChange={(e) => setEditing({ ...editing, country: e.target.value })} aria-label={t("col_country")} />
+                      : <input type="number" value={editing.sortOrder ?? 0} onChange={(e) => setEditing({ ...editing, sortOrder: Number(e.target.value) })} aria-label={t("col_sort")} />}</td>
                     <td>{i.count}</td>
-                    <td style={{ whiteSpace: "nowrap" }}><button className="btn sm" onClick={saveEdit}>Saqlash</button>{" "}<button className="btn ghost sm" onClick={() => setEditing(null)}>Bekor</button></td>
+                    <td style={{ whiteSpace: "nowrap" }}><button className="btn sm" onClick={saveEdit}>{t("save")}</button>{" "}<button className="btn ghost sm" onClick={() => setEditing(null)}>{t("cancel")}</button></td>
                   </>
                 ) : (
                   <>
                     <td style={{ fontWeight: 600 }}>{i.name}</td>
                     <td>{withCountry ? i.country || "—" : i.sortOrder}</td>
                     <td>{i.count}</td>
-                    <td style={{ whiteSpace: "nowrap" }}><button className="btn ghost sm" onClick={() => setEditing(i)}>Tahrirlash</button>{" "}<button className="btn ghost sm" onClick={() => remove(i)}>O'chirish</button></td>
+                    <td style={{ whiteSpace: "nowrap" }}><button className="btn ghost sm" onClick={() => setEditing(i)}>{t("edit")}</button>{" "}<button className="btn ghost sm" onClick={() => remove(i)}>{t("delete")}</button></td>
                   </>
                 )}
               </tr>
@@ -83,11 +92,12 @@ function Block({ title, path, withCountry }: { title: string; path: "categories"
 }
 
 export default function Taxonomy() {
+  const { t } = useAdminI18n();
   return (
     <>
-      <h1>Kategoriya va brendlar</h1>
-      <Block title="Kategoriyalar" path="categories" />
-      <Block title="Brendlar" path="brands" withCountry />
+      <h1>{t("taxonomy_page_title")}</h1>
+      <Block title={t("categories")} path="categories" />
+      <Block title={t("brands")} path="brands" withCountry />
     </>
   );
 }

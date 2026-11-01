@@ -7,6 +7,7 @@ import { useAdminI18n } from "./i18n";
 interface Blocked { id: number; type: "PHONE" | "IP"; value: string; reason: string; createdAt: string }
 
 export function Blocklist() {
+  const { t } = useAdminI18n();
   const [rows, setRows] = useState<Blocked[]>([]);
   const [type, setType] = useState<"PHONE" | "IP">("PHONE");
   const [value, setValue] = useState("");
@@ -24,29 +25,32 @@ export function Blocklist() {
 
   return (
     <>
-      <h1>Bloklanganlar</h1>
+      <h1>{t("blocklist_title")}</h1>
       <p className="muted" style={{ maxWidth: "62ch" }}>
-        Bu ro'yxatdagi telefon raqam yoki IP manzildan SMS kod ham, buyurtma ham qabul qilinmaydi. Soxta deb belgilangan raqamlar limitga yetganda shu yerga avtomatik tushadi.
+        {t("blocklist_desc")}
       </p>
       {error && <p className="err">{error}</p>}
       <form className="row" onSubmit={add}>
-        <select style={{ width: 120 }} value={type} onChange={(e) => setType(e.target.value as any)} aria-label="Turi"><option value="PHONE">Telefon</option><option value="IP">IP</option></select>
-        <input type="text" style={{ flex: 1, minWidth: 180 }} placeholder={type === "PHONE" ? "+998 90 123 45 67" : "IP manzil"} value={value} onChange={(e) => setValue(e.target.value)} required aria-label="Qiymat" />
-        <input type="text" style={{ flex: 1, minWidth: 180 }} placeholder="Sabab (ixtiyoriy)" value={reason} onChange={(e) => setReason(e.target.value)} aria-label="Sabab" />
-        <button className="btn">Bloklash</button>
+        <select style={{ width: 120 }} value={type} onChange={(e) => setType(e.target.value as any)} aria-label={t("type")}>
+          <option value="PHONE">{t("phone")}</option>
+          <option value="IP">IP</option>
+        </select>
+        <input type="text" style={{ flex: 1, minWidth: 180 }} placeholder={type === "PHONE" ? "+998 90 123 45 67" : "IP"} value={value} onChange={(e) => setValue(e.target.value)} required aria-label={t("value")} />
+        <input type="text" style={{ flex: 1, minWidth: 180 }} placeholder={t("reason")} value={reason} onChange={(e) => setReason(e.target.value)} aria-label={t("reason")} />
+        <button className="btn">{t("btn_block")}</button>
       </form>
       <div className="tbl-wrap">
         <table className="tbl">
-          <thead><tr><th>Turi</th><th>Qiymat</th><th>Sabab</th><th>Sana</th><th></th></tr></thead>
+          <thead><tr><th>{t("type")}</th><th>{t("value")}</th><th>{t("reason")}</th><th>{t("date")}</th><th></th></tr></thead>
           <tbody>
             {rows.map((r) => (
               <tr key={r.id}>
-                <td>{r.type === "PHONE" ? "Telefon" : "IP"}</td><td style={{ fontWeight: 600 }}>{r.value}</td><td>{r.reason || "—"}</td>
+                <td>{r.type === "PHONE" ? t("phone") : "IP"}</td><td style={{ fontWeight: 600 }}>{r.value}</td><td>{r.reason || "—"}</td>
                 <td>{new Date(r.createdAt).toLocaleDateString("ru-RU")}</td>
-                <td><button className="btn ghost sm" onClick={async () => { await api(`/admin/blocklist/${r.id}`, { method: "DELETE", admin: true }); load(); }}>Blokdan chiqarish</button></td>
+                <td><button className="btn ghost sm" onClick={async () => { await api(`/admin/blocklist/${r.id}`, { method: "DELETE", admin: true }); load(); }}>{t("btn_unblock")}</button></td>
               </tr>
             ))}
-            {rows.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: "center", padding: 32 }}>Ro'yxat bo'sh.</td></tr>}
+            {rows.length === 0 && <tr><td colSpan={5} className="muted" style={{ textAlign: "center", padding: 32 }}>{t("blocklist_empty")}</td></tr>}
           </tbody>
         </table>
       </div>
@@ -57,6 +61,7 @@ export function Blocklist() {
 /* -------------------------------- Import ------------------------------- */
 
 export function ImportPage() {
+  const { t } = useAdminI18n();
   const [file, setFile] = useState<File | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -83,20 +88,19 @@ export function ImportPage() {
 
   return (
     <>
-      <h1>Excel orqali yuklash</h1>
+      <h1>{t("import_title")}</h1>
       <p className="muted" style={{ maxWidth: "62ch" }}>
-        Yuzlab mahsulotni bir marta kiriting. Ustunlar: Nomi, Kategoriya, Brend, Davlat, Narx, Artikul, Tavsif. Yo'q kategoriya va brendlar avtomatik yaratiladi.
-        Artikuli mavjud mahsulot yangilanadi, qolganlari yangi qo'shiladi. Rasmlarni keyin har bir mahsulotga alohida yuklaysiz.
+        {t("import_desc")}
       </p>
-      <div className="row"><button className="btn ghost" onClick={downloadTemplate}>Shablonni yuklab olish</button></div>
+      <div className="row"><button className="btn ghost" onClick={downloadTemplate}>{t("btn_download_template")}</button></div>
       <form onSubmit={submit} className="row">
         <input type="file" accept=".xlsx" onChange={(e) => setFile(e.target.files?.[0] || null)} aria-label="Excel fayl" />
-        <button className="btn" disabled={!file || busy}>{busy ? "Yuklanmoqda…" : "Yuklash"}</button>
+        <button className="btn" disabled={!file || busy}>{busy ? t("uploading") : t("btn_upload")}</button>
       </form>
       {error && <p className="err">{error}</p>}
       {res && (
         <div className="ok">
-          Yangi: <b>{res.created}</b>, yangilangan: <b>{res.updated}</b>, o'tkazib yuborilgan: <b>{res.skipped}</b>, xato: <b>{res.errorCount}</b>
+          {t("import_res_new")}: <b>{res.created}</b>, {t("import_res_updated")}: <b>{res.updated}</b>, {t("import_res_skipped")}: <b>{res.skipped}</b>, {t("import_res_error")}: <b>{res.errorCount}</b>
           {res.errors.length > 0 && <ul>{res.errors.map((e: any) => <li key={e.row}>{e.row}-qator: {e.message}</li>)}</ul>}
         </div>
       )}
@@ -109,6 +113,7 @@ export function ImportPage() {
 interface U { id: number; email: string; name: string; role: "OWNER" | "ADMIN" | "MANAGER" }
 
 export function Users() {
+  const { t } = useAdminI18n();
   const [rows, setRows] = useState<U[]>([]);
   const [f, setF] = useState({ email: "", name: "", password: "", role: "MANAGER" });
   const [error, setError] = useState("");
@@ -123,25 +128,25 @@ export function Users() {
 
   return (
     <>
-      <h1>Xodimlar va Ega</h1>
+      <h1>{t("users_title")}</h1>
       <p className="muted" style={{ margin: "-8px 0 16px" }}>
-        Loyiha Egasi (Owner) barcha adminlar va menejerlarni boshqaradi.
+        {t("users_desc")}
       </p>
       {error && <p className="err">{error}</p>}
       <form className="row" onSubmit={add}>
-        <input type="text" placeholder="Ism" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required aria-label="Ism" />
-        <input type="email" placeholder="Email" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required aria-label="Email" />
-        <input type="password" placeholder="Parol (8+ belgi)" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required minLength={8} aria-label="Parol" autoComplete="new-password" />
-        <select style={{ width: 160 }} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as any })} aria-label="Rol">
-          <option value="MANAGER">Menejer</option>
-          <option value="ADMIN">Administrator</option>
-          <option value="OWNER">👑 Ega (Owner)</option>
+        <input type="text" placeholder={t("name")} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} required aria-label={t("name")} />
+        <input type="email" placeholder={t("col_email")} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} required aria-label={t("col_email")} />
+        <input type="password" placeholder={t("pass_min")} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required minLength={8} aria-label={t("pass_min")} autoComplete="new-password" />
+        <select style={{ width: 160 }} value={f.role} onChange={(e) => setF({ ...f, role: e.target.value as any })} aria-label={t("col_role")}>
+          <option value="MANAGER">{t("role_manager")}</option>
+          <option value="ADMIN">{t("role_admin")}</option>
+          <option value="OWNER">{t("role_owner")}</option>
         </select>
-        <button className="btn">Qo'shish</button>
+        <button className="btn">{t("add_new")}</button>
       </form>
       <div className="tbl-wrap">
         <table className="tbl">
-          <thead><tr><th>Ism</th><th>Email</th><th>Rol</th><th></th></tr></thead>
+          <thead><tr><th>{t("name")}</th><th>{t("col_email")}</th><th>{t("col_role")}</th><th></th></tr></thead>
           <tbody>
             {rows.map((u) => (
               <tr key={u.id}>
@@ -158,20 +163,20 @@ export function Users() {
                     background: u.role === "OWNER" ? "#fef3c7" : u.role === "ADMIN" ? "#e0f2fe" : "#f1f5f9",
                     color: u.role === "OWNER" ? "#b45309" : u.role === "ADMIN" ? "#0284c7" : "#475569",
                   }}>
-                    {u.role === "OWNER" ? "👑 Ega (Owner)" : u.role === "ADMIN" ? "Administrator" : "Menejer"}
+                    {u.role === "OWNER" ? t("role_owner") : u.role === "ADMIN" ? t("role_admin") : t("role_manager")}
                   </span>
                 </td>
                 <td>
                   {u.role !== "OWNER" ? (
                     <button className="btn ghost sm" onClick={async () => {
-                      if (!confirm("Ushbu xodim o'chirilsinmi?")) return;
+                      if (!confirm(t("confirm_del_user"))) return;
                       try { await api(`/admin/users/${u.id}`, { method: "DELETE", admin: true }); load(); }
                       catch (e) { setError((e as ApiError).message); }
                     }}>
-                      O'chirish
+                      {t("delete")}
                     </button>
                   ) : (
-                    <span style={{ fontSize: 12, color: "var(--ink2)", fontStyle: "italic" }}>Asosiy Ega</span>
+                    <span style={{ fontSize: 12, color: "var(--ink2)", fontStyle: "italic" }}>{t("main_owner")}</span>
                   )}
                 </td>
               </tr>

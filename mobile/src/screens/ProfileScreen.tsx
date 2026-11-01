@@ -848,6 +848,30 @@ export function ProfileScreen() {
 
         <TouchableOpacity
           style={[styles.contactItemRow, { borderTopColor: colors.border }]}
+          onPress={() => Linking.openURL("https://t.me/medax_uz")}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.contactItemIcon}>✈️</Text>
+          <View>
+            <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_tg")}</Text>
+            <Text style={[styles.contactItemValue, { color: "#0284c7" }]}>@medax_uz ↗</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.contactItemRow, { borderTopColor: colors.border }]}
+          onPress={() => Linking.openURL("https://instagram.com/medax_uz")}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.contactItemIcon}>📸</Text>
+          <View>
+            <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_insta")}</Text>
+            <Text style={[styles.contactItemValue, { color: "#e1306c" }]}>@medax_uz ↗</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.contactItemRow, { borderTopColor: colors.border }]}
           onPress={() => Linking.openURL("https://maps.app.goo.gl/Fi3DDmU1kWqHVST4A")}
           activeOpacity={0.7}
         >

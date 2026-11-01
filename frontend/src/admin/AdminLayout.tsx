@@ -182,8 +182,19 @@ function AdminLayoutInner() {
           </div>
 
           <div className="adm-topbar-right">
-            {/* Smooth Globe Dropdown Language Switcher */}
-            <LanguageSwitcher />
+            {/* 3-Button Segmented Language Picker */}
+            <div className="adm-lang-picker">
+              {(["uz", "ru", "en"] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  className={`lang-btn ${lang === l ? "active" : ""}`}
+                  onClick={() => setLang(l)}
+                >
+                  {l === "uz" ? "🇺🇿 UZ" : l === "ru" ? "🇷🇺 RU" : "🇬🇧 EN"}
+                </button>
+              ))}
+            </div>
 
             {/* Sun-to-Moon Morphing SVG Theme Toggle */}
             <ThemeToggle />
@@ -429,8 +440,8 @@ export function Dashboard() {
           </div>
           <div className="kpi-meta">
             <span className="kpi-value">{s.unreadContacts || 0}</span>
-            <strong className="kpi-title">Murojaatlar</strong>
-            <span className="kpi-sub">Yangi o'qilmagan xabarlar</span>
+            <strong className="kpi-title">{t("stat_inquiries")}</strong>
+            <span className="kpi-sub">{t("stat_inquiries_sub")}</span>
           </div>
         </Link>
       </div>
@@ -447,7 +458,7 @@ export function Dashboard() {
               <span className="qa-icon">➕</span>
               <div className="qa-text">
                 <strong>{t("action_add_product")}</strong>
-                <small>Yangi tibbiy uskuna spetsifikatsiyasini kiritish</small>
+                <small>{t("action_add_product_sub")}</small>
               </div>
             </Link>
 
@@ -455,7 +466,7 @@ export function Dashboard() {
               <span className="qa-icon">📁</span>
               <div className="qa-text">
                 <strong>{t("action_add_category")}</strong>
-                <small>Kategoriyalar va brendlar ro'yxatini boshqarish</small>
+                <small>{t("action_add_category_sub")}</small>
               </div>
             </Link>
 
@@ -463,7 +474,7 @@ export function Dashboard() {
               <span className="qa-icon">📋</span>
               <div className="qa-text">
                 <strong>{t("action_view_orders")}</strong>
-                <small>Kelib tushgan B2B buyurtmalarni tekshirish</small>
+                <small>{t("action_view_orders_sub")}</small>
               </div>
             </Link>
 
@@ -471,7 +482,7 @@ export function Dashboard() {
               <span className="qa-icon">📊</span>
               <div className="qa-text">
                 <strong>{t("action_excel_import")}</strong>
-                <small>Ommaviy mahsulotlarni Excel fayl orqali yuklash</small>
+                <small>{t("action_excel_import_sub")}</small>
               </div>
             </Link>
           </div>
@@ -510,7 +521,7 @@ export function Dashboard() {
                 <span className="health-indicator-dot online" />
                 <div>
                   <strong>{t("sys_security")}</strong>
-                  <small>SMS OTP va IP antispam filtri</small>
+                  <small>{t("sys_security_sub")}</small>
                 </div>
               </div>
               <span className="health-status-badge">{t("sys_active")}</span>
@@ -540,7 +551,7 @@ export function Dashboard() {
                   <th>{t("order_code")}</th>
                   <th>{t("customer")}</th>
                   <th>{t("phone")}</th>
-                  <th>Uskunalar</th>
+                  <th>{t("products_col")}</th>
                   <th>{t("status")}</th>
                   <th>{t("date")}</th>
                 </tr>

@@ -164,7 +164,7 @@ export function ProductList() {
         }}
       >
         <span style={{ fontSize: 13, fontWeight: 700, color: "var(--ink, #1e293b)" }}>
-          {selectedIds.size > 0 ? `Tanlandi: ${selectedIds.size} ta` : "Tezkor amallar:"}
+          {selectedIds.size > 0 ? `${aT("bulk_selected")}: ${selectedIds.size}` : aT("bulk_quick")}
         </span>
 
         {selectedIds.size > 0 ? (
@@ -176,7 +176,7 @@ export function ProductList() {
               onClick={() => handleBulkStatus(false, Array.from(selectedIds))}
               style={{ color: "#ef4444", borderColor: "#fca5a5" }}
             >
-              🙈 Tanlanganlarni yashirish
+              {aT("bulk_hide")}
             </button>
             <button
               type="button"
@@ -185,7 +185,7 @@ export function ProductList() {
               onClick={() => handleBulkStatus(true, Array.from(selectedIds))}
               style={{ color: "#10b981", borderColor: "#86efac" }}
             >
-              👁️ Tanlanganlarni ko'rsatish
+              {aT("bulk_show")}
             </button>
             <button
               type="button"
@@ -194,14 +194,14 @@ export function ProductList() {
               onClick={() => handleBulkDelete(Array.from(selectedIds))}
               style={{ background: "#dc2626", color: "#fff", borderColor: "#dc2626" }}
             >
-              🗑️ Tanlanganlarni o'chirish ({selectedIds.size})
+              {aT("bulk_delete")} ({selectedIds.size})
             </button>
             <button
               type="button"
               className="btn sm ghost"
               onClick={() => setSelectedIds(new Set())}
             >
-              Bekor qilish
+              {aT("cancel")}
             </button>
           </>
         ) : (
@@ -212,9 +212,9 @@ export function ProductList() {
               disabled={busy}
               onClick={() => handleBulkStatus(false)}
               style={{ color: "#ef4444", borderColor: "rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.05)" }}
-              title="Barcha mahsulotlarni sayt katalogidan va qidiruvidan yashirib qo'yish"
+              title="Deactivate / Hide all"
             >
-              🙈 Barchasini yashirish (Nofaol qilish)
+              {aT("bulk_hide_all")}
             </button>
             <button
               type="button"
@@ -222,9 +222,9 @@ export function ProductList() {
               disabled={busy}
               onClick={() => handleBulkStatus(true)}
               style={{ color: "#10b981", borderColor: "rgba(16,185,129,0.3)", background: "rgba(16,185,129,0.05)" }}
-              title="Barcha mahsulotlarni saytda yana ko'rinadigan qilish"
+              title="Activate / Show all"
             >
-              👁️ Barchasini ko'rsatish (Faol qilish)
+              {aT("bulk_show_all")}
             </button>
             <button
               type="button"
@@ -232,9 +232,9 @@ export function ProductList() {
               disabled={busy}
               onClick={() => handleBulkDelete()}
               style={{ background: "#ef4444", color: "#fff", borderColor: "#ef4444" }}
-              title="Bazadagi barcha mahsulotlarni birdaniga o'chirish"
+              title="Delete all"
             >
-              🗑️ Barcha mahsulotlarni o'chirish
+              {aT("bulk_delete_all")}
             </button>
           </>
         )}
@@ -249,7 +249,7 @@ export function ProductList() {
                   type="checkbox"
                   checked={allSelected}
                   onChange={toggleSelectAll}
-                  aria-label="Barchasini tanlash"
+                  aria-label="Select all"
                   style={{ cursor: "pointer", width: 16, height: 16 }}
                 />
               </th>
@@ -257,7 +257,7 @@ export function ProductList() {
               <th>{aT("name")}</th>
               <th>{aT("category")}</th>
               <th>{aT("price")}</th>
-              <th>Qoldiq (dona)</th>
+              <th>{aT("stock_col")}</th>
               <th>{aT("status")}</th>
               <th>{aT("actions")}</th>
             </tr>
@@ -271,7 +271,7 @@ export function ProductList() {
                     checked={selectedIds.has(p.id)}
                     onChange={() => toggleSelectOne(p.id)}
                     style={{ cursor: "pointer", width: 16, height: 16 }}
-                    aria-label={`${p.name} ni tanlash`}
+                    aria-label={`${p.name}`}
                   />
                 </td>
                 <td style={{ width: 56 }}>
@@ -295,11 +295,11 @@ export function ProductList() {
                   {p.stock !== undefined && p.stock !== null ? (
                     p.stock > 0 ? (
                       <span style={{ fontWeight: 700, color: p.stock <= 5 ? "#d97706" : "#0284c7" }}>
-                        {p.stock} dona {p.stock <= 5 ? "⚠️" : ""}
+                        {p.stock} {aT("unit_pcs")} {p.stock <= 5 ? "⚠️" : ""}
                       </span>
                     ) : (
                       <span style={{ fontWeight: 800, color: "#dc2626", background: "#fef2f2", padding: "2px 8px", borderRadius: 6, fontSize: 12 }}>
-                        0 dona (Tugagan)
+                        0 {aT("unit_pcs")} ({aT("out_of_stock")})
                       </span>
                     )
                   ) : (

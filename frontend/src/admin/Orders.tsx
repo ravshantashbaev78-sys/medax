@@ -40,10 +40,10 @@ interface Order {
 
 import { useAdminI18n } from "./i18n";
 
-const FLAG_LABEL: Record<string, string> = {
-  FIRST: "Yangi mijoz (1-buyurtma)",
-  TRUSTED: "Ishonchli mijoz",
-  OTP_VERIFIED: "SMS kod bilan tasdiqlangan",
+const FLAG_LABEL: Record<string, Record<string, string>> = {
+  FIRST: { uz: "Yangi mijoz (1-buyurtma)", ru: "Новый клиент (1-й заказ)", en: "New customer (1st order)" },
+  TRUSTED: { uz: "Ishonchli mijoz", ru: "Надежный клиент", en: "Trusted customer" },
+  OTP_VERIFIED: { uz: "SMS kod bilan tasdiqlangan", ru: "Подтвержден по SMS", en: "Verified via SMS" },
 };
 const fmt = (s: string) => new Date(s).toLocaleString("ru-RU", { dateStyle: "short", timeStyle: "short" });
 
@@ -75,7 +75,7 @@ export default function Orders() {
     switch (s) {
       case "NEW": return t("st_new") || "Yangi";
       case "CONFIRMED": return t("st_confirmed") || "Tasdiqlangan";
-      case "READY": return "Olib ketishga tayyor";
+      case "READY": return t("st_ready") || "Olib ketishga tayyor";
       case "DONE": return t("st_done") || "Bajarildi";
       case "CANCELED": return t("st_canceled") || "Bekor qilingan";
       case "FAKE": return t("st_fake") || "Soxta";
@@ -152,8 +152,8 @@ export default function Orders() {
           <span>{lang === "ru" ? "Экспорт в Excel" : "Excel (CSV)"}</span>
         </button>
         <form className="search" onSubmit={(e: FormEvent) => { e.preventDefault(); setPage(1); setQuery(q.trim()); }}>
-          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Kod, ism yoki telefon" aria-label="Qidirish" />
-          <button className="btn sm">Qidirish</button>
+          <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t("search_ph_orders")} aria-label={t("search")} />
+          <button className="btn sm">{t("search")}</button>
         </form>
       </div>
       {error && <p className="err">{error}</p>}
@@ -164,9 +164,9 @@ export default function Orders() {
               <th>{t("order_code")}</th>
               <th>{t("customer")}</th>
               <th>{t("phone")}</th>
-              <th>Mahsulotlar</th>
-              <th>Jami summa</th>
-              <th>To'lov</th>
+              <th>{t("products_col")}</th>
+              <th>{t("total_col")}</th>
+              <th>{t("payment_col")}</th>
               <th>{t("date")}</th>
               <th>{t("status")}</th>
             </tr>
@@ -177,18 +177,18 @@ export default function Orders() {
                 <td style={{ fontWeight: 600 }}>#{o.code}</td>
                 <td>{o.customerName}{o.organization && <div className="muted" style={{ fontSize: 13 }}>{o.organization}</div>}</td>
                 <td>{o.phone}</td>
-                <td>{o.items.length} {lang === "ru" ? "поз." : lang === "en" ? "items" : "ta"} ({o.items.reduce((s, i) => s + i.quantity, 0)} {lang === "ru" ? "шт" : lang === "en" ? "pcs" : "dona"})</td>
+                <td>{o.items.length} {lang === "ru" ? "поз." : lang === "en" ? "items" : "ta"} ({o.items.reduce((s, i) => s + i.quantity, 0)} {t("unit_pcs")})</td>
                 <td style={{ fontWeight: 600 }}>
-                  {o.totalAmount && Number(o.totalAmount) > 0 ? Number(o.totalAmount).toLocaleString() + " so'm" : <span className="muted">Kelishuv</span>}
+                  {o.totalAmount && Number(o.totalAmount) > 0 ? Number(o.totalAmount).toLocaleString() + " so'm" : <span className="muted">{t("agreement_price")}</span>}
                 </td>
                 <td>
                   {o.isPaid ? (
                     <span style={{ color: "var(--moss, #065f46)", fontWeight: 700, fontSize: 12, background: "var(--mint, #ecfdf5)", padding: "3px 8px", borderRadius: 6 }}>
-                      To'langan
+                      {t("paid")}
                     </span>
                   ) : (
                     <span style={{ color: "#854d0e", fontWeight: 600, fontSize: 12, background: "#fef9c3", padding: "3px 8px", borderRadius: 6 }}>
-                      Kutilmoqda
+                      {t("pending")}
                     </span>
                   )}
                 </td>
@@ -235,17 +235,17 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
   };
 
   const confirmCancel = () => {
-    const fullReason = cancelReasonPreset === "Boshqa"
-      ? (cancelReasonText.trim() || "Sabab ko'rsatilmadi")
-      : `${cancelReasonPreset}${cancelReasonText.trim() ? `. Qo'shimcha: ${cancelReasonText.trim()}` : ""}`;
+    const fullReason = cancelReasonPreset === (lang === "ru" ? "Другая причина" : lang === "en" ? "Other reason" : "Boshqa")
+      ? (cancelReasonText.trim() || t("st_canceled"))
+      : `${cancelReasonPreset}${cancelReasonText.trim() ? `. ${cancelReasonText.trim()}` : ""}`;
     patch({ status: "CANCELED", managerNote: fullReason });
     setCanceling(false);
   };
 
   const markFake = () => {
     setConfirmAction({
-      title: "Soxta buyurtma deb belgilash",
-      message: "Bu buyurtma soxta deb belgilansinmi? Raqam takror soxta bo'lsa tizim tomonidan avtomatik bloklanadi.",
+      title: t("confirm_fake_title"),
+      message: t("confirm_fake_msg"),
       danger: true,
       onConfirm: () => {
         setConfirmAction(null);
@@ -256,14 +256,14 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
 
   const blockNow = () => {
     setConfirmAction({
-      title: "Raqamni bloklash",
-      message: `${order.phone} raqamini bloklashni tasdiqlaysizmi? Bu raqamdan yangi buyurtmalar qabul qilinmaydi.`,
+      title: t("confirm_block_title"),
+      message: `${order.phone} - ${t("confirm_del_taxonomy")}`,
       danger: true,
       onConfirm: async () => {
         setConfirmAction(null);
         try {
           await api("/admin/blocklist", { json: { type: "PHONE", value: order.phone, reason: `Buyurtma ${order.code}` }, admin: true });
-          setInfo("Raqam bloklandi.");
+          setInfo("OK");
         } catch (e) { setError((e as ApiError).message); }
       },
     });
@@ -271,8 +271,8 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
 
   const markPaid = () => {
     setConfirmAction({
-      title: "To'lovni tasdiqlash",
-      message: "Buyurtma kassada to'landi deb belgilansinmi?",
+      title: t("confirm_paid_title"),
+      message: t("confirm_paid_msg"),
       danger: false,
       onConfirm: () => {
         setConfirmAction(null);
@@ -288,7 +288,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
           <h2 style={{ fontSize: 26 }}>{order.code}</h2>
           <span className={`st ${order.status}`}>{STATUS_LABEL[order.status]}</span>
           <span className="grow" />
-          <button className="btn ghost sm" onClick={onClose}>Yopish</button>
+          <button className="btn ghost sm" onClick={onClose}>{t("close")}</button>
         </div>
         {error && <p className="err">{error}</p>}
         {info && <p className="ok">{info}</p>}
@@ -304,7 +304,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
               className={`flag ${f}`}
               style={f === "OTP_VERIFIED" ? { background: "var(--mint, #ecfdf5)", color: "var(--moss, #065f46)" } : undefined}
             >
-              {FLAG_LABEL[f] || f}
+              {FLAG_LABEL[f]?.[lang] || FLAG_LABEL[f]?.uz || f}
             </span>
           ))}
         </div>
@@ -312,17 +312,17 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
         {order.status === "CANCELED" && (
           <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "12px 14px", margin: "10px 0" }}>
             <strong style={{ color: "#b91c1c", display: "block", fontSize: 13, marginBottom: 4 }}>
-              Buyurtma bekor qilingan
+              {t("order_canceled_notice")}
             </strong>
             <span style={{ color: "#7f1d1d", fontSize: 14 }}>
-              <b>Sababi:</b> {order.managerNote || "Sabab yozilmagan"}
+              <b>{t("reason_label")}</b> {order.managerNote || "—"}
             </span>
           </div>
         )}
 
         <h4 style={{ margin: "18px 0 8px", fontSize: 15, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
           <span>📦</span>
-          <span>{lang === "ru" ? "Заказанные товары:" : "Buyurtma qilingan mahsulotlar:"}</span>
+          <span>{t("order_items_title")}</span>
         </h4>
         <div style={{ display: "grid", gap: 8, margin: "8px 0 16px" }}>
           {order.items.map((i) => {
@@ -361,12 +361,12 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                     <strong style={{ fontSize: 14, color: "var(--ink)" }}>{i.productName}</strong>
                     {i.product?.sku && (
                       <span style={{ fontSize: 11, padding: "1px 6px", borderRadius: 4, background: "#f1f5f9", color: "#475569", fontWeight: 600 }}>
-                        Artikul: {i.product.sku}
+                        {t("sku_label")} {i.product.sku}
                       </span>
                     )}
                     {i.product?.isActive !== undefined && (
                       <span style={{ fontSize: 11, fontWeight: 700, color: i.product.isActive ? "#16a34a" : "#dc2626" }}>
-                        {i.product.isActive ? "● Omborda bor" : "○ Saytdan yashirilgan"}
+                        {i.product.isActive ? t("in_stock_label") : t("hidden_label")}
                       </span>
                     )}
                     {i.product?.stock !== undefined && (
@@ -380,15 +380,15 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                           borderRadius: 4,
                         }}
                       >
-                        Qoldiq: {i.product?.stock} dona
+                        {t("stock_remain")} {i.product?.stock} {t("unit_pcs")}
                       </span>
                     )}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4, fontSize: 13, color: "var(--ink-muted, #64748b)", flexWrap: "wrap" }}>
                     {price ? (
-                      <span>{price.toLocaleString()} so'm × <b>{i.quantity} dona</b></span>
+                      <span>{price.toLocaleString()} so'm × <b>{i.quantity} {t("unit_pcs")}</b></span>
                     ) : (
-                      <span>Kelishilgan narxda × <b>{i.quantity} dona</b></span>
+                      <span>{t("agreed_price")} × <b>{i.quantity} {t("unit_pcs")}</b></span>
                     )}
                     {i.product?.id && (
                       <a
@@ -397,14 +397,14 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                         rel="noreferrer"
                         style={{ color: "#0284c7", fontSize: 12, textDecoration: "underline" }}
                       >
-                        Tahrirlash / Ko'rish ↗
+                        {t("view_edit")}
                       </a>
                     )}
                   </div>
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <strong style={{ fontSize: 15, color: "var(--ink)" }}>
-                    {itemTotal ? itemTotal.toLocaleString() + " so'm" : "Kelishuv"}
+                    {itemTotal ? itemTotal.toLocaleString() + " so'm" : t("agreement_price")}
                   </strong>
                 </div>
               </div>
@@ -415,20 +415,20 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
         {/* Jami summa va to'lov holati */}
         <div style={{ background: "var(--sea, #f0f9ff)", border: "1px solid rgba(2, 132, 199, 0.25)", borderRadius: 12, padding: "12px 16px", margin: "12px 0", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
           <div>
-            <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)" }}>Buyurtma summasi:</strong>
+            <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)" }}>{t("order_sum_label")}</strong>
             <span style={{ fontSize: 19, fontWeight: 800, color: "var(--ink, #0f172a)" }}>
-              {order.totalAmount && Number(order.totalAmount) > 0 ? Number(order.totalAmount).toLocaleString() + " so'm" : "Kelishuv asosida"}
+              {order.totalAmount && Number(order.totalAmount) > 0 ? Number(order.totalAmount).toLocaleString() + " so'm" : t("agreement_price")}
             </span>
           </div>
           <div>
-            <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)", textAlign: "right" }}>To'lov holati:</strong>
+            <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)", textAlign: "right" }}>{t("payment_status_label")}</strong>
             {order.isPaid ? (
               <span style={{ color: "var(--moss, #065f46)", fontWeight: 800, fontSize: 14, background: "var(--mint, #ecfdf5)", padding: "4px 10px", borderRadius: 8 }}>
-                To'langan (Kassada / Hisob raqamda)
+                {t("paid_full")}
               </span>
             ) : (
               <span style={{ color: "#854d0e", fontWeight: 700, fontSize: 14, background: "#fef9c3", padding: "4px 10px", borderRadius: 8 }}>
-                To'lov kutilmoqda
+                {t("awaiting_payment")}
               </span>
             )}
           </div>
@@ -437,7 +437,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
         {order.deliveryAddress && (
           <div style={{ background: "var(--sea, #f0f9ff)", border: "1px solid rgba(2, 132, 199, 0.2)", borderRadius: 10, padding: "10px 14px", margin: "10px 0" }}>
             <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)", marginBottom: 4 }}>
-              Yetkazib berish manzili:
+              {t("delivery_address_label")}
             </strong>
             <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ink, #0f172a)" }}>{order.deliveryAddress}</span>
           </div>
@@ -446,12 +446,12 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
         {order.paymentMethod && (
           <div style={{ background: "var(--sea, #f0f9ff)", border: "1px solid rgba(2, 132, 199, 0.2)", borderRadius: 10, padding: "10px 14px", margin: "10px 0" }}>
             <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)", marginBottom: 4 }}>
-              To'lov usuli:
+              {t("payment_method_label")}
             </strong>
             <span style={{ fontSize: 15, fontWeight: 600, color: "var(--ink, #0f172a)" }}>
               {order.paymentMethod.includes("Shartnoma") || order.paymentMethod.includes("B2B")
-                ? "Shartnoma asosida (B2B / Bank o'tkazmasi)"
-                : "Do'konda to'lash (Olib ketish paytida)"}
+                ? t("payment_b2b")
+                : t("payment_cash")}
             </span>
           </div>
         )}
@@ -459,7 +459,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
         {order.comment && (
           <div style={{ background: "var(--sea, #f0f9ff)", borderRadius: 10, padding: "10px 14px", margin: "10px 0" }}>
             <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)", marginBottom: 4 }}>
-              Qo'shimcha izoh:
+              {t("notes_label")}
             </strong>
             <span style={{ fontSize: 14 }}>{order.comment}</span>
           </div>
@@ -471,10 +471,10 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
             <p style={{ margin: "0 0 14px", fontSize: 14, color: "var(--ink)" }}>{confirmAction.message}</p>
             <div style={{ display: "flex", gap: 8 }}>
               <button className={`btn ${confirmAction.danger ? "danger" : ""}`} disabled={busy} onClick={confirmAction.onConfirm}>
-                Tasdiqlash
+                {t("confirm")}
               </button>
               <button className="btn ghost" disabled={busy} onClick={() => setConfirmAction(null)}>
-                Bekor qilish
+                {t("cancel")}
               </button>
             </div>
           </div>
@@ -482,45 +482,45 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
 
         {canceling ? (
           <div style={{ background: "#fff1f2", border: "1px solid #fda4af", borderRadius: 12, padding: "16px", margin: "16px 0" }}>
-            <h4 style={{ margin: "0 0 10px", color: "#be123c", fontSize: 16 }}>Buyurtmani bekor qilish sababini ko'rsating</h4>
+            <h4 style={{ margin: "0 0 10px", color: "#be123c", fontSize: 16 }}>{t("cancel_modal_title")}</h4>
             <div className="field" style={{ marginBottom: 10 }}>
-              <label htmlFor="cancel-preset">Asosiy sabab:</label>
+              <label htmlFor="cancel-preset">{t("cancel_main_reason")}</label>
               <select
                 id="cancel-preset"
                 value={cancelReasonPreset}
                 onChange={(e) => setCancelReasonPreset(e.target.value)}
                 style={{ width: "100%", padding: "8px", borderRadius: 8 }}
               >
-                <option value="Mijoz rad etdi / O'zi bekor qildi">Mijoz rad etdi / O'zi bekor qildi</option>
-                <option value="Mahsulot omborda qolmagan">Mahsulot omborda qolmagan</option>
-                <option value="Mijoz telefoniga javob bermadi">Mijoz telefoniga javob bermadi</option>
-                <option value="Narx yoki yetkazib berish shartlari to'g'ri kelmadi">Narx yoki yetkazib berish shartlari to'g'ri kelmadi</option>
-                <option value="Boshqa">Boshqa sabab (qo'lda yozish)...</option>
+                <option value={t("cancel_reason_1")}>{t("cancel_reason_1")}</option>
+                <option value={t("cancel_reason_2")}>{t("cancel_reason_2")}</option>
+                <option value={t("cancel_reason_3")}>{t("cancel_reason_3")}</option>
+                <option value={t("cancel_reason_4")}>{t("cancel_reason_4")}</option>
+                <option value={t("cancel_reason_other")}>{t("cancel_reason_other")}</option>
               </select>
             </div>
             <div className="field" style={{ marginBottom: 12 }}>
-              <label htmlFor="cancel-detail">Qo'shimcha tafsilot / izoh:</label>
+              <label htmlFor="cancel-detail">{t("cancel_extra_detail")}</label>
               <textarea
                 id="cancel-detail"
                 value={cancelReasonText}
                 onChange={(e) => setCancelReasonText(e.target.value)}
-                placeholder="Masalan: Mijoz bilan bog'lanildi, 2 haftadan keyin qayta murojaat qiladi..."
+                placeholder={t("cancel_ph")}
                 style={{ minHeight: 60, width: "100%" }}
               />
             </div>
             <div style={{ display: "flex", gap: 8 }}>
               <button className="btn danger" disabled={busy} onClick={confirmCancel}>
-                Bekor qilishni tasdiqlash
+                {t("confirm_cancel_btn")}
               </button>
               <button className="btn ghost" disabled={busy} onClick={() => setCanceling(false)}>
-                Orqaga
+                {t("back_btn")}
               </button>
             </div>
           </div>
         ) : (
           <>
             <div className="field" style={{ marginTop: 14 }}>
-              <label htmlFor="note">Menejer izohi</label>
+              <label htmlFor="note">{t("manager_note")}</label>
               <textarea id="note" value={note} onChange={(e) => setNote(e.target.value)} style={{ minHeight: 80 }} />
             </div>
             <div className="row" style={{ flexWrap: "wrap", gap: 8 }}>
@@ -531,7 +531,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                   disabled={busy}
                   onClick={() => patch({ status: "CONFIRMED", managerNote: note })}
                 >
-                  ✓ Tasdiqlash (Mijozga SMS va Bildirishnoma)
+                  {t("confirm_order_btn")}
                 </button>
               )}
               {order.status === "CONFIRMED" && (
@@ -541,12 +541,12 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                   disabled={busy}
                   onClick={() => patch({ status: "READY", managerNote: note })}
                 >
-                  Olib ketishga tayyor (READY)
+                  {t("ready_pickup_btn")}
                 </button>
               )}
               {order.status === "READY" && (
                 <button className="btn" style={{ background: "#16a34a" }} disabled={busy} onClick={() => patch({ status: "DONE", managerNote: note })}>
-                  Bajarildi (Mijoz olib ketdi)
+                  {t("done_pickup_btn")}
                 </button>
               )}
               {!order.isPaid && order.status !== "CANCELED" && order.status !== "FAKE" && (
@@ -556,17 +556,17 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                   disabled={busy}
                   onClick={markPaid}
                 >
-                  Kassada to'landi deb belgilash
+                  {t("mark_paid_btn")}
                 </button>
               )}
               {(order.status === "NEW" || order.status === "CONFIRMED" || order.status === "READY") && (
                 <button className="btn ghost" disabled={busy} style={{ color: "#ef4444" }} onClick={() => setCanceling(true)}>
-                  Bekor qilish...
+                  {t("action_cancel_order")}...
                 </button>
               )}
-              {order.status !== "FAKE" && <button className="btn danger" disabled={busy} onClick={markFake}>Soxta (Bekor va Bloklash)</button>}
-              <button className="btn ghost" disabled={busy} onClick={() => patch({ managerNote: note })}>Izohni saqlash</button>
-              <button className="btn ghost" disabled={busy} onClick={blockNow}>Raqamni bloklash</button>
+              {order.status !== "FAKE" && <button className="btn danger" disabled={busy} onClick={markFake}>{t("fake_btn")}</button>}
+              <button className="btn ghost" disabled={busy} onClick={() => patch({ managerNote: note })}>{t("save_note")}</button>
+              <button className="btn ghost" disabled={busy} onClick={blockNow}>{t("block_phone_btn")}</button>
             </div>
           </>
         )}
