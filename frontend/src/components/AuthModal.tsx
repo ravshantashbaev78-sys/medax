@@ -142,9 +142,11 @@ export function AuthModal() {
 
     setError("");
     setInfoMessage("");
+    setCode("");
     setLoading(true);
     try {
       const res = await sendOtp(phone);
+      setCode("");
       setMode("register-verify");
       setResendTimer(res.resendIn || 60);
     } catch (err: any) {
@@ -202,9 +204,11 @@ export function AuthModal() {
 
     setError("");
     setInfoMessage("");
+    setCode("");
     setLoading(true);
     try {
       const res = await forgotPasswordOtp(phone);
+      setCode("");
       setInfoMessage(
         res.message ||
           (lang === "ru"
@@ -631,21 +635,22 @@ export function AuthModal() {
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="------"
+                placeholder="••••••"
                 required
                 autoFocus
+                autoComplete="one-time-code"
                 style={{
                   width: "100%",
                   height: 44,
                   textAlign: "center",
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: 700,
-                  letterSpacing: 6,
+                  letterSpacing: 8,
                   borderRadius: 8,
                   border: "1.5px solid var(--teal, #0d9488)",
                   outline: "none",
                   boxSizing: "border-box",
-                  opacity: code ? 1 : 0.85,
+                  color: "var(--ink, #0f172a)",
                 }}
               />
             </div>
@@ -881,21 +886,22 @@ export function AuthModal() {
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                placeholder="------"
+                placeholder="••••••"
                 required
                 autoFocus
+                autoComplete="one-time-code"
                 style={{
                   width: "100%",
                   height: 44,
                   textAlign: "center",
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: 700,
-                  letterSpacing: 6,
+                  letterSpacing: 8,
                   borderRadius: 8,
                   border: "1.5px solid var(--teal, #0d9488)",
                   outline: "none",
                   boxSizing: "border-box",
-                  opacity: code ? 1 : 0.85,
+                  color: "var(--ink, #0f172a)",
                 }}
               />
             </div>

@@ -45,7 +45,8 @@ export function ProfileScreen() {
   const { lang, setLang, t } = useI18n();
 
   // Auth form state (when not logged in)
-  const [authMode, setAuthMode] = useState<"phone" | "otp" | "password" | "set_password">("phone");
+  const [authTab, setAuthTab] = useState<"login" | "register">("login");
+  const [authMode, setAuthMode] = useState<"phone" | "otp" | "password" | "set_password">("password");
   const [phone, setPhone] = useState("+998 ");
   const [name, setName] = useState("");
   const [otpCode, setOtpCode] = useState("");
@@ -187,29 +188,28 @@ export function ProfileScreen() {
     setAuthMode("set_password");
   };
 
-  const handleSetPasswordAndFinish = async (skipPassword = false) => {
-    if (!skipPassword) {
-      if (newPassword.length < 6) {
-        Alert.alert(t("error"), "Parol kamida 6 ta belgidan iborat bo'lishi kerak");
-        return;
-      }
-      if (newPassword !== confirmPassword) {
-        Alert.alert(t("error"), "Kiritilgan parollar bir-biriga mos kelmadi");
-        return;
-      }
+  const handleSetPasswordAndFinish = async () => {
+    if (newPassword.length < 6) {
+      Alert.alert(t("error"), "Parol kamida 6 ta belgidan iborat bo'lishi kerak");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert(t("error"), "Kiritilgan parollar bir-biriga mos kelmadi. Iltimos, tekshirib qayta tering.");
+      return;
     }
 
     setLoading(true);
     try {
-      const res = await verifyCustomerOtp(phone, otpCode, name, skipPassword ? undefined : newPassword);
+      const res = await verifyCustomerOtp(phone, otpCode, name, newPassword);
       if (res.ok && res.token && res.customer) {
         await loginWithToken(res.token, res.customer);
         setSuccessModal({
           visible: true,
           title: t("auth_success_title"),
-          message: `${t("auth_welcome")}, ${res.customer.name}!`,
+          message: `${t("auth_welcome")}, ${res.customer.name}! Akkauntingiz muvaffaqiyatli yaratildi.`,
         });
-        setAuthMode("phone");
+        setAuthTab("login");
+        setAuthMode("password");
         setOtpCode("");
         setNewPassword("");
         setConfirmPassword("");
@@ -519,162 +519,60 @@ export function ProfileScreen() {
               MEDTEXNIKA MARKAZI
             </Text>
           </View>
-          <Text style={[styles.loginTitle, { color: colors.text }]}>{t("profile_title")}</Text>
+          <Text style={[styles.loginTitle, { color: colors.text }]}>
+            {authTab === "login" ? "Shaxsiy kabinetga kirish" : "Yangi akkaunt ochish"}
+          </Text>
           <Text style={[styles.loginSub, { color: colors.textMuted }]}>
-            {authMode === "otp"
+            {authTab === "login"
+              ? "Oldingi buyurtmalaringiz va shaxsiy hisobingizga kirish uchun telefon raqamingiz va parolingizni kiriting."
+              : authMode === "otp"
               ? `${phone} raqamiga yuborilgan 6 xonali SMS kodni kiriting`
               : authMode === "set_password"
-              ? "Akkauntingiz uchun doimiy parol o'rnating. Keyingi safar SMS kutmasdan to'g'ridan-to'g'ri kirasiz."
-              : authMode === "password"
-              ? "Parolingiz orqali tizimga kiring"
-              : t("profile_login_sub")}
+              ? "Akkauntingiz uchun mustahkam parol o'rnating va tasdiqlang."
+              : "Buyurtmalar tarixi va kafolat hujjatlari saqlanadigan shaxsiy akkaunt yarating."}
           </Text>
 
-          {authMode === "phone" && (
-            <View style={styles.formWidth}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_phone_label")}</Text>
-              <TextInput
-                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                value={phone}
-                onChangeText={formatPhone}
-                keyboardType="phone-pad"
-                placeholder="+998 90 123 45 67"
-                placeholderTextColor={colors.textMuted}
-              />
+          {/* Mode Tabs */}
+          <View style={{ flexDirection: "row", backgroundColor: colors.inputBg, borderRadius: 12, padding: 3, marginBottom: 16, width: "100%" }}>
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                paddingVertical: 9,
+                alignItems: "center",
+                borderRadius: 9,
+                backgroundColor: authTab === "login" ? colors.card : "transparent",
+              }}
+              onPress={() => {
+                setAuthTab("login");
+                setAuthMode("password");
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color: authTab === "login" ? colors.primary : colors.textMuted }}>
+                🔑 Kirish
+              </Text>
+            </TouchableOpacity>
 
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_name_label")}</Text>
-              <TextInput
-                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                value={name}
-                onChangeText={setName}
-                placeholder="Masalan: Dr. Karimov"
-                placeholderTextColor={colors.textMuted}
-              />
+            <TouchableOpacity
+              style={{
+                flex: 1,
+                paddingVertical: 9,
+                alignItems: "center",
+                borderRadius: 9,
+                backgroundColor: authTab === "register" ? colors.card : "transparent",
+              }}
+              onPress={() => {
+                setAuthTab("register");
+                setAuthMode("phone");
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color: authTab === "register" ? colors.primary : colors.textMuted }}>
+                📝 Ro'yxatdan o'tish
+              </Text>
+            </TouchableOpacity>
+          </View>
 
-              <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-                onPress={handleSendOtp}
-                disabled={loading}
-                activeOpacity={0.88}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>{t("auth_get_code")}</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.switchLink}
-                onPress={() => {
-                  setOtpCode("");
-                  setAuthMode("password");
-                }}
-              >
-                <Text style={[styles.switchLinkText, { color: colors.primary }]}>{t("auth_password_link")}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {authMode === "otp" && (
-            <View style={styles.formWidth}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_otp_title")}</Text>
-              <TextInput
-                style={[
-                  styles.inputField,
-                  styles.otpField,
-                  { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
-                ]}
-                value={otpCode}
-                onChangeText={setOtpCode}
-                keyboardType="number-pad"
-                maxLength={6}
-                placeholder="------"
-                placeholderTextColor="rgba(148, 163, 184, 0.35)"
-                autoFocus
-              />
-
-              <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-                onPress={handleVerifyOtp}
-                disabled={loading}
-                activeOpacity={0.88}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>{t("auth_verify_btn")}</Text>
-                )}
-              </TouchableOpacity>
-
-              <View style={styles.otpActions}>
-                {countdown > 0 ? (
-                  <Text style={[styles.timerText, { color: colors.textMuted }]}>Qayta yuborish: {countdown}s</Text>
-                ) : (
-                  <TouchableOpacity onPress={handleSendOtp}>
-                    <Text style={[styles.resendText, { color: colors.primary }]}>{t("cart_resend_code")}</Text>
-                  </TouchableOpacity>
-                )}
-                <TouchableOpacity
-                  onPress={() => {
-                    setOtpCode("");
-                    setAuthMode("phone");
-                  }}
-                >
-                  <Text style={[styles.backText, { color: colors.textMuted }]}>{t("auth_change_phone")}</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {authMode === "set_password" && (
-            <View style={styles.formWidth}>
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Yangi parol (kamida 6 ta belgi)</Text>
-              <TextInput
-                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
-                placeholder="••••••••"
-                placeholderTextColor={colors.textMuted}
-                autoFocus
-              />
-
-              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Parolni qayta tasdiqlang</Text>
-              <TextInput
-                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                placeholder="••••••••"
-                placeholderTextColor={colors.textMuted}
-              />
-
-              <TouchableOpacity
-                style={[styles.submitBtn, { backgroundColor: colors.primary }]}
-                onPress={() => handleSetPasswordAndFinish(false)}
-                disabled={loading}
-                activeOpacity={0.88}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#ffffff" />
-                ) : (
-                  <Text style={styles.submitBtnText}>Ro'yxatdan o'tishni yakunlash ✓</Text>
-                )}
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.switchLink}
-                onPress={() => handleSetPasswordAndFinish(true)}
-              >
-                <Text style={[styles.switchLinkText, { color: colors.textMuted }]}>
-                  Parolsiz davom etish (faqat SMS orqali) →
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {authMode === "password" && (
+          {/* TAB 1: KIRISH (Telefon + Parol) */}
+          {authTab === "login" && (
             <View style={styles.formWidth}>
               <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_phone_label")}</Text>
               <TextInput
@@ -711,9 +609,154 @@ export function ProfileScreen() {
 
               <TouchableOpacity
                 style={styles.switchLink}
-                onPress={() => setAuthMode("phone")}
+                onPress={() => {
+                  setAuthTab("register");
+                  setAuthMode("phone");
+                }}
               >
-                <Text style={[styles.switchLinkText, { color: colors.primary }]}>SMS orqali kirishga qaytish</Text>
+                <Text style={[styles.switchLinkText, { color: colors.textMuted }]}>
+                  Hisobingiz yo'qmi? <Text style={{ color: colors.primary, fontWeight: "700" }}>Ro'yxatdan o'tish →</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* TAB 2: RO'YXATDAN O'TISH - 1-QADAM */}
+          {authTab === "register" && authMode === "phone" && (
+            <View style={styles.formWidth}>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_phone_label")} *</Text>
+              <TextInput
+                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+                value={phone}
+                onChangeText={formatPhone}
+                keyboardType="phone-pad"
+                placeholder="+998 90 123 45 67"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_name_label")}</Text>
+              <TextInput
+                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+                value={name}
+                onChangeText={setName}
+                placeholder="Masalan: Dr. Karimov"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: colors.primary }]}
+                onPress={handleSendOtp}
+                disabled={loading}
+                activeOpacity={0.88}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>{t("auth_get_code")}</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.switchLink}
+                onPress={() => {
+                  setAuthTab("login");
+                  setAuthMode("password");
+                }}
+              >
+                <Text style={[styles.switchLinkText, { color: colors.textMuted }]}>
+                  Oldin ro'yxatdan o'tganmisiz? <Text style={{ color: colors.primary, fontWeight: "700" }}>Kirish</Text>
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* TAB 2: RO'YXATDAN O'TISH - 2-QADAM (SMS OTP) */}
+          {authTab === "register" && authMode === "otp" && (
+            <View style={styles.formWidth}>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_otp_title")}</Text>
+              <TextInput
+                style={[
+                  styles.inputField,
+                  styles.otpField,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+                ]}
+                value={otpCode}
+                onChangeText={(v) => setOtpCode(v.replace(/\D/g, ""))}
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="••••••"
+                placeholderTextColor="#cbd5e1"
+                autoFocus
+              />
+
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: colors.primary }]}
+                onPress={handleVerifyOtp}
+                disabled={loading}
+                activeOpacity={0.88}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>{t("auth_verify_btn")}</Text>
+                )}
+              </TouchableOpacity>
+
+              <View style={styles.otpActions}>
+                {countdown > 0 ? (
+                  <Text style={[styles.timerText, { color: colors.textMuted }]}>Qayta yuborish: {countdown}s</Text>
+                ) : (
+                  <TouchableOpacity onPress={handleSendOtp}>
+                    <Text style={[styles.resendText, { color: colors.primary }]}>{t("cart_resend_code")}</Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  onPress={() => {
+                    setOtpCode("");
+                    setAuthMode("phone");
+                  }}
+                >
+                  <Text style={[styles.backText, { color: colors.textMuted }]}>{t("auth_change_phone")}</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* TAB 2: RO'YXATDAN O'TISH - 3-QADAM (PAROL O'RNATISH VA TASDIQLASH) */}
+          {authTab === "register" && authMode === "set_password" && (
+            <View style={styles.formWidth}>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Yangi parol (kamida 6 ta belgi) *</Text>
+              <TextInput
+                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+                value={newPassword}
+                onChangeText={setNewPassword}
+                secureTextEntry
+                placeholder="••••••••"
+                placeholderTextColor={colors.textMuted}
+                autoFocus
+              />
+
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Parolni qayta tasdiqlang *</Text>
+              <TextInput
+                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+                value={confirmPassword}
+                onChangeText={setConfirmPassword}
+                secureTextEntry
+                placeholder="••••••••"
+                placeholderTextColor={colors.textMuted}
+              />
+
+              <TouchableOpacity
+                style={[styles.submitBtn, { backgroundColor: colors.primary }]}
+                onPress={handleSetPasswordAndFinish}
+                disabled={loading}
+                activeOpacity={0.88}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.submitBtnText}>Akkauntni yaratish va kirish ✓</Text>
+                )}
               </TouchableOpacity>
             </View>
           )}

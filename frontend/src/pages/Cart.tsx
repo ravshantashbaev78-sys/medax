@@ -612,10 +612,10 @@ export default function Cart() {
                     <span style={{ fontSize: 24 }}>🏢</span>
                     <div>
                       <strong style={{ fontSize: 16, color: "var(--ink, #0f172a)", display: "block", marginBottom: 4 }}>
-                        Medax do'koni va ombori:
+                        {lang === "ru" ? "Наш адрес:" : lang === "en" ? "Our address:" : "Bizning manzil:"}
                       </strong>
                       <p style={{ margin: 0, fontSize: 14, color: "var(--ink2, #334155)" }}>
-                        {SITE_CONFIG.addressUz}
+                        {lang === "ru" ? SITE_CONFIG.addressRu : lang === "en" ? SITE_CONFIG.addressEn : SITE_CONFIG.addressUz}
                       </p>
                     </div>
                   </div>

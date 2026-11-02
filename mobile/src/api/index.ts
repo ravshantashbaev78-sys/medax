@@ -172,31 +172,29 @@ export async function uploadCustomerAvatar(imageUri: string): Promise<{ ok: bool
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     if (!token) return { ok: false, error: "Tizimga kirilmagan" };
 
-    const filename = imageUri.split("/").pop() || "avatar.jpg";
-    const match = /\.(\w+)$/.exec(filename);
-    const type = match ? `image/${match[1]}` : `image/jpeg`;
+    const filename = imageUri.split("/").pop() || `avatar_${Date.now()}.jpg`;
+    const ext = filename.split(".").pop()?.toLowerCase() || "jpg";
+    const mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
 
     const formData = new FormData();
-    try {
-      const imgRes = await fetch(imageUri);
-      const blob = await imgRes.blob();
-      formData.append("avatar", blob, filename);
-    } catch {
-      formData.append("avatar", {
-        uri: Platform.OS === "android" ? imageUri : imageUri.replace("file://", ""),
-        name: filename,
-        type,
-      } as any);
-    }
+    formData.append("avatar", {
+      uri: imageUri,
+      name: filename.includes(".") ? filename : `${filename}.jpg`,
+      type: mimeType,
+    } as any);
 
     const res = await fetch(`${API_BASE}/customer/auth/avatar`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
+        Accept: "application/json",
       },
       body: formData,
     });
     const data = await res.json();
+    if (!res.ok) {
+      return { ok: false, error: data.error || `Server xatosi (${res.status})` };
+    }
     return data;
   } catch (err: any) {
     return { ok: false, error: err.message || "Rasm yuklashda xatolik" };

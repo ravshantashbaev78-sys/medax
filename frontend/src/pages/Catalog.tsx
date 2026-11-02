@@ -134,7 +134,7 @@ export default function Catalog() {
                     set({ category: "" });
                   }}
                 >
-                  <span className="cat-name">{lang === "ru" ? "Все категории" : lang === "en" ? "All categories" : "Barcha kategoriyalar"}</span>
+                  <span className="cat-name">{lang === "ru" ? "Все категории" : lang === "en" ? "All categories" : "Barcha toifalar"}</span>
                   <span className="cat-count-badge">{(Array.isArray(cats) ? cats : []).reduce((s, c) => s + (c.count || 0), 0)}</span>
                 </a>
               </li>
