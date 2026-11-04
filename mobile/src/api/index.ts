@@ -149,6 +149,42 @@ export async function loginCustomerWithPassword(phone: string, password: string)
   }
 }
 
+export async function sendForgotPasswordOtp(phone: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+  try {
+    const cleanPhone = phone.replace(/[^\d+]/g, "");
+    const res = await fetch(`${API_BASE}/customer/auth/forgot-password-otp`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: cleanPhone }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error || "SMS yuborishda xatolik" };
+    return data;
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Tarmoq xatosi" };
+  }
+}
+
+export async function resetCustomerPassword(
+  phone: string,
+  code: string,
+  newPassword: string
+): Promise<{ ok: boolean; token?: string; customer?: Customer; error?: string }> {
+  try {
+    const cleanPhone = phone.replace(/[^\d+]/g, "");
+    const res = await fetch(`${API_BASE}/customer/auth/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone: cleanPhone, code, newPassword }),
+    });
+    const data = await res.json();
+    if (!res.ok) return { ok: false, error: data.error || "Parolni yangilashda xatolik" };
+    return data;
+  } catch (err: any) {
+    return { ok: false, error: err.message || "Tarmoq xatosi" };
+  }
+}
+
 export async function fetchCustomerProfile(): Promise<Customer | null> {
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);

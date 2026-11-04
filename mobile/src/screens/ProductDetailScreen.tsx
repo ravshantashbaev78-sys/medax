@@ -11,12 +11,14 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchProductDetail, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
+import { useTheme } from "../context/ThemeContext";
 import { useI18n, localizeCategoryName, localizeProductName, localizeProductDescription } from "../context/I18nContext";
 import { ShieldIcon, CartIcon } from "../components/Icons";
 
 export function ProductDetailScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { lang, t } = useI18n();
+  const { colors, theme } = useTheme();
   const { slug } = route.params;
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -32,16 +34,16 @@ export function ProductDetailScreen({ route, navigation }: any) {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#0284c7" />
+      <View style={[styles.center, { backgroundColor: colors.bg }]}>
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
 
   if (!product) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.notFound}>Mahsulot topilmadi</Text>
+      <View style={[styles.center, { backgroundColor: colors.bg }]}>
+        <Text style={[styles.notFound, { color: colors.textMuted }]}>Mahsulot topilmadi</Text>
       </View>
     );
   }
@@ -49,13 +51,13 @@ export function ProductDetailScreen({ route, navigation }: any) {
   const imgUrl = getImageUrl(product.images?.[0]?.url);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { paddingBottom: 120 + insets.bottom }]}
+        contentContainerStyle={[styles.scroll, { backgroundColor: colors.bg, paddingBottom: 120 + insets.bottom }]}
       >
         {/* Main Product Image */}
-        <View style={styles.mainImgWrap}>
+        <View style={[styles.mainImgWrap, { backgroundColor: theme === "dark" ? "#0e1822" : "#f8fafc", borderBottomColor: colors.border }]}>
           <Image source={{ uri: imgUrl }} style={styles.mainImg} resizeMode="contain" />
           {product.isHit && (
             <View style={styles.hitBadge}>
@@ -64,26 +66,26 @@ export function ProductDetailScreen({ route, navigation }: any) {
           )}
         </View>
 
-        <View style={styles.body}>
+        <View style={[styles.body, { backgroundColor: colors.bg }]}>
           {product.category && (
-            <Text style={styles.catName}>
+            <Text style={[styles.catName, { color: colors.primary }]}>
               {localizeCategoryName(product.category.slug || product.category.name, lang)}
             </Text>
           )}
 
-          <Text style={styles.title}>{localizeProductName(product, lang)}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>{localizeProductName(product, lang)}</Text>
 
           <View style={styles.priceRow}>
-            <Text style={styles.price}>{formatPrice(product.priceFrom)}</Text>
+            <Text style={[styles.price, { color: colors.primary }]}>{formatPrice(product.priceFrom)}</Text>
             {product.country && (
-              <View style={styles.countryBadge}>
-                <Text style={styles.countryText}>🌍 {product.country}</Text>
+              <View style={[styles.countryBadge, { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]}>
+                <Text style={[styles.countryText, { color: colors.text }]}>🌍 {product.country}</Text>
               </View>
             )}
           </View>
 
           <View style={styles.stockRow}>
-            <Text style={[styles.stockText, { color: (product.stock ?? 1) > 0 ? "#0284c7" : "#dc2626" }]}>
+            <Text style={[styles.stockText, { color: (product.stock ?? 1) > 0 ? colors.primary : "#dc2626" }]}>
               {product.stock !== undefined && product.stock !== null ? (
                 product.stock > 0
                   ? `📦 ${t("stock_in").replace("{n}", String(product.stock))}`
@@ -96,25 +98,25 @@ export function ProductDetailScreen({ route, navigation }: any) {
 
           {/* Description */}
           {product.description || product.descriptionRu || product.descriptionEn ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionHeader}>
+            <View style={[styles.section, { borderTopColor: colors.border }]}>
+              <Text style={[styles.sectionHeader, { color: colors.text }]}>
                 {lang === "ru" ? "Описание и назначение" : lang === "en" ? "Description & Details" : "Tavsif va ma'lumot"}
               </Text>
-              <Text style={styles.desc}>{localizeProductDescription(product, lang)}</Text>
+              <Text style={[styles.desc, { color: colors.text }]}>{localizeProductDescription(product, lang)}</Text>
             </View>
           ) : null}
 
           {/* Specs Table */}
           {Array.isArray(product.specs) && product.specs.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionHeader}>
+            <View style={[styles.section, { borderTopColor: colors.border }]}>
+              <Text style={[styles.sectionHeader, { color: colors.text }]}>
                 {lang === "ru" ? "Характеристики" : lang === "en" ? "Specifications" : "Xususiyatlari"}
               </Text>
-              <View style={styles.specsWrap}>
+              <View style={[styles.specsWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
                 {product.specs.map((spec: any, idx: number) => (
-                  <View key={idx} style={[styles.specRow, idx % 2 === 1 && styles.specRowAlt]}>
-                    <Text style={styles.specName}>{spec.name || spec.key}:</Text>
-                    <Text style={styles.specValue}>{spec.value}</Text>
+                  <View key={idx} style={[styles.specRow, idx % 2 === 1 && { backgroundColor: colors.card }]}>
+                    <Text style={[styles.specName, { color: colors.textMuted }]}>{spec.name || spec.key}:</Text>
+                    <Text style={[styles.specValue, { color: colors.text }]}>{spec.value}</Text>
                   </View>
                 ))}
               </View>
@@ -122,12 +124,12 @@ export function ProductDetailScreen({ route, navigation }: any) {
           )}
 
           {/* Kafolat va yetkazib berish (Web sayt kabi) */}
-          <View style={styles.guaranteeBox}>
+          <View style={[styles.guaranteeBox, theme === "dark" && { backgroundColor: "#064e3b25", borderColor: "#05966950" }]}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <ShieldIcon size={17} color="#065f46" />
-              <Text style={styles.guaranteeTitle}>Medax Rasmiy Kafolati</Text>
+              <ShieldIcon size={17} color="#10b981" />
+              <Text style={[styles.guaranteeTitle, { color: "#10b981" }]}>Medax Rasmiy Kafolati</Text>
             </View>
-            <Text style={styles.guaranteeDesc}>
+            <Text style={[styles.guaranteeDesc, { color: theme === "dark" ? "#a7f3d0" : "#047857" }]}>
               Barcha uskunalarimiz 100% sertifikatlangan, rasmiy zavod kafolatiga ega va butun O'zbekiston bo'ylab mutaxassislarimiz tomonidan yetkazib o'rnatiladi.
             </Text>
           </View>
@@ -135,7 +137,7 @@ export function ProductDetailScreen({ route, navigation }: any) {
       </ScrollView>
 
       {/* Bottom Bar: Quantity & Add to Cart */}
-      <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+      <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
         {product.stock !== undefined && product.stock <= 0 ? (
           <View style={[styles.addToCartBtn, { backgroundColor: "#fee2e2", flex: 1, elevation: 0 }]}>
             <Text style={{ color: "#dc2626", fontWeight: "800", fontSize: 15 }}>
@@ -144,24 +146,24 @@ export function ProductDetailScreen({ route, navigation }: any) {
           </View>
         ) : (
           <>
-            <View style={styles.qtyControl}>
+            <View style={[styles.qtyControl, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
               <TouchableOpacity
-                style={styles.qtyBtn}
+                style={[styles.qtyBtn, { backgroundColor: colors.card }]}
                 onPress={() => setQuantity((q) => Math.max(1, q - 1))}
               >
-                <Text style={styles.qtyBtnText}>-</Text>
+                <Text style={[styles.qtyBtnText, { color: colors.text }]}>-</Text>
               </TouchableOpacity>
-              <Text style={styles.qtyText}>{quantity}</Text>
+              <Text style={[styles.qtyText, { color: colors.text }]}>{quantity}</Text>
               <TouchableOpacity
-                style={styles.qtyBtn}
+                style={[styles.qtyBtn, { backgroundColor: colors.card }]}
                 onPress={() => setQuantity((q) => Math.min(product.stock ?? 100, q + 1))}
               >
-                <Text style={styles.qtyBtnText}>+</Text>
+                <Text style={[styles.qtyBtnText, { color: colors.text }]}>+</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity
-              style={styles.addToCartBtn}
+              style={[styles.addToCartBtn, { backgroundColor: "#0284c7" }]}
               onPress={() => {
                 addToCart(product, quantity);
                 navigation.navigate("Savatcha");

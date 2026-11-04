@@ -17,6 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { submitOrder, sendOrderOtp, getImageUrl, formatPrice } from "../api";
+import { useTheme } from "../context/ThemeContext";
 import { useI18n, localizeProductName } from "../context/I18nContext";
 import { CartIcon, CloseIcon, ShieldIcon, BoltIcon, MapPinIcon, UserIcon } from "../components/Icons";
 import { SuccessModal } from "../components/SuccessModal";
@@ -24,6 +25,7 @@ import { SuccessModal } from "../components/SuccessModal";
 export function CartScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { lang, t } = useI18n();
+  const { colors, theme } = useTheme();
   const { items, updateQuantity, removeFromCart, clearCart, totalPrice, totalItems } = useCart();
   const { customer, token, logout } = useAuth();
 
@@ -133,16 +135,16 @@ export function CartScreen({ navigation }: any) {
 
   if (items.length === 0) {
     return (
-      <View style={[styles.emptyContainer, { paddingTop: insets.top + 20 }]}>
-        <View style={styles.emptyIconCircle}>
-          <CartIcon size={46} color="#0284c7" />
+      <View style={[styles.emptyContainer, { backgroundColor: colors.bg, paddingTop: insets.top + 20 }]}>
+        <View style={[styles.emptyIconCircle, { backgroundColor: colors.inputBg }]}>
+          <CartIcon size={46} color={colors.primary} />
         </View>
-        <Text style={styles.emptyTitle}>{t("cart_empty_title")}</Text>
-        <Text style={styles.emptyDesc}>
+        <Text style={[styles.emptyTitle, { color: colors.text }]}>{t("cart_empty_title")}</Text>
+        <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
           {t("cart_empty_sub")}
         </Text>
         <TouchableOpacity
-          style={styles.shopBtn}
+          style={[styles.shopBtn, { backgroundColor: "#0284c7" }]}
           onPress={() => navigation.navigate("Katalog")}
           activeOpacity={0.85}
         >
@@ -153,12 +155,12 @@ export function CartScreen({ navigation }: any) {
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <CartIcon size={22} color="#0284c7" />
-          <Text style={styles.headerTitle}>{t("nav_cart")} ({totalItems})</Text>
+          <CartIcon size={22} color={colors.primary} />
+          <Text style={[styles.headerTitle, { color: colors.text }]}>{t("nav_cart")} ({totalItems})</Text>
         </View>
         <TouchableOpacity onPress={clearCart} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
           <Text style={styles.clearAll}>{t("cart_clear")}</Text>
@@ -180,20 +182,20 @@ export function CartScreen({ navigation }: any) {
               const imgUrl = getImageUrl(product.images?.[0]?.url);
               const price = product.priceFrom ? Number(product.priceFrom) : 0;
               return (
-                <View key={product.id} style={styles.card}>
-                  <Image source={{ uri: imgUrl }} style={styles.cardImg} resizeMode="contain" />
+                <View key={product.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+                  <Image source={{ uri: imgUrl }} style={[styles.cardImg, { backgroundColor: theme === "dark" ? "#0e1822" : "#f8fafc" }]} resizeMode="contain" />
                   <View style={styles.cardInfo}>
-                    <Text style={styles.cardName} numberOfLines={2}>
+                    <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={2}>
                       {localizeProductName(product, lang)}
                     </Text>
-                    <Text style={styles.cardPrice}>
+                    <Text style={[styles.cardPrice, { color: colors.primary }]}>
                       {price ? `${(price * quantity).toLocaleString()} UZS` : "Kelishuv asosida"}
                     </Text>
                     {product.stock !== undefined && (
                       <Text
                         style={{
                           fontSize: 11,
-                          color: (product.stock ?? 0) > 0 ? "#0284c7" : "#ef4444",
+                          color: (product.stock ?? 0) > 0 ? colors.primary : "#ef4444",
                           fontWeight: "600",
                           marginTop: 2,
                         }}
@@ -205,20 +207,20 @@ export function CartScreen({ navigation }: any) {
                     )}
 
                     <View style={styles.cardActions}>
-                      <View style={styles.qtyBox}>
+                      <View style={[styles.qtyBox, { backgroundColor: colors.inputBg }]}>
                         <TouchableOpacity
-                          style={styles.qtyBtn}
+                          style={[styles.qtyBtn, { backgroundColor: colors.card }]}
                           onPress={() => updateQuantity(product.id, quantity - 1)}
                         >
-                          <Text style={styles.qtyBtnText}>−</Text>
+                          <Text style={[styles.qtyBtnText, { color: colors.text }]}>−</Text>
                         </TouchableOpacity>
-                        <Text style={styles.qtyNumber}>{quantity}</Text>
+                        <Text style={[styles.qtyNumber, { color: colors.text }]}>{quantity}</Text>
                         <TouchableOpacity
-                          style={styles.qtyBtn}
+                          style={[styles.qtyBtn, { backgroundColor: colors.card }]}
                           disabled={product.stock !== undefined && quantity >= product.stock}
                           onPress={() => updateQuantity(product.id, Math.min(product.stock ?? 100, quantity + 1))}
                         >
-                          <Text style={styles.qtyBtnText}>+</Text>
+                          <Text style={[styles.qtyBtnText, { color: colors.text }]}>+</Text>
                         </TouchableOpacity>
                       </View>
 
@@ -238,113 +240,113 @@ export function CartScreen({ navigation }: any) {
 
           {/* SMS Verified info or guest tip */}
           {customer ? (
-            <View style={styles.authBadge}>
-              <UserIcon size={16} color="#0284c7" />
-              <Text style={styles.authBadgeText}>
-                Hisob: <Text style={{ fontWeight: "800", color: "#0f172a" }}>{customer.name}</Text>
+            <View style={[styles.authBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+              <UserIcon size={16} color={colors.primary} />
+              <Text style={[styles.authBadgeText, { color: colors.textMuted }]}>
+                Hisob: <Text style={{ fontWeight: "800", color: colors.text }}>{customer.name}</Text>
               </Text>
             </View>
           ) : null}
 
           {/* Checkout Form */}
-          <View style={styles.checkoutBox}>
-            <Text style={styles.checkoutTitle}>{t("cart_checkout_title")}</Text>
-            <Text style={styles.checkoutSub}>{t("cart_checkout_sub")}</Text>
+          <View style={[styles.checkoutBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
+            <Text style={[styles.checkoutTitle, { color: colors.text }]}>{t("cart_checkout_title")}</Text>
+            <Text style={[styles.checkoutSub, { color: colors.textMuted }]}>{t("cart_checkout_sub")}</Text>
 
-            <Text style={styles.label}>{t("cart_name_label")}</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t("cart_name_label")}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
               placeholder="Masalan: Azizbek Karimov"
               value={customerName}
               onChangeText={setCustomerName}
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.textMuted}
             />
 
-            <Text style={styles.label}>{t("cart_phone_label")}</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t("cart_phone_label")}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
               placeholder="+998 90 123 45 67"
               value={phone}
               onChangeText={setPhone}
               keyboardType="phone-pad"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.textMuted}
             />
 
-            <Text style={styles.label}>{t("contact_store") || "Olib ketish manzili"}</Text>
-            <View style={styles.storeAddressCard}>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t("contact_store") || "Olib ketish manzili"}</Text>
+            <View style={[styles.storeAddressCard, theme === "dark" && { backgroundColor: "#064e3b25", borderColor: "#05966950" }]}>
               <View style={styles.storeAddressIconWrap}>
-                <MapPinIcon size={20} color="#059669" />
+                <MapPinIcon size={20} color="#10b981" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.storeAddressTitle}>Medax tibbiyot texnikalari markazi</Text>
-                <Text style={styles.storeAddressDesc}>
+                <Text style={[styles.storeAddressTitle, { color: "#10b981" }]}>Medax tibbiyot texnikalari markazi</Text>
+                <Text style={[styles.storeAddressDesc, { color: colors.text }]}>
                   {t("contact_address")}
                 </Text>
-                <Text style={styles.storeAddressPickupNote}>
+                <Text style={[styles.storeAddressPickupNote, { color: theme === "dark" ? "#a7f3d0" : "#047857" }]}>
                   ℹ️ Hozircha faqat do'kondan olib ketish mavjud. Uskunani do'konda tekshirib qabul qilib olasiz.
                 </Text>
               </View>
             </View>
 
-            <Text style={styles.label}>{t("cart_comment_label")}</Text>
+            <Text style={[styles.label, { color: colors.textMuted }]}>{t("cart_comment_label")}</Text>
             <TextInput
-              style={[styles.input, { height: 64, textAlignVertical: "top" }]}
+              style={[styles.input, { height: 64, textAlignVertical: "top", backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
               placeholder="Klinika nomi, o'rnatish yoki olib ketish vaqti"
               value={comment}
               onChangeText={setComment}
               multiline
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.textMuted}
             />
 
             {/* Payment Method Selection */}
-            <Text style={[styles.label, { marginTop: 8, marginBottom: 8 }]}>{t("cart_pay_method")}</Text>
+            <Text style={[styles.label, { marginTop: 8, marginBottom: 8, color: colors.textMuted }]}>{t("cart_pay_method")}</Text>
 
             {/* Option: Cash / Store pickup */}
             <TouchableOpacity
               style={[
                 styles.payOption,
                 styles.payOptionActive,
-                { marginTop: 4 },
+                { marginTop: 4, backgroundColor: theme === "dark" ? "rgba(56, 189, 248, 0.12)" : "#f0f9ff", borderColor: colors.primary },
               ]}
               onPress={() => setPaymentMethod("Do'konda to'lash (Olib ketishda)")}
               activeOpacity={0.8}
             >
-              <View style={styles.radioCircle}>
-                <View style={styles.radioDot} />
+              <View style={[styles.radioCircle, { borderColor: colors.primary }]}>
+                <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />
               </View>
               <View style={{ flex: 1 }}>
                 <View style={styles.payOptionHeader}>
-                  <Text style={styles.payTitle}>{t("cart_pay_cash_title")}</Text>
+                  <Text style={[styles.payTitle, { color: colors.text }]}>{t("cart_pay_cash_title")}</Text>
                 </View>
-                <Text style={styles.payDesc}>
+                <Text style={[styles.payDesc, { color: colors.textMuted }]}>
                   {t("cart_pay_cash_desc")}
                 </Text>
               </View>
             </TouchableOpacity>
 
             {/* Total Row */}
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>{t("cart_total_label")}</Text>
-              <Text style={styles.totalValue}>
+            <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
+              <Text style={[styles.totalLabel, { color: colors.textMuted }]}>{t("cart_total_label")}</Text>
+              <Text style={[styles.totalValue, { color: colors.primary }]}>
                 {totalPrice > 0 ? `${totalPrice.toLocaleString()} UZS` : "Kelishuv asosida"}
               </Text>
             </View>
 
             {/* Mehmonlar uchun OTP Kod kiritish maydoni */}
             {!token && otpSent && (
-              <View style={styles.otpCard}>
-                <Text style={styles.otpTitle}>{t("cart_otp_title")}</Text>
-                <Text style={styles.otpSubtitle}>
+              <View style={[styles.otpCard, theme === "dark" && { backgroundColor: "#1e3a8a25", borderColor: "#3b82f650" }]}>
+                <Text style={[styles.otpTitle, { color: colors.primary }]}>{t("cart_otp_title")}</Text>
+                <Text style={[styles.otpSubtitle, { color: colors.textMuted }]}>
                   {phone} {t("cart_otp_sub")}
                 </Text>
                 <TextInput
-                  style={styles.otpInput}
+                  style={[styles.otpInput, { backgroundColor: colors.inputBg, borderColor: colors.primary, color: colors.text }]}
                   placeholder="------"
                   value={otpCode}
                   onChangeText={setOtpCode}
                   keyboardType="number-pad"
                   maxLength={6}
-                  placeholderTextColor="rgba(148, 163, 184, 0.35)"
+                  placeholderTextColor={colors.textMuted}
                 />
                 <TouchableOpacity
                   disabled={resendTimer > 0 || loading}
@@ -361,7 +363,7 @@ export function CartScreen({ navigation }: any) {
                   }}
                   style={styles.resendBtn}
                 >
-                  <Text style={[styles.resendText, resendTimer > 0 && { color: "#94a3b8" }]}>
+                  <Text style={[styles.resendText, { color: colors.primary }, resendTimer > 0 && { color: colors.textMuted }]}>
                     {resendTimer > 0 ? `${t("cart_resend_code")} (${resendTimer}s)` : t("cart_resend_code")}
                   </Text>
                 </TouchableOpacity>
@@ -369,7 +371,7 @@ export function CartScreen({ navigation }: any) {
             )}
 
             <TouchableOpacity
-              style={[styles.orderBtn, loading && { opacity: 0.7 }]}
+              style={[styles.orderBtn, { backgroundColor: "#0284c7" }, loading && { opacity: 0.7 }]}
               onPress={handleCheckout}
               disabled={loading}
               activeOpacity={0.88}

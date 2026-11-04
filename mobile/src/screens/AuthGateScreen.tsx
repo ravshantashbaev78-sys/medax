@@ -13,8 +13,15 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 import { useI18n } from "../context/I18nContext";
-import { sendCustomerOtp, verifyCustomerOtp, loginCustomerWithPassword } from "../api";
+import {
+  sendCustomerOtp,
+  verifyCustomerOtp,
+  loginCustomerWithPassword,
+  sendForgotPasswordOtp,
+  resetCustomerPassword,
+} from "../api";
 import { MedaxEmblem, EyeIcon, EyeOffIcon } from "../components/Icons";
 import { SuccessModal } from "../components/SuccessModal";
 
@@ -25,11 +32,12 @@ interface AuthGateScreenProps {
 export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
   const insets = useSafeAreaInsets();
   const { loginWithToken } = useAuth();
+  const { colors, theme } = useTheme();
   const { t } = useI18n();
   const scrollRef = useRef<ScrollView>(null);
 
-  // Tab: "login" (parol bilan kirish) yoki "register" (yangi ro'yxatdan o'tish)
-  const [tab, setTab] = useState<"login" | "register">("login");
+  // Tab: "login" (parol bilan kirish), "register" (yangi ro'yxatdan o'tish) yoki "forgot" (parolni tiklash)
+  const [tab, setTab] = useState<"login" | "register" | "forgot">("login");
   const [step, setStep] = useState<"phone" | "otp" | "set_password">("phone");
 
   const [phone, setPhone] = useState("+998 ");
@@ -41,6 +49,16 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Forgot password state
+  const [forgotStep, setForgotStep] = useState<"phone" | "reset">("phone");
+  const [forgotPhone, setForgotPhone] = useState("+998 ");
+  const [forgotOtp, setForgotOtp] = useState("");
+  const [forgotNewPassword, setForgotNewPassword] = useState("");
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState("");
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [showForgotConfirmPassword, setShowForgotConfirmPassword] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
@@ -180,9 +198,68 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
     }
   };
 
+  // 5. Parolni unutganlar uchun SMS yuborish
+  const handleForgotSendOtp = async () => {
+    const clean = forgotPhone.replace(/[^\d+]/g, "");
+    if (clean.length < 13) {
+      Alert.alert(t("error"), "Iltimos, to'liq telefon raqamingizni kiriting (+998 XX XXX XX XX)");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await sendForgotPasswordOtp(clean);
+      if (res.ok) {
+        setCountdown(60);
+        setForgotOtp("");
+        setForgotStep("reset");
+        Alert.alert("SMS yuborildi", "Telefon raqamingizga 6 xonali tasdiqlash kodi yuborildi.");
+      } else {
+        Alert.alert(t("error"), res.error || "SMS yuborishda xatolik yuz berdi");
+      }
+    } catch {
+      Alert.alert(t("error"), "Internet aloqasini tekshiring");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 6. Yangi parol o'rnatish va kirish
+  const handleForgotResetPassword = async () => {
+    if (forgotOtp.trim().length !== 6) {
+      Alert.alert(t("error"), "Iltimos, 6 xonali tasdiqlash kodini to'liq kiriting");
+      return;
+    }
+    if (forgotNewPassword.length < 6) {
+      Alert.alert(t("error"), "Yangi parol kamida 6 ta belgidan iborat bo'lishi kerak");
+      return;
+    }
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      Alert.alert(t("error"), "Kiritilgan yangi parollar bir-biriga mos kelmadi");
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await resetCustomerPassword(forgotPhone, forgotOtp, forgotNewPassword);
+      if (res.ok && res.token && res.customer) {
+        await loginWithToken(res.token, res.customer);
+        setSuccessInfo({
+          visible: true,
+          title: "Parol yangilandi!",
+          message: `Hurmatli ${res.customer.name}, yangi parolingiz muvaffaqiyatli o'rnatildi va tizimga kirdingiz.`,
+        });
+      } else {
+        Alert.alert(t("error"), res.error || "Parolni yangilashda xatolik yuz berdi");
+      }
+    } catch {
+      Alert.alert(t("error"), "Tarmoqda xatolik yuz berdi");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: "#f8fafc" }}
+      style={{ flex: 1, backgroundColor: colors.bg }}
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
@@ -190,6 +267,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
         contentContainerStyle={[
           styles.container,
           {
+            backgroundColor: colors.bg,
             paddingTop: insets.top + 16,
             paddingBottom: Math.max(insets.bottom, 24) + 60,
           },
@@ -204,70 +282,86 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
             <Text style={styles.brandMed}>Med</Text>
             <Text style={styles.brandAx}>ax</Text>
           </View>
-          <Text style={styles.tagline}>RASMIY TIBBIY USKUNALAR MARKAZI</Text>
+          <Text style={[styles.tagline, { color: colors.primary }]}>MEDTEXNIKA MARKAZI</Text>
         </View>
 
         {/* Auth Mode Tabs (Kirish / Ro'yxatdan o'tish) */}
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tabBtn, tab === "login" && styles.tabBtnActive]}
-            onPress={() => {
-              setTab("login");
-              setStep("phone");
-              setCode("");
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabBtnText, tab === "login" && styles.tabBtnTextActive]}>
-              🔑 Kirish
-            </Text>
-          </TouchableOpacity>
+        {tab !== "forgot" ? (
+          <View style={[styles.tabBar, { backgroundColor: colors.inputBg }]}>
+            <TouchableOpacity
+              style={[styles.tabBtn, tab === "login" && [styles.tabBtnActive, { backgroundColor: colors.card }]]}
+              onPress={() => {
+                setTab("login");
+                setStep("phone");
+                setCode("");
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabBtnText, { color: colors.textMuted }, tab === "login" && { color: colors.primary, fontWeight: "700" }]}>
+                🔑 Kirish
+              </Text>
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tabBtn, tab === "register" && styles.tabBtnActive]}
-            onPress={() => {
-              setTab("register");
-              setStep("phone");
-              setCode("");
-            }}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.tabBtnText, tab === "register" && styles.tabBtnTextActive]}>
-              📝 Ro'yxatdan o'tish
-            </Text>
-          </TouchableOpacity>
-        </View>
+            <TouchableOpacity
+              style={[styles.tabBtn, tab === "register" && [styles.tabBtnActive, { backgroundColor: colors.card }]]}
+              onPress={() => {
+                setTab("register");
+                setStep("phone");
+                setCode("");
+              }}
+              activeOpacity={0.8}
+            >
+              <Text style={[styles.tabBtnText, { color: colors.textMuted }, tab === "register" && { color: colors.primary, fontWeight: "700" }]}>
+                📝 Ro'yxatdan o'tish
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={{ width: "100%", marginBottom: 16 }}>
+            <TouchableOpacity
+              onPress={() => {
+                setTab("login");
+                setForgotStep("phone");
+              }}
+              style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4 }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary }}>
+                ← Kirish oynasiga qaytish
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Main Card */}
-        <View style={styles.card}>
+        <View style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
           {/* TAB 1: KIRISH (Telefon + Parol) */}
           {tab === "login" && (
             <View style={styles.form}>
-              <Text style={styles.cardTitle}>Shaxsiy kabinetga kirish</Text>
-              <Text style={styles.cardDesc}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Shaxsiy kabinetga kirish</Text>
+              <Text style={[styles.cardDesc, { color: colors.textMuted }]}>
                 Oldingi buyurtmalaringiz va shaxsiy hisobingizga kirish uchun telefon raqamingiz va parolingizni kiriting.
               </Text>
 
-              <Text style={styles.inputLabel}>Telefon raqamingiz</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Telefon raqamingiz</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                 value={phone}
                 onChangeText={formatPhone}
                 keyboardType="phone-pad"
                 placeholder="+998 90 123 45 67"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
                 onFocus={() => scrollToInput(100)}
               />
 
-              <Text style={styles.inputLabel}>Parolingiz</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Parolingiz</Text>
               <View style={styles.passwordInputWrap}>
                 <TextInput
-                  style={[styles.input, styles.passwordInput]}
+                  style={[styles.input, styles.passwordInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                   value={password}
                   onChangeText={setPassword}
                   secureTextEntry={!showPassword}
                   placeholder="Parolni kiriting"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.textMuted}
                   onFocus={() => scrollToInput(220)}
                 />
                 <TouchableOpacity
@@ -276,12 +370,27 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                   activeOpacity={0.7}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  {showPassword ? <EyeOffIcon size={20} color="#64748b" /> : <EyeIcon size={20} color="#64748b" />}
+                  {showPassword ? <EyeOffIcon size={20} color={colors.textMuted} /> : <EyeIcon size={20} color={colors.textMuted} />}
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 4, marginBottom: 12 }}>
+                <TouchableOpacity
+                  onPress={() => {
+                    setTab("forgot");
+                    setForgotPhone(phone);
+                    setForgotStep("phone");
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={{ fontSize: 12.5, fontWeight: "700", color: colors.primary }}>
+                    Parolni unutdingizmi?
+                  </Text>
                 </TouchableOpacity>
               </View>
 
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
                 onPress={handlePasswordLogin}
                 disabled={loading}
                 activeOpacity={0.88}
@@ -300,8 +409,8 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                   setStep("phone");
                 }}
               >
-                <Text style={styles.switchLinkText}>
-                  Hisobingiz yo'qmi? <Text style={{ fontWeight: "800", color: "#0284c7" }}>Ro'yxatdan o'tish →</Text>
+                <Text style={[styles.switchLinkText, { color: colors.textMuted }]}>
+                  Hisobingiz yo'qmi? <Text style={{ fontWeight: "800", color: colors.primary }}>Ro'yxatdan o'tish →</Text>
                 </Text>
               </TouchableOpacity>
             </View>
@@ -310,34 +419,34 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
           {/* TAB 2: RO'YXATDAN O'TISH */}
           {tab === "register" && step === "phone" && (
             <View style={styles.form}>
-              <Text style={styles.cardTitle}>Yangi akkaunt ochish</Text>
-              <Text style={styles.cardDesc}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Yangi akkaunt ochish</Text>
+              <Text style={[styles.cardDesc, { color: colors.textMuted }]}>
                 Tizimda ro'yxatdan o'tish uchun telefon raqamingiz va ismingizni kiriting. Tasdiqlash uchun SMS kod yuboriladi.
               </Text>
 
-              <Text style={styles.inputLabel}>Telefon raqamingiz *</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Telefon raqamingiz *</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                 value={phone}
                 onChangeText={formatPhone}
                 keyboardType="phone-pad"
                 placeholder="+998 90 123 45 67"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
                 onFocus={() => scrollToInput(100)}
               />
 
-              <Text style={styles.inputLabel}>Ism-familiyangiz (ixtiyoriy)</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Ism-familiyangiz (ixtiyoriy)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                 value={name}
                 onChangeText={setName}
                 placeholder="Masalan: Dr. Alisher"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor={colors.textMuted}
                 onFocus={() => scrollToInput(300)}
               />
 
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
                 onPress={handleSendOtp}
                 disabled={loading}
                 activeOpacity={0.88}
@@ -353,8 +462,8 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                 style={styles.switchLink}
                 onPress={() => setTab("login")}
               >
-                <Text style={styles.switchLinkText}>
-                  Oldin ro'yxatdan o'tganmisiz? <Text style={{ fontWeight: "800", color: "#0284c7" }}>Kirish</Text>
+                <Text style={[styles.switchLinkText, { color: colors.textMuted }]}>
+                  Oldin ro'yxatdan o'tganmisiz? <Text style={{ fontWeight: "800", color: colors.primary }}>Kirish</Text>
                 </Text>
               </TouchableOpacity>
             </View>
@@ -363,14 +472,14 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
           {/* TAB 2: STEP 2 - SMS OTP */}
           {tab === "register" && step === "otp" && (
             <View style={styles.form}>
-              <Text style={styles.cardTitle}>Tasdiqlash kodi</Text>
-              <Text style={styles.cardDesc}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Tasdiqlash kodi</Text>
+              <Text style={[styles.cardDesc, { color: colors.textMuted }]}>
                 {phone} raqamiga yuborilgan 6 xonali SMS kodni kiriting
               </Text>
 
-              <Text style={styles.inputLabel}>SMS kod (6 xonali)</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>SMS kod (6 xonali)</Text>
               <TextInput
-                style={[styles.input, styles.otpInput]}
+                style={[styles.input, styles.otpInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                 value={code}
                 onChangeText={(v) => setCode(v.replace(/\D/g, ""))}
                 keyboardType="number-pad"
@@ -382,7 +491,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
               />
 
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
                 onPress={handleVerifyOtp}
                 disabled={loading}
                 activeOpacity={0.88}
@@ -396,10 +505,10 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
 
               <View style={styles.otpActions}>
                 {countdown > 0 ? (
-                  <Text style={styles.timerText}>Qayta yuborish: {countdown}s</Text>
+                  <Text style={[styles.timerText, { color: colors.textMuted }]}>Qayta yuborish: {countdown}s</Text>
                 ) : (
                   <TouchableOpacity onPress={handleSendOtp}>
-                    <Text style={styles.resendText}>Kodni qayta yuborish</Text>
+                    <Text style={[styles.resendText, { color: colors.primary }]}>Kodni qayta yuborish</Text>
                   </TouchableOpacity>
                 )}
                 <TouchableOpacity
@@ -408,7 +517,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                     setStep("phone");
                   }}
                 >
-                  <Text style={styles.backLinkText}>Raqamni o'zgartirish</Text>
+                  <Text style={[styles.backLinkText, { color: colors.textMuted }]}>Raqamni o'zgartirish</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -417,20 +526,20 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
           {/* TAB 2: STEP 3 - PAROL O'RNATISH (Qat'iy ikki marta teriladi) */}
           {tab === "register" && step === "set_password" && (
             <View style={styles.form}>
-              <Text style={styles.cardTitle}>Doimiy parol o'rnatish</Text>
-              <Text style={styles.cardDesc}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Doimiy parol o'rnatish</Text>
+              <Text style={[styles.cardDesc, { color: colors.textMuted }]}>
                 Akkauntingizga kelgusida SMS kutmasdan tezkor kirishingiz uchun mustahkam parol belgilang va tasdiqlang.
               </Text>
 
-              <Text style={styles.inputLabel}>Parol (kamida 6 ta belgi) *</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Parol (kamida 6 ta belgi) *</Text>
               <View style={styles.passwordInputWrap}>
                 <TextInput
-                  style={[styles.input, styles.passwordInput]}
+                  style={[styles.input, styles.passwordInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                   value={newPassword}
                   onChangeText={setNewPassword}
                   secureTextEntry={!showNewPassword}
                   placeholder="Yangi parolni kiriting"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.textMuted}
                   autoFocus
                   onFocus={() => scrollToInput(240)}
                 />
@@ -440,19 +549,19 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                   activeOpacity={0.7}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  {showNewPassword ? <EyeOffIcon size={20} color="#64748b" /> : <EyeIcon size={20} color="#64748b" />}
+                  {showNewPassword ? <EyeOffIcon size={20} color={colors.textMuted} /> : <EyeIcon size={20} color={colors.textMuted} />}
                 </TouchableOpacity>
               </View>
 
-              <Text style={styles.inputLabel}>Parolni qayta tasdiqlang *</Text>
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Parolni qayta tasdiqlang *</Text>
               <View style={styles.passwordInputWrap}>
                 <TextInput
-                  style={[styles.input, styles.passwordInput]}
+                  style={[styles.input, styles.passwordInput, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
                   value={confirmPassword}
                   onChangeText={setConfirmPassword}
                   secureTextEntry={!showConfirmPassword}
                   placeholder="Parolni qayta tering"
-                  placeholderTextColor="#94a3b8"
+                  placeholderTextColor={colors.textMuted}
                   onFocus={() => scrollToInput(300)}
                 />
                 <TouchableOpacity
@@ -461,12 +570,12 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                   activeOpacity={0.7}
                   hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                  {showConfirmPassword ? <EyeOffIcon size={20} color="#64748b" /> : <EyeIcon size={20} color="#64748b" />}
+                  {showConfirmPassword ? <EyeOffIcon size={20} color={colors.textMuted} /> : <EyeIcon size={20} color={colors.textMuted} />}
                 </TouchableOpacity>
               </View>
 
               <TouchableOpacity
-                style={styles.primaryBtn}
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
                 onPress={handleSetPasswordAndFinish}
                 disabled={loading}
                 activeOpacity={0.88}
@@ -480,16 +589,165 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
             </View>
           )}
 
-          <View style={styles.benefitsRow}>
-            <Text style={styles.benefitText}>🔒 100% xavfsiz SMS OTP</Text>
-            <Text style={styles.benefitText}>⚡ Doimiy saqlanadigan profil</Text>
+          {/* TAB 3: PAROLNI TIKLASH (FORGOT PASSWORD) */}
+          {tab === "forgot" && forgotStep === "phone" && (
+            <View style={styles.form}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Parolni tiklash</Text>
+              <Text style={[styles.cardDesc, { color: colors.textMuted }]}>
+                Parolingizni unutdingizmi? Telefon raqamingizni kiriting va biz SMS orqali tasdiqlash kodini yuboramiz.
+              </Text>
+
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Telefon raqamingiz</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
+                value={forgotPhone}
+                onChangeText={(text) => {
+                  let raw = text.replace(/[^\d+]/g, "");
+                  if (!raw.startsWith("+998")) raw = "+998" + raw.replace("+", "");
+                  if (raw.length > 13) raw = raw.slice(0, 13);
+                  setForgotPhone(raw);
+                }}
+                keyboardType="phone-pad"
+                placeholder="+998 90 123 45 67"
+                placeholderTextColor={colors.textMuted}
+                onFocus={() => scrollToInput(100)}
+              />
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+                onPress={handleForgotSendOtp}
+                disabled={loading}
+                activeOpacity={0.88}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>SMS kodni olish →</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.switchLink}
+                onPress={() => setTab("login")}
+              >
+                <Text style={[styles.switchLinkText, { color: colors.primary, fontWeight: "700" }]}>
+                  ← Kirish oynasiga qaytish
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {tab === "forgot" && forgotStep === "reset" && (
+            <View style={styles.form}>
+              <Text style={[styles.cardTitle, { color: colors.text }]}>Yangi parol o'rnatish</Text>
+              <Text style={[styles.cardDesc, { color: colors.textMuted }]}>
+                {forgotPhone} raqamiga yuborilgan 6 xonali SMS kodni va yangi parolingizni kiriting.
+              </Text>
+
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>SMS tasdiqlash kodi</Text>
+              <TextInput
+                style={[
+                  styles.input,
+                  styles.otpInput,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+                ]}
+                value={forgotOtp}
+                onChangeText={(v) => setForgotOtp(v.replace(/\D/g, ""))}
+                keyboardType="number-pad"
+                maxLength={6}
+                placeholder="••••••"
+                placeholderTextColor="#cbd5e1"
+                autoFocus
+                onFocus={() => scrollToInput(100)}
+              />
+
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Yangi parol (kamida 6 ta belgi)</Text>
+              <View style={styles.passwordInputWrap}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.passwordInput,
+                    { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+                  ]}
+                  value={forgotNewPassword}
+                  onChangeText={setForgotNewPassword}
+                  secureTextEntry={!showForgotNewPassword}
+                  placeholder="Yangi parolni kiriting"
+                  placeholderTextColor={colors.textMuted}
+                  onFocus={() => scrollToInput(200)}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {showForgotNewPassword ? <EyeOffIcon size={20} color={colors.textMuted} /> : <EyeIcon size={20} color={colors.textMuted} />}
+                </TouchableOpacity>
+              </View>
+
+              <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Yangi parolni tasdiqlang</Text>
+              <View style={styles.passwordInputWrap}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.passwordInput,
+                    { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+                  ]}
+                  value={forgotConfirmPassword}
+                  onChangeText={setForgotConfirmPassword}
+                  secureTextEntry={!showForgotConfirmPassword}
+                  placeholder="Parolni qayta tering"
+                  placeholderTextColor={colors.textMuted}
+                  onFocus={() => scrollToInput(280)}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowForgotConfirmPassword(!showForgotConfirmPassword)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {showForgotConfirmPassword ? <EyeOffIcon size={20} color={colors.textMuted} /> : <EyeIcon size={20} color={colors.textMuted} />}
+                </TouchableOpacity>
+              </View>
+
+              <TouchableOpacity
+                style={[styles.primaryBtn, { backgroundColor: colors.primary }]}
+                onPress={handleForgotResetPassword}
+                disabled={loading}
+                activeOpacity={0.88}
+              >
+                {loading ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Parolni yangilash va kirish ✓</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.switchLink}
+                onPress={() => {
+                  setTab("login");
+                  setForgotStep("phone");
+                }}
+              >
+                <Text style={[styles.switchLinkText, { color: colors.primary, fontWeight: "700" }]}>
+                  ← Kirish oynasiga qaytish
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          <View style={[styles.benefitsRow, { borderTopColor: colors.border }]}>
+            <Text style={[styles.benefitText, { color: colors.textMuted }]}>🔒 100% xavfsiz SMS OTP</Text>
+            <Text style={[styles.benefitText, { color: colors.textMuted }]}>⚡ Doimiy saqlanadigan profil</Text>
           </View>
         </View>
 
         {/* Bottom Guest Continue */}
         <View style={styles.bottomSection}>
           <TouchableOpacity style={styles.guestBtn} onPress={onContinue}>
-            <Text style={styles.guestBtnText}>Ilovaga o'tish (Mehmon sifatida) →</Text>
+            <Text style={[styles.guestBtnText, { color: colors.textMuted }]}>Ilovaga o'tish (Mehmon sifatida) →</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -515,7 +773,7 @@ const styles = StyleSheet.create({
   brandTitleWrap: { flexDirection: "row", marginTop: 8 },
   brandMed: { fontSize: 26, fontWeight: "900", color: "#0284c7" },
   brandAx: { fontSize: 26, fontWeight: "900", color: "#16a34a" },
-  tagline: { fontSize: 9, fontWeight: "900", color: "#0f172a", letterSpacing: 1, marginTop: 2 },
+  tagline: { fontSize: 9.5, fontWeight: "800", color: "#0284c7", letterSpacing: 0.8, marginTop: 2 },
 
   tabBar: {
     flexDirection: "row",

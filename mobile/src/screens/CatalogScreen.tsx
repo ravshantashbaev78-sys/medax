@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Category, fetchCategories, fetchProducts, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
+import { useTheme } from "../context/ThemeContext";
 import { useI18n, localizeCategoryName, localizeProductName } from "../context/I18nContext";
 import { SearchIcon, CloseIcon, CartIcon } from "../components/Icons";
 
@@ -21,6 +22,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 export function CatalogScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const { lang, t } = useI18n();
+  const { colors, theme } = useTheme();
   const initialCategory = route?.params?.categoryId;
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -55,28 +57,28 @@ export function CatalogScreen({ navigation, route }: any) {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.bg }]}>
       {/* Search Header with Safe Area */}
-      <View style={[styles.searchWrap, { paddingTop: insets.top + 8 }]}>
-        <View style={styles.searchInputRow}>
-          <SearchIcon size={18} color="#0284c7" />
+      <View style={[styles.searchWrap, { paddingTop: insets.top + 8, backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+        <View style={[styles.searchInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
+          <SearchIcon size={18} color={colors.primary} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text }]}
             placeholder={t("cat_search_ph")}
             value={search}
             onChangeText={setSearch}
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.textMuted}
           />
           {search.length > 0 && (
             <TouchableOpacity onPress={() => setSearch("")} style={styles.clearBtn}>
-              <CloseIcon size={16} color="#94a3b8" />
+              <CloseIcon size={16} color={colors.textMuted} />
             </TouchableOpacity>
           )}
         </View>
       </View>
 
       {/* Category Pills */}
-      <View style={styles.pillsWrap}>
+      <View style={[styles.pillsWrap, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <FlatList
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -87,10 +89,20 @@ export function CatalogScreen({ navigation, route }: any) {
             const active = (!selectedCat && item.id === 0) || selectedCat === item.id;
             return (
               <TouchableOpacity
-                style={[styles.pill, active && styles.pillActive]}
+                style={[
+                  styles.pill,
+                  { backgroundColor: colors.inputBg, borderColor: colors.border },
+                  active && { backgroundColor: "#0284c7", borderColor: "#0284c7" },
+                ]}
                 onPress={() => setSelectedCat(item.id === 0 ? undefined : item.id)}
               >
-                <Text style={[styles.pillText, active && styles.pillTextActive]}>
+                <Text
+                  style={[
+                    styles.pillText,
+                    { color: colors.text },
+                    active && { color: "#ffffff", fontWeight: "700" },
+                  ]}
+                >
                   {item.slug === "all" ? t("cat_all_count") : localizeCategoryName(item.slug || item.name, lang)}
                 </Text>
               </TouchableOpacity>
@@ -101,12 +113,12 @@ export function CatalogScreen({ navigation, route }: any) {
 
       {/* Product List */}
       {loading ? (
-        <ActivityIndicator size="large" color="#0284c7" style={{ marginTop: 40 }} />
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
       ) : products.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Text style={{ fontSize: 40, marginBottom: 12 }}>🔎</Text>
-          <Text style={styles.emptyTitle}>{t("cat_not_found")}</Text>
-          <Text style={styles.emptySub}>{t("cat_not_found_sub")}</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t("cat_not_found")}</Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t("cat_not_found_sub")}</Text>
         </View>
       ) : (
         <FlatList
@@ -121,11 +133,11 @@ export function CatalogScreen({ navigation, route }: any) {
             const isAdded = addedId === item.id;
             return (
               <TouchableOpacity
-                style={styles.productCard}
+                style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                 activeOpacity={0.9}
                 onPress={() => navigation.navigate("ProductDetail", { slug: item.slug })}
               >
-                <View style={styles.productImgWrap}>
+                <View style={[styles.productImgWrap, { backgroundColor: theme === "dark" ? "#0e1822" : "#f8fafc" }]}>
                   <Image source={{ uri: imgUrl }} style={styles.productImg} resizeMode="contain" />
                   {item.isHit && (
                     <View style={styles.hitBadge}>
@@ -141,15 +153,15 @@ export function CatalogScreen({ navigation, route }: any) {
 
                 <View style={styles.productBody}>
                   {item.category?.name && (
-                    <Text style={styles.productCatName} numberOfLines={1}>
+                    <Text style={[styles.productCatName, { color: colors.primary }]} numberOfLines={1}>
                       {localizeCategoryName(item.category.slug || item.category.name, lang)}
                     </Text>
                   )}
-                  <Text style={styles.productName} numberOfLines={2}>
+                  <Text style={[styles.productName, { color: colors.text }]} numberOfLines={2}>
                     {localizeProductName(item, lang)}
                   </Text>
                   {item.country && (
-                    <Text style={styles.productCountry}>🌍 {item.country}</Text>
+                    <Text style={[styles.productCountry, { color: colors.textMuted }]}>🌍 {item.country}</Text>
                   )}
 
                   {item.stock !== undefined && (
@@ -157,7 +169,7 @@ export function CatalogScreen({ navigation, route }: any) {
                       style={{
                         fontSize: 11,
                         fontWeight: "700",
-                        color: (item.stock ?? 0) > 0 ? "#0284c7" : "#ef4444",
+                        color: (item.stock ?? 0) > 0 ? colors.primary : "#ef4444",
                         marginBottom: 4,
                       }}
                     >
@@ -167,7 +179,7 @@ export function CatalogScreen({ navigation, route }: any) {
                     </Text>
                   )}
 
-                  <Text style={styles.productPrice}>{formatPrice(item.priceFrom)}</Text>
+                  <Text style={[styles.productPrice, { color: colors.primary }]}>{formatPrice(item.priceFrom)}</Text>
 
                   {item.stock !== undefined && item.stock <= 0 ? (
                     <View style={[styles.addCartBtn, { backgroundColor: "#fee2e2", borderColor: "#fca5a5" }]}>
@@ -177,12 +189,16 @@ export function CatalogScreen({ navigation, route }: any) {
                     </View>
                   ) : (
                     <TouchableOpacity
-                      style={[styles.addCartBtn, isAdded && styles.addCartBtnDone]}
+                      style={[
+                        styles.addCartBtn,
+                        { backgroundColor: theme === "dark" ? "rgba(56, 189, 248, 0.15)" : "rgba(2, 132, 199, 0.09)" },
+                        isAdded && styles.addCartBtnDone,
+                      ]}
                       onPress={() => handleAddToCart(item)}
                     >
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                        <CartIcon size={14} color={isAdded ? "#ffffff" : "#0284c7"} />
-                        <Text style={[styles.addCartText, isAdded && styles.addCartTextDone]}>
+                        <CartIcon size={14} color={isAdded ? "#ffffff" : colors.primary} />
+                        <Text style={[styles.addCartText, { color: isAdded ? "#ffffff" : colors.primary }, isAdded && styles.addCartTextDone]}>
                           {isAdded ? "Qo'shildi" : "Savatchaga"}
                         </Text>
                       </View>

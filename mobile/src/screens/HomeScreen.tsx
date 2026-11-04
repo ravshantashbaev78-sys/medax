@@ -12,6 +12,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Category, fetchCategories, fetchProducts, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
+import { useTheme } from "../context/ThemeContext";
 import { useI18n, localizeCategoryName, localizeProductName, Language } from "../context/I18nContext";
 import {
   MedaxHeaderBrand,
@@ -78,6 +79,7 @@ function getBannerSlides(lang: Language) {
 export function HomeScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { lang, t } = useI18n();
+  const { colors, theme } = useTheme();
   const bannerSlides = getBannerSlides(lang);
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -122,33 +124,33 @@ export function HomeScreen({ navigation }: any) {
   const activeSlide = bannerSlides[currentSlide] || bannerSlides[0];
 
   return (
-    <View style={styles.screen}>
+    <View style={[styles.screen, { backgroundColor: colors.bg }]}>
       {/* 1. Medax Asl Logotipi Header (Web sayt kabi) */}
-      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+      <View style={[styles.header, { paddingTop: insets.top + 8, backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <MedaxHeaderBrand />
 
         <TouchableOpacity
-          style={styles.headerPhoneBtn}
+          style={[styles.headerPhoneBtn, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
           onPress={() => navigation.navigate("Profil")}
         >
-          <Text style={{ fontSize: 12.5, color: "#0284c7", fontWeight: "800" }}>{t("home_cabinet")}</Text>
+          <Text style={{ fontSize: 12.5, color: colors.primary, fontWeight: "800" }}>{t("home_cabinet")}</Text>
         </TouchableOpacity>
       </View>
 
       {/* 2. Original Vektor Qidiruv paneli */}
-      <View style={styles.searchContainer}>
+      <View style={[styles.searchContainer, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <TouchableOpacity
-          style={styles.searchBar}
+          style={[styles.searchBar, { backgroundColor: colors.inputBg, borderColor: colors.border }]}
           activeOpacity={0.8}
           onPress={() => navigation.navigate("Katalog")}
         >
-          <SearchIcon size={18} color="#0284c7" />
-          <Text style={styles.searchPlaceholder}>{t("home_search_ph")}</Text>
+          <SearchIcon size={18} color={colors.primary} />
+          <Text style={[styles.searchPlaceholder, { color: colors.textMuted }]}>{t("home_search_ph")}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
-        style={styles.scroll}
+        style={[styles.scroll, { backgroundColor: colors.bg }]}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 24 }}
       >
@@ -214,42 +216,42 @@ export function HomeScreen({ navigation }: any) {
         </View>
 
         {/* 4. Medax Afzalliklari (Original Vektor Belgilar) */}
-        <View style={styles.trustBadgesRow}>
+        <View style={[styles.trustBadgesRow, { backgroundColor: colors.card, borderColor: colors.border }]}>
           <View style={styles.trustItem}>
-            <View style={styles.trustIconWrap}>
+            <View style={[styles.trustIconWrap, { backgroundColor: colors.inputBg }]}>
               <TruckIcon size={19} color="#0284c7" />
             </View>
-            <Text style={styles.trustTitle}>{t("trust_delivery")}</Text>
-            <Text style={styles.trustSub}>{t("trust_delivery_sub")}</Text>
+            <Text style={[styles.trustTitle, { color: colors.text }]}>{t("trust_delivery")}</Text>
+            <Text style={[styles.trustSub, { color: colors.textMuted }]}>{t("trust_delivery_sub")}</Text>
           </View>
           <View style={styles.trustItem}>
-            <View style={styles.trustIconWrap}>
+            <View style={[styles.trustIconWrap, { backgroundColor: colors.inputBg }]}>
               <ShieldIcon size={19} color="#0d9488" />
             </View>
-            <Text style={styles.trustTitle}>{t("trust_warranty")}</Text>
-            <Text style={styles.trustSub}>{t("trust_warranty_sub")}</Text>
+            <Text style={[styles.trustTitle, { color: colors.text }]}>{t("trust_warranty")}</Text>
+            <Text style={[styles.trustSub, { color: colors.textMuted }]}>{t("trust_warranty_sub")}</Text>
           </View>
           <View style={styles.trustItem}>
-            <View style={styles.trustIconWrap}>
+            <View style={[styles.trustIconWrap, { backgroundColor: colors.inputBg }]}>
               <CertificateIcon size={19} color="#4f46e5" />
             </View>
-            <Text style={styles.trustTitle}>{t("trust_cert")}</Text>
-            <Text style={styles.trustSub}>{t("trust_cert_sub")}</Text>
+            <Text style={[styles.trustTitle, { color: colors.text }]}>{t("trust_cert")}</Text>
+            <Text style={[styles.trustSub, { color: colors.textMuted }]}>{t("trust_cert_sub")}</Text>
           </View>
           <View style={styles.trustItem}>
-            <View style={styles.trustIconWrap}>
+            <View style={[styles.trustIconWrap, { backgroundColor: colors.inputBg }]}>
               <BoltIcon size={19} color="#eab308" />
             </View>
-            <Text style={styles.trustTitle}>{t("trust_eng")}</Text>
-            <Text style={styles.trustSub}>{t("trust_eng_sub")}</Text>
+            <Text style={[styles.trustTitle, { color: colors.text }]}>{t("trust_eng")}</Text>
+            <Text style={[styles.trustSub, { color: colors.textMuted }]}>{t("trust_eng_sub")}</Text>
           </View>
         </View>
 
         {/* 5. Toifalar bo'limi (2 tadan ixcham grid) */}
         <View style={styles.sectionHeaderWrap}>
-          <Text style={styles.sectionTitle}>{t("home_all_cat")}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("home_all_cat")}</Text>
           <TouchableOpacity onPress={() => navigation.navigate("Katalog")}>
-            <Text style={styles.sectionSeeAll}>{t("cat_all_count")} ({categories.length}) →</Text>
+            <Text style={[styles.sectionSeeAll, { color: colors.primary }]}>{t("cat_all_count")} ({categories.length}) →</Text>
           </TouchableOpacity>
         </View>
 
@@ -257,14 +259,14 @@ export function HomeScreen({ navigation }: any) {
           {categories.map((cat) => (
             <TouchableOpacity
               key={cat.id}
-              style={styles.categoryCard}
+              style={[styles.categoryCard, { backgroundColor: colors.card, borderColor: colors.border }]}
               onPress={() => navigation.navigate("Katalog", { categoryId: cat.id })}
               activeOpacity={0.7}
             >
-              <View style={styles.catIconWrap}>
+              <View style={[styles.catIconWrap, { backgroundColor: colors.inputBg }]}>
                 <Text style={{ fontSize: 22 }}>{getCategoryEmoji(cat.slug)}</Text>
               </View>
-              <Text style={styles.categoryName} numberOfLines={2}>
+              <Text style={[styles.categoryName, { color: colors.text }]} numberOfLines={2}>
                 {localizeCategoryName(cat.slug || cat.name, lang)}
               </Text>
             </TouchableOpacity>
@@ -274,19 +276,19 @@ export function HomeScreen({ navigation }: any) {
         {/* 6. Ommabop Mahsulotlar (Web sayt kartochkalari kabi) */}
         <View style={styles.sectionHeaderWrap}>
           <View>
-            <Text style={styles.sectionTitle}>{t("home_popular")}</Text>
-            <Text style={styles.sectionSub}>{t("home_popular_sub")}</Text>
+            <Text style={[styles.sectionTitle, { color: colors.text }]}>{t("home_popular")}</Text>
+            <Text style={[styles.sectionSub, { color: colors.textMuted }]}>{t("home_popular_sub")}</Text>
           </View>
           <TouchableOpacity onPress={() => navigation.navigate("Katalog")}>
-            <Text style={styles.sectionSeeAll}>{t("cat_all_count")} →</Text>
+            <Text style={[styles.sectionSeeAll, { color: colors.primary }]}>{t("cat_all_count")} →</Text>
           </TouchableOpacity>
         </View>
 
         {loading ? (
-          <ActivityIndicator size="large" color="#0284c7" style={{ marginTop: 24 }} />
+          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 24 }} />
         ) : products.length === 0 ? (
           <View style={styles.emptyWrap}>
-            <Text style={styles.emptyText}>{t("home_no_products")}</Text>
+            <Text style={[styles.emptyText, { color: colors.textMuted }]}>{t("home_no_products")}</Text>
           </View>
         ) : (
           <View style={styles.productGrid}>
@@ -296,12 +298,12 @@ export function HomeScreen({ navigation }: any) {
               return (
                 <TouchableOpacity
                   key={item.id}
-                  style={styles.productCard}
+                  style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]}
                   activeOpacity={0.9}
                   onPress={() => navigation.navigate("ProductDetail", { slug: item.slug })}
                 >
                   {/* Image Container with Badges */}
-                  <View style={styles.productImgWrap}>
+                  <View style={[styles.productImgWrap, { backgroundColor: theme === "dark" ? "#0e1822" : "#f8fafc" }]}>
                     <Image
                       source={{ uri: imgUrl }}
                       style={styles.productImg}
@@ -322,17 +324,17 @@ export function HomeScreen({ navigation }: any) {
                   {/* Card Body */}
                   <View style={styles.productBody}>
                     {item.category?.name && (
-                      <Text style={styles.productCatName} numberOfLines={1}>
+                      <Text style={[styles.productCatName, { color: colors.primary }]} numberOfLines={1}>
                         {localizeCategoryName(item.category.slug || item.category.name, lang)}
                       </Text>
                     )}
 
-                    <Text style={styles.productTitle} numberOfLines={2}>
+                    <Text style={[styles.productTitle, { color: colors.text }]} numberOfLines={2}>
                       {localizeProductName(item, lang)}
                     </Text>
 
                     {item.country && (
-                      <Text style={styles.productCountry}>🌍 {item.country}</Text>
+                      <Text style={[styles.productCountry, { color: colors.textMuted }]}>🌍 {item.country}</Text>
                     )}
 
                     {item.stock !== undefined && (
@@ -340,7 +342,7 @@ export function HomeScreen({ navigation }: any) {
                         style={{
                           fontSize: 11,
                           fontWeight: "700",
-                          color: (item.stock ?? 0) > 0 ? "#0284c7" : "#ef4444",
+                          color: (item.stock ?? 0) > 0 ? colors.primary : "#ef4444",
                           marginBottom: 4,
                         }}
                       >
@@ -351,7 +353,7 @@ export function HomeScreen({ navigation }: any) {
                     )}
 
                     <View style={styles.priceRow}>
-                      <Text style={styles.productPrice}>{formatPrice(item.priceFrom)}</Text>
+                      <Text style={[styles.productPrice, { color: colors.primary }]}>{formatPrice(item.priceFrom)}</Text>
                     </View>
 
                     {/* Add to Cart Button with SVG Icon */}
@@ -363,12 +365,16 @@ export function HomeScreen({ navigation }: any) {
                       </View>
                     ) : (
                       <TouchableOpacity
-                        style={[styles.addBtn, isAdded && styles.addBtnDone]}
+                        style={[
+                          styles.addBtn,
+                          { backgroundColor: theme === "dark" ? "rgba(56, 189, 248, 0.15)" : "rgba(2, 132, 199, 0.09)" },
+                          isAdded && styles.addBtnDone,
+                        ]}
                         onPress={() => handleAddToCart(item)}
                       >
                         <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                          <CartIcon size={14} color={isAdded ? "#ffffff" : "#0284c7"} />
-                          <Text style={[styles.addBtnText, isAdded && styles.addBtnTextDone]}>
+                          <CartIcon size={14} color={isAdded ? "#ffffff" : colors.primary} />
+                          <Text style={[styles.addBtnText, { color: isAdded ? "#ffffff" : colors.primary }, isAdded && styles.addBtnTextDone]}>
                             {isAdded ? t("prod_added") : t("prod_add_cart")}
                           </Text>
                         </View>
@@ -382,14 +388,14 @@ export function HomeScreen({ navigation }: any) {
         )}
 
         {/* 7. Callout Aloqa banneri */}
-        <View style={styles.contactCallout}>
-          <Text style={styles.contactCalloutTitle}>{t("home_questions_title")}</Text>
-          <Text style={styles.contactCalloutDesc}>
+        <View style={[styles.contactCallout, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={[styles.contactCalloutTitle, { color: colors.text }]}>{t("home_questions_title")}</Text>
+          <Text style={[styles.contactCalloutDesc, { color: colors.textMuted }]}>
             {t("home_questions_sub")}
           </Text>
           <View style={styles.contactRow}>
-            <Text style={styles.contactPhone}>📞 +998 91 186-66-61</Text>
-            <Text style={styles.contactHours}>{t("home_work_hours")}</Text>
+            <Text style={[styles.contactPhone, { color: colors.primary }]}>📞 +998 91 186-66-61</Text>
+            <Text style={[styles.contactHours, { color: colors.textMuted }]}>{t("home_work_hours")}</Text>
           </View>
         </View>
       </ScrollView>
