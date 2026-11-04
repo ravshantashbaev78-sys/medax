@@ -182,7 +182,20 @@ export function ProfileScreen() {
         setAuthMode("otp");
       } else {
         if (res.error && res.error.includes("allaqachon ro'yxatdan o'tgan")) {
-          Alert.alert("Ro'yxatdan o'tilgan", "Ushbu raqam allaqachon ro'yxatdan o'tgan. Parolingiz bilan kiring.");
+          Alert.alert(
+            "Akkaunt mavjud",
+            res.error,
+            [
+              {
+                text: "Kirish bo'limiga o'tish",
+                onPress: () => {
+                  setAuthTab("login");
+                  setAuthMode("password");
+                },
+              },
+            ]
+          );
+          setAuthTab("login");
           setAuthMode("password");
         } else {
           Alert.alert(t("error"), res.error || "SMS yuborishda xatolik yuz berdi");

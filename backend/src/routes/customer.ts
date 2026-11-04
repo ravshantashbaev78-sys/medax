@@ -133,13 +133,20 @@ customerRouter.post("/auth/send-otp", customerOtpLimiter, async (req, res) => {
   const phone = normalizePhone(raw);
   if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri. Misol: +998 90 123 45 67");
 
-  // Agar mijoz allaqachon ro'yxatdan o'tgan bo'lsa va paroli bo'lsa, ro'yxatdan o'tish uchun SMS yuborilmaydi!
+  // Agar mijoz allaqachon ro'yxatdan o'tgan bo'lsa, qayta ro'yxatdan o'tish uchun kod yuborilmaydi!
   const existing = await prisma.customer.findUnique({ where: { phone } });
-  if (existing && existing.passwordHash) {
-    throw new HttpError(
-      400,
-      "Ushbu telefon raqami allaqachon ro'yxatdan o'tgan. Iltimos, 'Kirish' bo'limi orqali parolingiz bilan kiring."
-    );
+  if (existing) {
+    if (existing.passwordHash) {
+      throw new HttpError(
+        400,
+        "Ushbu telefon raqami allaqachon ro'yxatdan o'tgan. Iltimos, 'Kirish' bo'limi orqali parolingiz bilan kiring."
+      );
+    } else {
+      throw new HttpError(
+        400,
+        "Ushbu telefon raqami allaqachon ro'yxatdan o'tgan. Iltimos, 'Kirish' bo'limi orqali kiring (parol o'rnatish uchun 'Parolni unutdim' tugmasidan foydalaning)."
+      );
+    }
   }
 
   const ip = getClientIp(req);
