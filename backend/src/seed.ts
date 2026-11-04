@@ -29,6 +29,14 @@ export async function seedDatabase() {
   const adminCount = await prisma.user.count({ where: { role: { in: ["OWNER", "ADMIN"] } } });
   if (adminCount === 0) {
     const primaryEmail = (process.env.ADMIN_EMAIL || "admin@medax.uz").toLowerCase();
+    if (
+      process.env.NODE_ENV === "production" &&
+      (!process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === "ChangeMe123!")
+    ) {
+      throw new Error(
+        "XAVFSIZLIK XATOSI: Production muhitida xavfsiz ADMIN_PASSWORD berilishi shart! Standart 'ChangeMe123!' parolidan foydalanish taqiqlanadi."
+      );
+    }
     const password = process.env.ADMIN_PASSWORD || "ChangeMe123!";
     const hash = await bcrypt.hash(password, 10);
     await prisma.user.create({

@@ -245,7 +245,7 @@ export function HomeScreen({ navigation }: any) {
           </View>
         </View>
 
-        {/* 5. Kategoriyalar bo'limi */}
+        {/* 5. Toifalar bo'limi (2 tadan ixcham grid) */}
         <View style={styles.sectionHeaderWrap}>
           <Text style={styles.sectionTitle}>{t("home_all_cat")}</Text>
           <TouchableOpacity onPress={() => navigation.navigate("Katalog")}>
@@ -253,26 +253,23 @@ export function HomeScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryScroll}
-        >
+        <View style={styles.categoryGrid}>
           {categories.map((cat) => (
             <TouchableOpacity
               key={cat.id}
               style={styles.categoryCard}
               onPress={() => navigation.navigate("Katalog", { categoryId: cat.id })}
+              activeOpacity={0.7}
             >
               <View style={styles.catIconWrap}>
-                <Text style={{ fontSize: 20 }}>{getCategoryEmoji(cat.slug)}</Text>
+                <Text style={{ fontSize: 22 }}>{getCategoryEmoji(cat.slug)}</Text>
               </View>
               <Text style={styles.categoryName} numberOfLines={2}>
                 {localizeCategoryName(cat.slug || cat.name, lang)}
               </Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
+        </View>
 
         {/* 6. Ommabop Mahsulotlar (Web sayt kartochkalari kabi) */}
         <View style={styles.sectionHeaderWrap}>
@@ -519,27 +516,46 @@ const styles = StyleSheet.create({
   sectionSub: { fontSize: 11, color: "#64748b", marginTop: 1 },
   sectionSeeAll: { fontSize: 12.5, color: "#0284c7", fontWeight: "700" },
 
-  // Categories
-  categoryScroll: { paddingHorizontal: 16, gap: 10 },
+  // Categories (2 tadan ixcham grid)
+  categoryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    gap: 10,
+  },
   categoryCard: {
-    width: 100,
-    backgroundColor: "#ffffff",
-    padding: 12,
-    borderRadius: 16,
+    width: "48.5%",
+    flexDirection: "row",
     alignItems: "center",
+    backgroundColor: "#ffffff",
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    gap: 10,
+    elevation: 1,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
   },
   catIconWrap: {
-    width: 40,
-    height: 40,
+    width: 42,
+    height: 42,
     borderRadius: 12,
     backgroundColor: "rgba(2, 132, 199, 0.08)",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 8,
   },
-  categoryName: { fontSize: 11, fontWeight: "700", color: "#1e293b", textAlign: "center", lineHeight: 14 },
+  categoryName: {
+    flex: 1,
+    fontSize: 12.5,
+    fontWeight: "700",
+    color: "#0f172a",
+    lineHeight: 16,
+  },
 
   // Products Grid
   productGrid: {

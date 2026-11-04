@@ -40,6 +40,14 @@ const orderIpLimiter = rateLimit({
   keyGenerator: (req) => getClientIp(req),
   message: limitMsg,
 });
+const statusIpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
+  message: limitMsg,
+});
 
 const PHONE_ERR = "Telefon raqami notoʻgʻri. Misol: +998 90 123 45 67";
 
@@ -276,7 +284,7 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
 });
 
 // Buyurtma holatini ko'rish
-ordersRouter.get("/status/:code", orderIpLimiter, async (req, res) => {
+ordersRouter.get("/status/:code", statusIpLimiter, async (req, res) => {
   const code = String(req.params.code);
   const order = await prisma.order.findUnique({
     where: { code },

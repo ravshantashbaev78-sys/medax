@@ -490,7 +490,7 @@ const DEFAULT_CATEGORY_RULE: CategoryRule = {
 const empty = {
   name: "", nameRu: "", nameEn: "", sku: "", description: "", descriptionRu: "", descriptionEn: "", country: "", priceFrom: "" as string | number,
   oldPrice: "" as string | number, discountPercent: "" as string | number,
-  unit: "dona", packageQty: 1 as string | number, stock: 50 as string | number,
+  unit: "dona", packageQty: 1 as string | number, stock: 0 as string | number,
   mfdDate: "", expDate: "",
   isHit: false, isNew: false, isActive: true, categoryId: "" as string | number, brandId: "" as string | number,
   specs: [] as { name: string; value: string }[],

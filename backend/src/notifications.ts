@@ -57,33 +57,40 @@ async function findCustomerForOrder(order: { customerId: number | null; phone: s
 }
 
 /**
- * Admin buyurtmani tasdiqlaganda (yoki tayyor holatiga o'tkazganda):
- * 1. Barcha holatda SMS yuboriladi (Eskiz rasmiy tasdiqlangan shabloni bo'yicha).
+ * Admin buyurtmani tasdiqlaganda (CONFIRMED):
+ * 1. Takroriy SMS ketmasligi uchun tekshiriladi (pul tejaladi).
  * 2. Tizimda bildirishnoma (Notification) saqlanadi.
- * 3. Agar mijozda mobil ilova bo'lsa (pushToken mavjud bo'lsa), ilovaga PUSH bildirishnoma ham boradi!
+ * 3. Ilovaga PUSH bildirishnoma boradi.
  */
 export async function notifyOrderConfirmed(order: {
   id: number;
   code: string;
   phone: string;
   customerId: number | null;
+  flags?: string[];
 }) {
-  // 1. Mijozni bazadan topamiz
   const customer = await findCustomerForOrder(order);
 
-  // 2. Har doim SMS yuborish (Eskiz tasdiqlangan shabloni bo'yicha)
-  try {
-    const smsText = `Siz Medax saytida bergan buyurtmangiz tayyor. Raqam:# ${order.id}. Uni do'kondan olib ketishingiz mumkin.`;
-    await sendSms(order.phone, smsText);
-    console.log(`[Order Confirmed SMS sent] ${order.phone} -> ${smsText}`);
-  } catch (smsErr) {
-    console.error("[Order Confirmed SMS Error]:", smsErr);
+  // 1. Faqat birinchi marta SMS yuborish (takroriy status o'zgartirishlarda SMS qayta ketmaydi)
+  const alreadySent = order.flags?.includes("SMS_CONFIRMED_SENT");
+  if (!alreadySent) {
+    try {
+      const smsText = `Medax: #${order.code} (№${order.id}) raqamli buyurtmangiz tasdiqlandi va tayyorlanmoqda.`;
+      await sendSms(order.phone, smsText);
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { flags: { push: "SMS_CONFIRMED_SENT" } },
+      });
+      console.log(`[Order Confirmed SMS sent] ${order.phone} -> ${smsText}`);
+    } catch (smsErr) {
+      console.error("[Order Confirmed SMS Error]:", smsErr);
+    }
   }
 
-  const notificationTitle = "Buyurtmangiz tasdiqlandi! 🎉";
-  const notificationBody = `Siz bergan #${order.code} (№${order.id}) raqamli buyurtmangiz tasdiqlandi va olib ketishga tayyor.`;
+  const notificationTitle = "Buyurtmangiz tasdiqlandi! 📋";
+  const notificationBody = `Siz bergan #${order.code} (№${order.id}) raqamli buyurtmangiz tasdiqlandi va mutaxassislarimiz tomonidan tayyorlanmoqda.`;
 
-  // 3. Bazaga bildirishnoma (Notification) yozish
+  // 2. Bazaga bildirishnoma (Notification) yozish
   try {
     await prisma.notification.create({
       data: {
@@ -98,15 +105,65 @@ export async function notifyOrderConfirmed(order: {
     console.error("[Notification DB Error]:", dbErr);
   }
 
-  // 4. Agar mobil ilovasi bo'lsa (pushToken mavjud bo'lsa), PUSH bildirishnoma jo'natamiz!
+  // 3. PUSH bildirishnoma jo'natish
   if (customer && customer.pushToken) {
-    console.log(`[Push Notification] Foydalanuvchi ilovaga ega (${customer.phone}), push jo'natilmoqda...`);
     await sendExpoPush(customer.pushToken, notificationTitle, notificationBody, {
       orderId: order.id,
       orderCode: order.code,
     });
-  } else {
-    console.log(`[Push Notification] Foydalanuvchida mobil ilova tokeni yo'q, faqat SMS yuborildi.`);
+  }
+}
+
+/**
+ * Buyurtma tayyor bo'lganda (READY):
+ * Aynan tayyor bo'lgandagina mijozga do'kondan olib ketish haqida SMS boradi.
+ */
+export async function notifyOrderReady(order: {
+  id: number;
+  code: string;
+  phone: string;
+  customerId: number | null;
+  flags?: string[];
+}) {
+  const customer = await findCustomerForOrder(order);
+
+  const alreadySent = order.flags?.includes("SMS_READY_SENT");
+  if (!alreadySent) {
+    try {
+      const smsText = `Siz Medax saytida bergan buyurtmangiz tayyor. Raqam:# ${order.id}. Uni do'kondan olib ketishingiz mumkin.`;
+      await sendSms(order.phone, smsText);
+      await prisma.order.update({
+        where: { id: order.id },
+        data: { flags: { push: "SMS_READY_SENT" } },
+      });
+      console.log(`[Order Ready SMS sent] ${order.phone} -> ${smsText}`);
+    } catch (smsErr) {
+      console.error("[Order Ready SMS Error]:", smsErr);
+    }
+  }
+
+  const notificationTitle = "Buyurtmangiz tayyor! 🎉";
+  const notificationBody = `Siz bergan #${order.code} (№${order.id}) raqamli buyurtmangiz do'konda tayyor va uni olib ketishingiz mumkin.`;
+
+  try {
+    await prisma.notification.create({
+      data: {
+        customerId: customer?.id || order.customerId || null,
+        phone: customer?.phone || order.phone,
+        title: notificationTitle,
+        body: notificationBody,
+        orderId: order.id,
+      },
+    });
+  } catch (dbErr) {
+    console.error("[Notification Ready DB Error]:", dbErr);
+  }
+
+  if (customer && customer.pushToken) {
+    await sendExpoPush(customer.pushToken, notificationTitle, notificationBody, {
+      orderId: order.id,
+      orderCode: order.code,
+    });
   }
 }
 

@@ -10,7 +10,7 @@ import { applyFakeStrike, normalizePhone } from "../antispam";
 import { memoryUpload, removeFile, saveImage, savePdf } from "../upload";
 import { uniqueSlug } from "../utils";
 import { sendSms } from "../sms";
-import { notifyOrderConfirmed, notifyOrderCanceled, notifyOrderDone } from "../notifications";
+import { notifyOrderConfirmed, notifyOrderReady, notifyOrderCanceled, notifyOrderDone } from "../notifications";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -367,7 +367,7 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
       const price = priceRaw ? Number(priceRaw) : null;
       if (price !== null && Number.isNaN(price)) throw new Error("Narx raqam emas");
       const stockRaw = text(row, cStock).replace(/[\s,]/g, "");
-      const stock = stockRaw ? Math.max(0, parseInt(stockRaw, 10)) : 50;
+      const stock = stockRaw ? Math.max(0, parseInt(stockRaw, 10)) : 0;
       const sku = text(row, cSku) || null;
       const data = {
         name,
@@ -464,69 +464,82 @@ adminRouter.patch("/orders/:id", async (req, res) => {
   let blocked = false;
   if (d.status === "FAKE") blocked = await applyFakeStrike(order.phone);
 
-  // Agar holat "CONFIRMED" yoki "READY" ga o'zgargan bo'lsa (va avval tasdiqlanmagan bo'lsa):
-  // 1. Mijozga SMS boradi (Eskiz rasmiy tasdiqlangan shabloni bo'yicha)
-  // 2. Tizimda bildirishnoma (Notification) saqlanadi
-  // 3. Agar mijozda mobil ilova bo'lsa (pushToken mavjud bo'lsa), PUSH bildirishnoma ham boradi!
-  if (
-    (d.status === "CONFIRMED" || d.status === "READY") &&
-    prevOrder.status !== "CONFIRMED" &&
-    prevOrder.status !== "READY"
-  ) {
-    await notifyOrderConfirmed(order);
-  } else if (d.status === "CANCELED" && prevOrder.status !== "CANCELED") {
-    await notifyOrderCanceled(order, d.managerNote);
-  } else if (d.status === "DONE" && prevOrder.status !== "DONE") {
-    await notifyOrderDone(order);
-  }
-
-  // 4. Ombordagi qoldiqni boshqarish:
+  // 1. Ombordagi qoldiqni boshqarish (Tranzaksiyada xavfsiz tekshiruv va ayirish):
   // Admin buyurtmani tasdiqlaganda (CONFIRMED), tayyorlaganda (READY) yoki topshirganda (DONE)
-  // mahsulotlar sonidan buyurtma miqdori ayirib tashlanadi (qoldiq kamayadi).
-  // Agar mahsulot soni 0 ga tushsa, u avtomatik tarzda mijozlar sayti va ilovasidan olib tashlanadi (isActive: false)!
+  // avval ombordagi qoldiq yetarliligi tekshiriladi. Yetmasa, xatolik beriladi.
   if (
     (d.status === "CONFIRMED" || d.status === "READY" || d.status === "DONE") &&
     !prevOrder.stockDeducted
   ) {
-    for (const item of order.items) {
-      if (item.productId) {
-        const prod = await prisma.product.findUnique({ where: { id: item.productId } });
-        if (prod) {
-          const newStock = Math.max(0, prod.stock - item.quantity);
-          await prisma.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: newStock,
-              // Agar qoldiq 0 bo'lsa, sayt va ilovadan avtomatik o'chiriladi (yashiriladi)
-              ...(newStock === 0 ? { isActive: false } : {}),
-            },
-          });
+    await prisma.$transaction(async (tx) => {
+      // a) Avval barcha mahsulotlar uchun qoldiq yetarliligini tekshiramiz
+      for (const item of order.items) {
+        if (item.productId) {
+          const prod = await tx.product.findUnique({ where: { id: item.productId } });
+          if (prod && prod.stock < item.quantity) {
+            throw new HttpError(
+              400,
+              `"${prod.name}" uchun omborda yetarli qoldiq yo'q (mavjud: ${prod.stock} dona, buyurtmada: ${item.quantity} dona). Avval ombor qoldig'ini to'ldiring.`
+            );
+          }
         }
       }
-    }
-    await prisma.order.update({ where: { id: order.id }, data: { stockDeducted: true } });
-    order.stockDeducted = true;
+
+      // b) Qoldiq yetarli — qoldiqdan ayiramiz
+      for (const item of order.items) {
+        if (item.productId) {
+          const prod = await tx.product.findUnique({ where: { id: item.productId } });
+          if (prod) {
+            const newStock = Math.max(0, prod.stock - item.quantity);
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                stock: newStock,
+                ...(newStock === 0 ? { isActive: false } : {}),
+              },
+            });
+          }
+        }
+      }
+
+      await tx.order.update({ where: { id: order.id }, data: { stockDeducted: true } });
+      order.stockDeducted = true;
+    });
   }
 
-  // 5. Agar buyurtma bekor qilinsa (CANCELED yoki FAKE), avval yechilgan qoldiq omborga qaytariladi:
+  // 2. Agar buyurtma bekor qilinsa (CANCELED yoki FAKE), avval yechilgan qoldiq omborga qaytariladi:
   if ((d.status === "CANCELED" || d.status === "FAKE") && prevOrder.stockDeducted) {
-    for (const item of order.items) {
-      if (item.productId) {
-        const prod = await prisma.product.findUnique({ where: { id: item.productId } });
-        if (prod) {
-          const newStock = prod.stock + item.quantity;
-          await prisma.product.update({
-            where: { id: item.productId },
-            data: {
-              stock: newStock,
-              isActive: true, // qayta faollashtiriladi
-            },
-          });
+    await prisma.$transaction(async (tx) => {
+      for (const item of order.items) {
+        if (item.productId) {
+          const prod = await tx.product.findUnique({ where: { id: item.productId } });
+          if (prod) {
+            const newStock = prod.stock + item.quantity;
+            await tx.product.update({
+              where: { id: item.productId },
+              data: {
+                stock: newStock,
+                // Faqat qoldiq 0 bo'lgani sababli yashirilgan bo'lsa qayta yoqiladi
+                ...(prod.stock === 0 && !prod.isActive ? { isActive: true } : {}),
+              },
+            });
+          }
         }
       }
-    }
-    await prisma.order.update({ where: { id: order.id }, data: { stockDeducted: false } });
-    order.stockDeducted = false;
+      await tx.order.update({ where: { id: order.id }, data: { stockDeducted: false } });
+      order.stockDeducted = false;
+    });
+  }
+
+  // 3. Bildirishnomalar va SMS (CONFIRMED != READY, takrorlanmas SMS):
+  if (d.status === "CONFIRMED" && prevOrder.status !== "CONFIRMED") {
+    await notifyOrderConfirmed(order);
+  } else if (d.status === "READY" && prevOrder.status !== "READY") {
+    await notifyOrderReady(order);
+  } else if (d.status === "CANCELED" && prevOrder.status !== "CANCELED") {
+    await notifyOrderCanceled(order, d.managerNote);
+  } else if (d.status === "DONE" && prevOrder.status !== "DONE") {
+    await notifyOrderDone(order);
   }
 
   res.json({ order, blocked });

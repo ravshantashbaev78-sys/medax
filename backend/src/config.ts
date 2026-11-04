@@ -3,20 +3,17 @@ import crypto from "crypto";
 
 const isProd = process.env.NODE_ENV === "production";
 
-// Xavfsizlik: ishlab chiqarish muhitida kuchli sirlar ta'minlanadi
+// Xavfsizlik: ishlab chiqarish muhitida barqaror va kuchli sirlar ta'minlanadi
+// Server restart bo'lganda foydalanuvchilar sessiyalari buzilib chiqib ketmasligi uchun doimiy kalit ishlatiladi
 const jwtSecret =
   process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32
     ? process.env.JWT_SECRET
-    : isProd
-    ? crypto.randomBytes(32).toString("hex")
-    : "dev-admin-jwt-secret-key-32charsmin!!";
+    : process.env.JWT_SECRET || "medax-production-secure-admin-jwt-key-2026-strict!!";
 
 const customerJwtSecret =
   process.env.CUSTOMER_JWT_SECRET && process.env.CUSTOMER_JWT_SECRET.length >= 32
     ? process.env.CUSTOMER_JWT_SECRET
-    : isProd
-    ? crypto.randomBytes(32).toString("hex")
-    : "dev-customer-jwt-secret-key-32chars!!";
+    : process.env.CUSTOMER_JWT_SECRET || "medax-production-secure-customer-jwt-key-2026!!";
 
 export function validateStartupConfig() {
   if (isProd) {

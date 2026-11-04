@@ -294,7 +294,7 @@ customerRouter.post("/auth/login", customerLoginLimiter, async (req, res) => {
 });
 
 // 3a. Telefon raqam holatini tekshirish
-customerRouter.post("/auth/check-phone", async (req, res) => {
+customerRouter.post("/auth/check-phone", authLimiter, async (req, res) => {
   const { phone: raw } = z.object({ phone: z.string().max(30) }).parse(req.body);
   const phone = normalizePhone(raw);
   if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri.");
@@ -326,18 +326,15 @@ customerRouter.post("/auth/forgot-password-otp", customerOtpLimiter, async (req,
   await assertNotBlocked(phone, ip);
   await verifyTurnstile(captchaToken, ip);
 
-  // 12 soatda 1 marta urinish qoidasi:
-  const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+  // Qisqa takroriy so'rovlardan himoya (60 soniya kutish vaqti):
+  const COOLDOWN_MS = 60 * 1000;
   if (customer.resetPasswordOtpSentAt) {
     const elapsed = Date.now() - customer.resetPasswordOtpSentAt.getTime();
-    if (elapsed < TWELVE_HOURS_MS) {
-      const remainingMs = TWELVE_HOURS_MS - elapsed;
-      const hours = Math.floor(remainingMs / (60 * 60 * 1000));
-      const minutes = Math.ceil((remainingMs % (60 * 60 * 1000)) / (60 * 1000));
-      const timeText = hours > 0 ? `${hours} soat ${minutes} daqiqa` : `${minutes} daqiqa`;
+    if (elapsed < COOLDOWN_MS) {
+      const remainingSec = Math.ceil((COOLDOWN_MS - elapsed) / 1000);
       throw new HttpError(
         429,
-        `Parolni tiklash uchun SMS 12 soatda faqat 1 marta yuboriladi. Iltimos, ${timeText}dan so'ng qayta urinib ko'ring.`
+        `Yangi tasdiqlash kodi so'rash uchun ${remainingSec} soniya kuting.`
       );
     }
   }
@@ -588,6 +585,17 @@ customerRouter.post("/auth/push-token", requireCustomerAuth, async (req, res) =>
     },
   });
   res.json({ ok: true, message: "Push token saqlandi" });
+});
+
+// 7b. Chiqishda Push Tokenini tozalash (oldingi akkauntga boshqa odamning xabarlari bormasligi uchun)
+customerRouter.delete("/auth/push-token", requireCustomerAuth, async (req, res) => {
+  await prisma.customer.update({
+    where: { id: req.customer!.id },
+    data: {
+      pushToken: null,
+    },
+  });
+  res.json({ ok: true, message: "Push token o'chirildi" });
 });
 
 // 8. Mijozning bildirishnomalari ro'yxati

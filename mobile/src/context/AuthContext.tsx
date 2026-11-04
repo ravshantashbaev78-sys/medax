@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Customer, fetchCustomerProfile, TOKEN_KEY } from "../api";
+import { Customer, fetchCustomerProfile, TOKEN_KEY, removePushToken } from "../api";
 
 interface AuthContextType {
   customer: Customer | null;
@@ -19,16 +19,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem(TOKEN_KEY).then((savedToken) => {
+    AsyncStorage.getItem(TOKEN_KEY).then(async (savedToken) => {
       if (savedToken) {
-        setToken(savedToken);
-        fetchCustomerProfile().then((profile) => {
-          if (profile) setCustomer(profile);
-          setLoading(false);
-        });
+        const profile = await fetchCustomerProfile();
+        if (profile) {
+          setToken(savedToken);
+          setCustomer(profile);
+        } else {
+          // Token muddati o'tgan yoki yaroqsiz — tozalaymiz
+          await AsyncStorage.removeItem(TOKEN_KEY);
+          setToken(null);
+          setCustomer(null);
+        }
       } else {
-        setLoading(false);
+        setToken(null);
+        setCustomer(null);
       }
+      setLoading(false);
     });
   }, []);
 
@@ -39,6 +46,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = async () => {
+    try {
+      await removePushToken();
+    } catch {
+      // ignore
+    }
     await AsyncStorage.removeItem(TOKEN_KEY);
     setToken(null);
     setCustomer(null);
@@ -46,7 +58,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     const profile = await fetchCustomerProfile();
-    if (profile) setCustomer(profile);
+    if (profile) {
+      setCustomer(profile);
+    } else {
+      await logout();
+    }
   };
 
   return (

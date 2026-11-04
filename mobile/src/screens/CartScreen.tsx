@@ -25,7 +25,7 @@ export function CartScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { lang, t } = useI18n();
   const { items, updateQuantity, removeFromCart, clearCart, totalPrice, totalItems } = useCart();
-  const { customer, token } = useAuth();
+  const { customer, token, logout } = useAuth();
 
   const [customerName, setCustomerName] = useState(customer?.name || "");
   const [phone, setPhone] = useState(customer?.phone || "+998 ");
@@ -117,6 +117,16 @@ export function CartScreen({ navigation }: any) {
         orderCode: String(res.code || res.orderId || "yangi"),
       });
     } else {
+      if (token && res.error && (res.error.includes("SMS tasdiqlash kodini") || res.error.includes("401"))) {
+        await logout();
+        setOtpSent(true);
+        Alert.alert(
+          "Sessiya yangilandi",
+          "Avvalgi profilingiz sessiyasi eskirgan. Telefoningizga tasdiqlash kodi yuborildi, kodni kiritib buyurtmani tasdiqlang."
+        );
+        await sendOrderOtp(phone.trim());
+        return;
+      }
       Alert.alert("Xatolik", res.error || "Buyurtma yuborishda xatolik yuz berdi");
     }
   };

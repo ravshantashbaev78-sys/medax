@@ -337,6 +337,22 @@ export async function registerPushToken(pushToken: string): Promise<boolean> {
   }
 }
 
+export async function removePushToken(): Promise<boolean> {
+  try {
+    const token = await AsyncStorage.getItem(TOKEN_KEY);
+    if (!token) return false;
+    const res = await fetch(`${API_BASE}/customer/auth/push-token`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function fetchNotifications(): Promise<{ notifications: any[]; unreadCount: number }> {
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
