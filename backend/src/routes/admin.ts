@@ -10,7 +10,7 @@ import { applyFakeStrike, normalizePhone } from "../antispam";
 import { memoryUpload, removeFile, saveImage, savePdf } from "../upload";
 import { uniqueSlug } from "../utils";
 import { sendSms } from "../sms";
-import { notifyOrderConfirmed } from "../notifications";
+import { notifyOrderConfirmed, notifyOrderCanceled, notifyOrderDone } from "../notifications";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -474,6 +474,10 @@ adminRouter.patch("/orders/:id", async (req, res) => {
     prevOrder.status !== "READY"
   ) {
     await notifyOrderConfirmed(order);
+  } else if (d.status === "CANCELED" && prevOrder.status !== "CANCELED") {
+    await notifyOrderCanceled(order, d.managerNote);
+  } else if (d.status === "DONE" && prevOrder.status !== "DONE") {
+    await notifyOrderDone(order);
   }
 
   // 4. Ombordagi qoldiqni boshqarish:

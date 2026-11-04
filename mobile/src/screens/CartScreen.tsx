@@ -18,7 +18,7 @@ import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
 import { submitOrder, sendOrderOtp, getImageUrl, formatPrice } from "../api";
 import { useI18n, localizeProductName } from "../context/I18nContext";
-import { CartIcon, CloseIcon, ShieldIcon, BoltIcon } from "../components/Icons";
+import { CartIcon, CloseIcon, ShieldIcon, BoltIcon, MapPinIcon, UserIcon } from "../components/Icons";
 import { SuccessModal } from "../components/SuccessModal";
 
 export function CartScreen({ navigation }: any) {
@@ -99,7 +99,7 @@ export function CartScreen({ navigation }: any) {
     const res = await submitOrder({
       customerName: customerName.trim(),
       phone: phone.trim(),
-      deliveryAddress: address.trim(),
+      deliveryAddress: t("contact_address") || "Namangan sh., Ozod MFY, Abu Rayhon Beruniy ko'chasi, 2-uy",
       comment: comment.trim(),
       paymentMethod: selectedMethod,
       items: orderItems,
@@ -229,9 +229,9 @@ export function CartScreen({ navigation }: any) {
           {/* SMS Verified info or guest tip */}
           {customer ? (
             <View style={styles.authBadge}>
-              <ShieldIcon size={18} color="#0284c7" />
+              <UserIcon size={16} color="#0284c7" />
               <Text style={styles.authBadgeText}>
-                SMS tasdiqlangan hisob: <Text style={{ fontWeight: "800", color: "#0f172a" }}>{customer.name}</Text>
+                Hisob: <Text style={{ fontWeight: "800", color: "#0f172a" }}>{customer.name}</Text>
               </Text>
             </View>
           ) : null}
@@ -260,19 +260,26 @@ export function CartScreen({ navigation }: any) {
               placeholderTextColor="#94a3b8"
             />
 
-            <Text style={styles.label}>{t("cart_address_label")}</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Viloyat, shahar, ko'cha, klinika yoki bino"
-              value={address}
-              onChangeText={setAddress}
-              placeholderTextColor="#94a3b8"
-            />
+            <Text style={styles.label}>{t("contact_store") || "Olib ketish manzili"}</Text>
+            <View style={styles.storeAddressCard}>
+              <View style={styles.storeAddressIconWrap}>
+                <MapPinIcon size={20} color="#059669" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.storeAddressTitle}>Medax tibbiyot texnikalari markazi</Text>
+                <Text style={styles.storeAddressDesc}>
+                  {t("contact_address")}
+                </Text>
+                <Text style={styles.storeAddressPickupNote}>
+                  ℹ️ Hozircha faqat do'kondan olib ketish mavjud. Uskunani do'konda tekshirib qabul qilib olasiz.
+                </Text>
+              </View>
+            </View>
 
             <Text style={styles.label}>{t("cart_comment_label")}</Text>
             <TextInput
               style={[styles.input, { height: 64, textAlignVertical: "top" }]}
-              placeholder="Klinika nomi, o'rnatish yoki yetkazish vaqti"
+              placeholder="Klinika nomi, o'rnatish yoki olib ketish vaqti"
               value={comment}
               onChangeText={setComment}
               multiline
@@ -310,14 +317,6 @@ export function CartScreen({ navigation }: any) {
               <Text style={styles.totalLabel}>{t("cart_total_label")}</Text>
               <Text style={styles.totalValue}>
                 {totalPrice > 0 ? `${totalPrice.toLocaleString()} UZS` : "Kelishuv asosida"}
-              </Text>
-            </View>
-
-            {/* Security note */}
-            <View style={styles.secNote}>
-              <ShieldIcon size={14} color="#059669" />
-              <Text style={styles.secNoteText}>
-                {t("cart_sec_note")}
               </Text>
             </View>
 
@@ -524,6 +523,45 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   payPillText: { fontSize: 10, fontWeight: "800", color: "#ffffff" },
+
+  storeAddressCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1.5,
+    borderColor: "rgba(5, 150, 105, 0.35)",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 14,
+  },
+  storeAddressIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "rgba(5, 150, 105, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  storeAddressTitle: {
+    fontSize: 13.5,
+    fontWeight: "800",
+    color: "#065f46",
+    marginBottom: 2,
+  },
+  storeAddressDesc: {
+    fontSize: 12,
+    color: "#1e293b",
+    lineHeight: 17,
+  },
+  storeAddressPickupNote: {
+    fontSize: 11,
+    color: "#047857",
+    fontWeight: "600",
+    marginTop: 6,
+    lineHeight: 15,
+  },
 
   totalRow: {
     flexDirection: "row",

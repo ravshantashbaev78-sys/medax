@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
   Text,
@@ -133,6 +134,15 @@ export function ProfileScreen() {
       setUnreadCount(0);
     }
   }, [customer]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (customer) {
+        loadOrders();
+        loadNotifications();
+      }
+    }, [customer])
+  );
 
   const handleMarkAllRead = async () => {
     try {
@@ -372,17 +382,9 @@ export function ProfileScreen() {
             <Text style={[styles.infoTitle, { color: colors.text }]}>{t("profile_info_title")}</Text>
 
             <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: colors.textMuted }]}>{t("profile_auth_type")}:</Text>
-              <View style={styles.pillBadgeBlue}>
-                <ShieldIcon size={13} color="#0284c7" />
-                <Text style={styles.pillTextBlue}>{t("profile_auth_val")}</Text>
-              </View>
-            </View>
-
-            <View style={[styles.infoRow, { marginTop: 10 }]}>
               <Text style={[styles.infoLabel, { color: colors.textMuted }]}>{t("profile_status")}:</Text>
               <View style={styles.pillBadgeGreen}>
-                <Text style={styles.pillTextGreen}>✓ {t("profile_status_active")}</Text>
+                <Text style={styles.pillTextGreen}>{t("profile_status_active")}</Text>
               </View>
             </View>
           </View>
@@ -398,7 +400,13 @@ export function ProfileScreen() {
                   </View>
                 )}
               </View>
-              <TouchableOpacity onPress={loadOrders} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  loadOrders();
+                  loadNotifications();
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
                 <Text style={[styles.refreshOrdersText, { color: colors.primary }]}>🔄 Yangilash</Text>
               </TouchableOpacity>
             </View>
@@ -433,9 +441,30 @@ export function ProfileScreen() {
                       </View>
 
                       {order.items && order.items.length > 0 && (
-                        <Text style={[styles.orderItemsPreview, { color: colors.textMuted }]} numberOfLines={1}>
-                          {order.items.map((it: any) => `${it.product?.name || "Mahsulot"} (${it.quantity || 1}x)`).join(", ")}
-                        </Text>
+                        <View style={styles.orderProductsList}>
+                          {order.items.map((it: any, idx: number) => {
+                            const rawImg = it.product?.images?.[0]?.thumbUrl || it.product?.images?.[0]?.url;
+                            const imgSrc = getImageUrl(rawImg);
+                            const prodName = it.product?.name || it.productName || "Mahsulot";
+                            return (
+                              <View key={idx} style={styles.orderProductRow}>
+                                <Image
+                                  source={{ uri: imgSrc }}
+                                  style={styles.orderProductImg}
+                                  resizeMode="contain"
+                                />
+                                <View style={{ flex: 1 }}>
+                                  <Text style={[styles.orderProductName, { color: colors.text }]} numberOfLines={2}>
+                                    {prodName}
+                                  </Text>
+                                  <Text style={[styles.orderProductMeta, { color: colors.textMuted }]}>
+                                    {it.quantity || 1} dona {it.price ? `• ${Number(it.price).toLocaleString()} so'm` : ""}
+                                  </Text>
+                                </View>
+                              </View>
+                            );
+                          })}
+                        </View>
                       )}
 
                       <View style={styles.orderItemBottom}>
@@ -1092,6 +1121,11 @@ const styles = StyleSheet.create({
   orderCode: { fontSize: 14, fontWeight: "800" },
   orderStatusPill: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
   orderStatusText: { fontSize: 11.5, fontWeight: "700" },
+  orderProductsList: { marginVertical: 8, gap: 8 },
+  orderProductRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
+  orderProductImg: { width: 44, height: 44, borderRadius: 8, backgroundColor: "#f8fafc", borderWidth: 1, borderColor: "#e2e8f0" },
+  orderProductName: { fontSize: 13, fontWeight: "700" },
+  orderProductMeta: { fontSize: 11.5, marginTop: 2 },
   orderItemsPreview: { fontSize: 12.5, lineHeight: 18, marginBottom: 8 },
   orderItemBottom: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   orderDate: { fontSize: 11.5 },

@@ -523,7 +523,7 @@ customerRouter.get("/orders", requireCustomerAuth, async (req, res) => {
       items: {
         include: {
           product: {
-            select: { id: true, name: true, slug: true, images: { take: 1, select: { thumbUrl: true } } },
+            select: { id: true, name: true, slug: true, images: { take: 1, select: { url: true, thumbUrl: true } } },
           },
         },
       },
@@ -594,10 +594,17 @@ customerRouter.post("/auth/push-token", requireCustomerAuth, async (req, res) =>
 customerRouter.get("/notifications", requireCustomerAuth, async (req, res) => {
   const customerId = req.customer!.id;
   const phone = req.customer!.phone;
+  const cleanDigits = phone ? phone.replace(/\D/g, "") : "";
+  const last9 = cleanDigits.slice(-9);
 
   const notifications = await prisma.notification.findMany({
     where: {
-      OR: [{ customerId }, ...(phone ? [{ phone }] : [])],
+      OR: [
+        { customerId },
+        ...(phone ? [{ phone }] : []),
+        ...(cleanDigits ? [{ phone: cleanDigits }, { phone: `+${cleanDigits}` }] : []),
+        ...(last9 ? [{ phone: { endsWith: last9 } }] : []),
+      ],
     },
     orderBy: { createdAt: "desc" },
     take: 50,

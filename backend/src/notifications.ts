@@ -37,6 +37,25 @@ export async function sendExpoPush(token: string, title: string, body: string, d
   }
 }
 
+async function findCustomerForOrder(order: { customerId: number | null; phone: string }) {
+  if (order.customerId) {
+    const byId = await prisma.customer.findUnique({ where: { id: order.customerId } });
+    if (byId) return byId;
+  }
+  const cleanDigits = order.phone.replace(/\D/g, "");
+  const last9 = cleanDigits.slice(-9);
+  return await prisma.customer.findFirst({
+    where: {
+      OR: [
+        { phone: order.phone },
+        { phone: `+${cleanDigits}` },
+        { phone: cleanDigits },
+        ...(last9 ? [{ phone: { endsWith: last9 } }] : []),
+      ],
+    },
+  });
+}
+
 /**
  * Admin buyurtmani tasdiqlaganda (yoki tayyor holatiga o'tkazganda):
  * 1. Barcha holatda SMS yuboriladi (Eskiz rasmiy tasdiqlangan shabloni bo'yicha).
@@ -50,12 +69,7 @@ export async function notifyOrderConfirmed(order: {
   customerId: number | null;
 }) {
   // 1. Mijozni bazadan topamiz
-  let customer = null;
-  if (order.customerId) {
-    customer = await prisma.customer.findUnique({ where: { id: order.customerId } });
-  } else if (order.phone) {
-    customer = await prisma.customer.findUnique({ where: { phone: order.phone } });
-  }
+  const customer = await findCustomerForOrder(order);
 
   // 2. Har doim SMS yuborish (Eskiz tasdiqlangan shabloni bo'yicha)
   try {
@@ -73,8 +87,8 @@ export async function notifyOrderConfirmed(order: {
   try {
     await prisma.notification.create({
       data: {
-        customerId: customer?.id || null,
-        phone: order.phone,
+        customerId: customer?.id || order.customerId || null,
+        phone: customer?.phone || order.phone,
         title: notificationTitle,
         body: notificationBody,
         orderId: order.id,
@@ -93,5 +107,87 @@ export async function notifyOrderConfirmed(order: {
     });
   } else {
     console.log(`[Push Notification] Foydalanuvchida mobil ilova tokeni yo'q, faqat SMS yuborildi.`);
+  }
+}
+
+/**
+ * Admin buyurtmani bekor qilganda:
+ * 1. Tizimda bildirishnoma (Notification) saqlanadi.
+ * 2. Ilovaga PUSH bildirishnoma yuboriladi.
+ */
+export async function notifyOrderCanceled(
+  order: {
+    id: number;
+    code: string;
+    phone: string;
+    customerId: number | null;
+  },
+  reason?: string
+) {
+  const customer = await findCustomerForOrder(order);
+
+  const notificationTitle = "Buyurtma bekor qilindi ⚠️";
+  const notificationBody = `Siz bergan #${order.code} (№${order.id}) raqamli buyurtmangiz bekor qilindi.${
+    reason ? ` Sabab: ${reason}` : ""
+  }`;
+
+  // 1. Bazada saqlash
+  try {
+    await prisma.notification.create({
+      data: {
+        customerId: customer?.id || order.customerId || null,
+        phone: customer?.phone || order.phone,
+        title: notificationTitle,
+        body: notificationBody,
+        orderId: order.id,
+      },
+    });
+    console.log(`[Notification Canceled saved] Order #${order.id} for ${order.phone}`);
+  } catch (dbErr) {
+    console.error("[Notification Canceled DB Error]:", dbErr);
+  }
+
+  // 2. Push jo'natish
+  if (customer && customer.pushToken) {
+    await sendExpoPush(customer.pushToken, notificationTitle, notificationBody, {
+      orderId: order.id,
+      orderCode: order.code,
+    });
+  }
+}
+
+/**
+ * Buyurtma topshirilganda / yakunlanganda:
+ */
+export async function notifyOrderDone(order: {
+  id: number;
+  code: string;
+  phone: string;
+  customerId: number | null;
+}) {
+  const customer = await findCustomerForOrder(order);
+
+  const notificationTitle = "Buyurtma topshirildi! ✅";
+  const notificationBody = `Siz bergan #${order.code} (№${order.id}) raqamli buyurtmangiz muvaffaqiyatli topshirildi. Medax xizmatidan foydalanganingiz uchun rahmat!`;
+
+  try {
+    await prisma.notification.create({
+      data: {
+        customerId: customer?.id || order.customerId || null,
+        phone: customer?.phone || order.phone,
+        title: notificationTitle,
+        body: notificationBody,
+        orderId: order.id,
+      },
+    });
+  } catch (dbErr) {
+    console.error("[Notification Done DB Error]:", dbErr);
+  }
+
+  if (customer && customer.pushToken) {
+    await sendExpoPush(customer.pushToken, notificationTitle, notificationBody, {
+      orderId: order.id,
+      orderCode: order.code,
+    });
   }
 }
