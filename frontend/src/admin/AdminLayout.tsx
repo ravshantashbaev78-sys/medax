@@ -21,6 +21,7 @@ function AdminLayoutInner() {
   const [me, setMe] = useState<Me | null>(null);
   const [newCount, setNewCount] = useState(0);
   const [unreadMsg, setUnreadMsg] = useState(0);
+  const [showPwdModal, setShowPwdModal] = useState(false);
 
   useEffect(() => {
     if (!getToken()) return void nav("/admin/login", { replace: true });
@@ -158,6 +159,19 @@ function AdminLayoutInner() {
 
           <button
             type="button"
+            className="adm-side-link"
+            onClick={() => setShowPwdModal(true)}
+            title={lang === "uz" ? "Parolni o'zgartirish" : lang === "ru" ? "Сменить пароль" : "Change password"}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+            </svg>
+            <span>{lang === "uz" ? "Parol almashtirish" : lang === "ru" ? "Сменить пароль" : "Change password"}</span>
+          </button>
+
+          <button
+            type="button"
             className="adm-side-link btn-logout"
             onClick={() => {
               setToken(null);
@@ -200,7 +214,12 @@ function AdminLayoutInner() {
             <ThemeToggle />
 
             {/* User Profile Pill */}
-            <div className="adm-user-profile-chip" title={`${me.email} (${me.role})`}>
+            <div
+              className="adm-user-profile-chip"
+              title={`${me.email} (${me.role}) - Parolni o'zgartirish uchun bosing`}
+              onClick={() => setShowPwdModal(true)}
+              style={{ cursor: "pointer" }}
+            >
               <span className="user-avatar-dot">{me.name.charAt(0).toUpperCase()}</span>
               <div className="user-meta">
                 <span className="user-name">{me.name}</span>
@@ -215,6 +234,171 @@ function AdminLayoutInner() {
         <main className="adm-content-body">
           <Outlet context={me} />
         </main>
+      </div>
+
+      {showPwdModal && <ChangePasswordModal onClose={() => setShowPwdModal(false)} />}
+    </div>
+  );
+}
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const { lang } = useAdminI18n();
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setSuccess("");
+
+    if (!currentPassword) {
+      setError(
+        lang === "uz"
+          ? "Joriy parolni kiriting"
+          : lang === "ru"
+          ? "Введите текущий пароль"
+          : "Enter current password"
+      );
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError(
+        lang === "uz"
+          ? "Yangi parol kamida 8 ta belgidan iborat bo'lishi kerak"
+          : lang === "ru"
+          ? "Новый пароль должен содержать минимум 8 символов"
+          : "New password must be at least 8 characters"
+      );
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError(
+        lang === "uz"
+          ? "Yangi parollar bir-biriga mos kelmadi"
+          : lang === "ru"
+          ? "Пароли не совпадают"
+          : "Passwords do not match"
+      );
+      return;
+    }
+
+    try {
+      setBusy(true);
+      await api("/admin/me/password", {
+        method: "PATCH",
+        json: { currentPassword, newPassword },
+        admin: true,
+      });
+      setSuccess(
+        lang === "uz"
+          ? "Parol muvaffaqiyatli o'zgartirildi!"
+          : lang === "ru"
+          ? "Пароль успешно изменён!"
+          : "Password updated successfully!"
+      );
+      setTimeout(() => {
+        onClose();
+      }, 1400);
+    } catch (err: any) {
+      setError(
+        err?.message ||
+          (lang === "uz"
+            ? "Parolni o'zgartirishda xatolik yuz berdi"
+            : "Error updating password")
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="modal" role="dialog" aria-modal="true" onClick={onClose}>
+      <div className="box" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+          <h2 style={{ fontSize: 20, margin: 0, fontWeight: 700 }}>
+            {lang === "uz" ? "Parolni o'zgartirish" : lang === "ru" ? "Смена пароля" : "Change Password"}
+          </h2>
+          <button type="button" className="btn ghost sm" onClick={onClose} style={{ padding: "4px 8px" }}>
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ background: "#fee2e2", color: "#991b1b", padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 14 }}>
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div style={{ background: "#dcfce7", color: "#166534", padding: "10px 14px", borderRadius: 8, marginBottom: 14, fontSize: 14 }}>
+            {success}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              {lang === "uz" ? "Joriy parol" : lang === "ru" ? "Текущий пароль" : "Current Password"}
+            </label>
+            <input
+              type="password"
+              className="inp"
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--line)" }}
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              autoFocus
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              {lang === "uz" ? "Yangi parol (kamida 8 belgi)" : lang === "ru" ? "Новый пароль (мин. 8 симв.)" : "New Password (min 8 chars)"}
+            </label>
+            <input
+              type="password"
+              className="inp"
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--line)" }}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              minLength={8}
+            />
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6 }}>
+              {lang === "uz" ? "Yangi parolni tasdiqlang" : lang === "ru" ? "Повторите новый пароль" : "Confirm New Password"}
+            </label>
+            <input
+              type="password"
+              className="inp"
+              style={{ width: "100%", padding: "10px 12px", borderRadius: 8, border: "1px solid var(--line)" }}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+              minLength={8}
+            />
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 8 }}>
+            <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>
+              {lang === "uz" ? "Bekor qilish" : lang === "ru" ? "Отмена" : "Cancel"}
+            </button>
+            <button type="submit" className="btn primary" disabled={busy}>
+              {busy
+                ? (lang === "uz" ? "Saqlanmoqda..." : "Saving...")
+                : (lang === "uz" ? "Saqlash" : lang === "ru" ? "Сохранить" : "Save")}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

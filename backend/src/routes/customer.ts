@@ -16,7 +16,7 @@ import {
   verifyTurnstile,
 } from "../antispam";
 import { getClientIp } from "../ip";
-import { memoryUpload, saveAvatar } from "../upload";
+import { avatarUpload, removeFile, saveAvatar } from "../upload";
 
 export interface CustomerAuthPayload {
   id: number;
@@ -101,6 +101,16 @@ const customerLoginLimiter = rateLimit({
   message: { error: "Kirish urinishlari ko'payib ketdi. 15 daqiqadan keyin qayta urinib ko'ring." },
 });
 
+// Profil rasmini yuklash limiti (xotira va disk to'lishidan himoya)
+const avatarLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => getClientIp(req),
+  message: { error: "Rasm yuklash limiti oshdi. 15 daqiqadan keyin urinib ko'ring." },
+});
+
 function createCustomerToken(c: { id: number; phone: string; name: string }) {
   const payload: CustomerAuthPayload = {
     id: c.id,
@@ -172,6 +182,7 @@ customerRouter.post("/auth/send-otp", customerOtpLimiter, async (req, res) => {
   await prisma.otpCode.create({
     data: {
       phone,
+      purpose: "AUTH",
       codeHash: hashCode(phone, code),
       ip,
       expiresAt: new Date(Date.now() + config.otpTtlMin * 60_000),
@@ -197,7 +208,7 @@ customerRouter.post("/auth/verify-otp", authLimiter, async (req, res) => {
   if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri.");
 
   const otp = await prisma.otpCode.findFirst({
-    where: { phone, usedAt: null, expiresAt: { gt: new Date() } },
+    where: { phone, purpose: "AUTH", usedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -356,6 +367,7 @@ customerRouter.post("/auth/forgot-password-otp", customerOtpLimiter, async (req,
   await prisma.otpCode.create({
     data: {
       phone,
+      purpose: "RESET_PASSWORD",
       codeHash: hashCode(phone, code),
       ip,
       expiresAt: new Date(Date.now() + config.otpTtlMin * 60_000),
@@ -387,7 +399,7 @@ customerRouter.post("/auth/reset-password", authLimiter, async (req, res) => {
   if (!customer) throw new HttpError(404, "Mijoz topilmadi.");
 
   const otp = await prisma.otpCode.findFirst({
-    where: { phone, usedAt: null, expiresAt: { gt: new Date() } },
+    where: { phone, purpose: "RESET_PASSWORD", usedAt: null, expiresAt: { gt: new Date() } },
     orderBy: { createdAt: "desc" },
   });
 
@@ -466,9 +478,21 @@ customerRouter.put("/auth/profile", requireCustomerAuth, async (req, res) => {
 });
 
 // 5b. Profil rasmini (avatar) yuklash
-customerRouter.post("/auth/avatar", requireCustomerAuth, memoryUpload.single("avatar"), async (req, res) => {
+customerRouter.post("/auth/avatar", requireCustomerAuth, avatarLimiter, avatarUpload.single("avatar"), async (req, res) => {
   if (!req.file) throw new HttpError(400, "Rasm tanlanmagan");
+
+  const existing = await prisma.customer.findUnique({
+    where: { id: req.customer!.id },
+    select: { avatar: true },
+  });
+
   const avatarUrl = await saveAvatar(req.file.buffer);
+
+  // Oldingi rasmni diskdan o'chirib, disk to'lib ketishini oldini olamiz
+  if (existing?.avatar) {
+    await removeFile(existing.avatar).catch(() => {});
+  }
+
   const updated = await prisma.customer.update({
     where: { id: req.customer!.id },
     data: { avatar: avatarUrl },

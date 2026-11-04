@@ -99,6 +99,7 @@ ordersRouter.post("/otp", otpIpLimiter, async (req, res) => {
   await prisma.otpCode.create({
     data: {
       phone,
+      purpose: "ORDER",
       codeHash: hashCode(phone, code),
       ip,
       expiresAt: new Date(Date.now() + config.otpTtlMin * 60_000),
@@ -191,7 +192,7 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
   if (!req.customer) {
     if (!body.code) throw new HttpError(400, "SMS tasdiqlash kodini kiriting.");
     const otp = await prisma.otpCode.findFirst({
-      where: { phone, usedAt: null, expiresAt: { gt: new Date() } },
+      where: { phone, purpose: "ORDER", usedAt: null, expiresAt: { gt: new Date() } },
       orderBy: { createdAt: "desc" },
     });
     if (!otp) throw new HttpError(400, "Tasdiqlash kodi eskirgan yoki topilmadi. Yangi kod soʻrang.");

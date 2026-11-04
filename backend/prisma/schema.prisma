@@ -184,6 +184,7 @@ model OrderItem {
 model OtpCode {
   id        Int       @id @default(autoincrement())
   phone     String
+  purpose   String    @default("AUTH") // "AUTH" (login/register), "ORDER", "RESET_PASSWORD"
   codeHash  String
   attempts  Int       @default(0)
   ip        String?
@@ -192,6 +193,7 @@ model OtpCode {
   createdAt DateTime  @default(now())
 
   @@index([phone, createdAt])
+  @@index([phone, purpose, createdAt])
 }
 
 model Blocked {

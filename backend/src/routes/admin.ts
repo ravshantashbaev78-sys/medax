@@ -464,39 +464,44 @@ adminRouter.patch("/orders/:id", async (req, res) => {
   let blocked = false;
   if (d.status === "FAKE") blocked = await applyFakeStrike(order.phone);
 
-  // 1. Ombordagi qoldiqni boshqarish (Tranzaksiyada xavfsiz tekshiruv va ayirish):
+  // 1. Ombordagi qoldiqni boshqarish (Tranzaksiyada atomar tekshiruv va decrement):
   // Admin buyurtmani tasdiqlaganda (CONFIRMED), tayyorlaganda (READY) yoki topshirganda (DONE)
-  // avval ombordagi qoldiq yetarliligi tekshiriladi. Yetmasa, xatolik beriladi.
+  // avval ombordagi qoldiq yetarliligi tekshiriladi va atomar tarzda ayiriladi.
   if (
     (d.status === "CONFIRMED" || d.status === "READY" || d.status === "DONE") &&
     !prevOrder.stockDeducted
   ) {
     await prisma.$transaction(async (tx) => {
-      // a) Avval barcha mahsulotlar uchun qoldiq yetarliligini tekshiramiz
       for (const item of order.items) {
         if (item.productId) {
-          const prod = await tx.product.findUnique({ where: { id: item.productId } });
-          if (prod && prod.stock < item.quantity) {
+          // Atomar tarzda faqat qoldiq yetarli bo'lgandagina ayiramiz (race condition bo'lmaydi)
+          const updateResult = await tx.product.updateMany({
+            where: {
+              id: item.productId,
+              stock: { gte: item.quantity },
+            },
+            data: {
+              stock: { decrement: item.quantity },
+            },
+          });
+
+          if (updateResult.count === 0) {
+            const prod = await tx.product.findUnique({ where: { id: item.productId } });
             throw new HttpError(
               400,
-              `"${prod.name}" uchun omborda yetarli qoldiq yo'q (mavjud: ${prod.stock} dona, buyurtmada: ${item.quantity} dona). Avval ombor qoldig'ini to'ldiring.`
+              `"${prod?.name || "Mahsulot"}" uchun omborda yetarli qoldiq yo'q (mavjud: ${prod?.stock ?? 0} dona, buyurtmada: ${item.quantity} dona). Avval ombor qoldig'ini to'ldiring.`
             );
           }
-        }
-      }
 
-      // b) Qoldiq yetarli — qoldiqdan ayiramiz
-      for (const item of order.items) {
-        if (item.productId) {
-          const prod = await tx.product.findUnique({ where: { id: item.productId } });
-          if (prod) {
-            const newStock = Math.max(0, prod.stock - item.quantity);
+          // Qoldiq 0 ga tushgan bo'lsa, mahsulotni avtomatik nofaol qilish
+          const updatedProd = await tx.product.findUnique({
+            where: { id: item.productId },
+            select: { stock: true },
+          });
+          if (updatedProd && updatedProd.stock === 0) {
             await tx.product.update({
               where: { id: item.productId },
-              data: {
-                stock: newStock,
-                ...(newStock === 0 ? { isActive: false } : {}),
-              },
+              data: { isActive: false },
             });
           }
         }
@@ -514,13 +519,13 @@ adminRouter.patch("/orders/:id", async (req, res) => {
         if (item.productId) {
           const prod = await tx.product.findUnique({ where: { id: item.productId } });
           if (prod) {
-            const newStock = prod.stock + item.quantity;
+            const wasZero = prod.stock === 0;
             await tx.product.update({
               where: { id: item.productId },
               data: {
-                stock: newStock,
+                stock: { increment: item.quantity },
                 // Faqat qoldiq 0 bo'lgani sababli yashirilgan bo'lsa qayta yoqiladi
-                ...(prod.stock === 0 && !prod.isActive ? { isActive: true } : {}),
+                ...(wasZero && !prod.isActive ? { isActive: true } : {}),
               },
             });
           }
@@ -688,5 +693,32 @@ adminRouter.get("/customers", async (req, res) => {
   ]);
 
   res.json({ items, total, page: q.page, pages: Math.max(1, Math.ceil(total / 30)) });
+});
+
+/* --------------------------- Admin o'z parolini o'zgartirishi --------------------------- */
+
+adminRouter.patch("/me/password", async (req, res) => {
+  if (!req.user) throw new HttpError(401, "Avtorizatsiyadan o'tilmagan");
+
+  const { currentPassword, newPassword } = z
+    .object({
+      currentPassword: z.string().min(1, "Joriy parolni kiriting"),
+      newPassword: z.string().min(8, "Yangi parol kamida 8 ta belgidan iborat bo'lishi kerak").max(100),
+    })
+    .parse(req.body);
+
+  const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+  if (!user) throw new HttpError(404, "Foydalanuvchi topilmadi");
+
+  const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+  if (!valid) throw new HttpError(400, "Joriy parol noto'g'ri kiritildi");
+
+  const hash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: hash },
+  });
+
+  res.json({ ok: true, message: "Parol muvaffaqiyatli yangilandi" });
 });
 

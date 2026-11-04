@@ -92,7 +92,11 @@ authRouter.post("/login", loginLimiter, async (req, res) => {
   const normalizedEmail = email.toLowerCase().trim();
   const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
 
-  if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
+  // Timing attack oldini olish: foydalanuvchi topilmasa ham dummy hash tekshiriladi
+  const DUMMY_HASH = "$2a$10$abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMN";
+  const valid = await bcrypt.compare(password, user ? user.passwordHash : DUMMY_HASH);
+
+  if (!user || !valid) {
     throw new HttpError(401, "Email yoki parol notoʻgʻri");
   }
   const payload: AuthUser = { id: user.id, role: user.role, email: user.email, name: user.name };
