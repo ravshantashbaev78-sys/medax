@@ -281,11 +281,12 @@ export function ProfileScreen() {
 
   const pickAndUploadAvatar = async () => {
     try {
-      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!perm.granted) {
-        Alert.alert("Ruxsat berilmadi", "Rasm tanlash uchun rasmlar galereyasiga ruxsat bering.");
-        return;
+      // Android 13+ da tizimli Photo Picker ruxsat talab qilmaydi, eski versiyalarda ruxsat so'raladi
+      const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
+      if (!perm.granted && perm.canAskAgain) {
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
       }
+
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
@@ -295,7 +296,8 @@ export function ProfileScreen() {
 
       if (!result.canceled && result.assets?.[0]?.uri) {
         setUploadingAvatar(true);
-        const res = await uploadCustomerAvatar(result.assets[0].uri);
+        const asset = result.assets[0];
+        const res = await uploadCustomerAvatar(asset.uri, asset.mimeType, asset.fileName);
         setUploadingAvatar(false);
         if (res.ok) {
           await refreshProfile();

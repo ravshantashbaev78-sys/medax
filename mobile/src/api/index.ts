@@ -167,14 +167,18 @@ export async function fetchCustomerProfile(): Promise<Customer | null> {
   }
 }
 
-export async function uploadCustomerAvatar(imageUri: string): Promise<{ ok: boolean; avatar?: string; error?: string }> {
+export async function uploadCustomerAvatar(
+  imageUri: string,
+  mimeTypeParam?: string | null,
+  fileNameParam?: string | null
+): Promise<{ ok: boolean; avatar?: string; error?: string }> {
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     if (!token) return { ok: false, error: "Tizimga kirilmagan" };
 
-    const filename = imageUri.split("/").pop() || `avatar_${Date.now()}.jpg`;
+    const filename = fileNameParam || imageUri.split("/").pop() || `avatar_${Date.now()}.jpg`;
     const ext = filename.split(".").pop()?.toLowerCase() || "jpg";
-    const mimeType = ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg";
+    const mimeType = mimeTypeParam || (ext === "png" ? "image/png" : ext === "webp" ? "image/webp" : "image/jpeg");
 
     const formData = new FormData();
     formData.append("avatar", {

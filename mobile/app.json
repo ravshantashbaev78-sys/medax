@@ -23,7 +23,9 @@
         "backgroundColor": "#ffffff"
       },
       "permissions": [
-        "INTERNET"
+        "INTERNET",
+        "READ_EXTERNAL_STORAGE",
+        "READ_MEDIA_IMAGES"
       ]
     },
     "web": {
@@ -31,7 +33,12 @@
     },
     "plugins": [
       "expo-asset",
-      "expo-image-picker"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Profil rasmini yuklash uchun rasmlar galereyasiga ruxsat bering."
+        }
+      ]
     ],
     "extra": {
       "eas": {
