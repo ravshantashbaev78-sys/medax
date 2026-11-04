@@ -35,7 +35,7 @@ contactRouter.post("/", contactLimiter, async (req, res) => {
     return void res.json({ ok: true, message: "Xabaringiz qabul qilindi" });
   }
 
-  const phone = normalizePhone(body.phone);
+  const phone = normalizePhone(body.phone, { allowLandline: true });
   if (!phone) {
     throw new HttpError(400, "Telefon raqami noto'g'ri. Misol: +998 90 123 45 67");
   }
@@ -43,8 +43,8 @@ contactRouter.post("/", contactLimiter, async (req, res) => {
   const ip = getClientIp(req);
   await assertNotBlocked(phone, ip);
 
-  if (hasLink(body.name) || hasLink(body.subject)) {
-    throw new HttpError(400, "Ism yoki mavzuda havola bo'lishi mumkin emas.");
+  if (hasLink(body.name) || hasLink(body.subject) || hasLink(body.message)) {
+    throw new HttpError(400, "Xabarda reklama havolalari, veb-manzillar yoki tashqi kontaktlar yuborish taqiqlangan.");
   }
 
   const fullMessage = body.email ? `[Email: ${body.email}]\n\n${body.message}` : body.message;

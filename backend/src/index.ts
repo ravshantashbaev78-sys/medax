@@ -64,7 +64,7 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "5mb" }));
 
 fs.mkdirSync(config.uploadDir, { recursive: true });
 app.use("/uploads", express.static(config.uploadDir, { maxAge: "30d", immutable: true }));
@@ -84,10 +84,36 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     return void res.status(400).json({ error: err.issues[0]?.message || "Ma'lumot noto'g'ri" });
   }
   if (err instanceof HttpError) return void res.status(err.status).json({ error: err.message });
+
+  // 1. Buzuq JSON formati (400 Bad Request)
+  if (
+    err instanceof SyntaxError &&
+    ((err as any).status === 400 || (err as any).statusCode === 400) &&
+    "body" in (err as any)
+  ) {
+    return void res.status(400).json({ error: "Buzuq yoki noto'g'ri JSON formati yuborildi." });
+  }
+
+  // 2. Katta hajmdagi so'rov (413 Payload Too Large)
+  if (
+    (err as any)?.type === "entity.too.large" ||
+    (err as any)?.status === 413 ||
+    (err as any)?.statusCode === 413
+  ) {
+    return void res.status(413).json({ error: "So'rov hajmi ruxsat etilgan limitdan oshib ketdi (maksimal 5 MB)." });
+  }
+
   const code = (err as any)?.code;
   if (code === "P2002") return void res.status(409).json({ error: "Bunday yozuv allaqachon mavjud" });
   if (code === "P2025") return void res.status(404).json({ error: "Yozuv topilmadi" });
-  if ((err as any)?.name === "MulterError") return void res.status(400).json({ error: "Fayl hajmi katta yoki noto'g'ri" });
+
+  if ((err as any)?.name === "MulterError") {
+    if ((err as any)?.code === "LIMIT_FILE_SIZE") {
+      return void res.status(413).json({ error: "Yuklangan fayl hajmi juda katta." });
+    }
+    return void res.status(400).json({ error: "Fayl hajmi katta yoki noto'g'ri" });
+  }
+
   console.error("Kutilmagan xatolik:", err);
   res.status(500).json({ error: "Serverda xatolik yuz berdi" });
 });

@@ -4,11 +4,41 @@ import { prisma } from "./db";
 import { config } from "./config";
 import { HttpError } from "./errors";
 
-/** +998901234567 koʻrinishiga keltiradi, notoʻgʻri boʻlsa null */
-export function normalizePhone(raw: string): string | null {
+/**
+ * Telefon raqamini xalqaro formatga (+998XXXXXXXXX) keltiradi va operator kodini tekshiradi.
+ *
+ * O'zbekiston rasmiy mobil operator kodlari:
+ * - Beeline: 90, 91, 20 (Oq)
+ * - Ucell: 93, 94, 50, 55
+ * - Mobiuz: 97, 88
+ * - Uztelecom (UzMobile): 99, 95, 77
+ * - Humans: 33
+ * - Perfectum: 98
+ *
+ * Mavjud bo'lmagan soxta kodlar (+998 00 ..., +998 11 ... va h.k.) rad etiladi va null qaytariladi.
+ */
+export function normalizePhone(
+  raw: string,
+  options: { allowLandline?: boolean } = {}
+): string | null {
+  if (!raw || typeof raw !== "string") return null;
   let d = raw.replace(/\D/g, "");
   if (d.length === 9) d = "998" + d;
-  if (!/^998\d{9}$/.test(d)) return null;
+  if (d.length !== 12 || !d.startsWith("998")) return null;
+
+  const code = d.slice(3, 5);
+  // O'zbekiston mobil operator kodlari
+  const isMobile = /^(20|33|50|55|77|88|90|91|93|94|95|97|98|99)$/.test(code);
+  // Shahar/viloyat statsionar telefon kodlari (Toshkent 71, 78, viloyatlar)
+  const isLandline = /^(61|62|65|66|67|69|70|71|72|73|74|75|76|78|79)$/.test(code);
+
+  if (options.allowLandline) {
+    if (!isMobile && !isLandline) return null;
+  } else {
+    // SMS borishi kerak bo'lgan joylarda faqat haqiqiy mobil operatorlar qabul qilinadi
+    if (!isMobile) return null;
+  }
+
   return "+" + d;
 }
 
@@ -25,8 +55,49 @@ export async function assertNotBlocked(phone: string, ip: string) {
   }
 }
 
+/**
+ * Matnda havolalar, veb-domenlar (lotin va kirill), tg:// protokoli,
+ * @username va spam kontaktlar borligini qat'iy tekshiradi.
+ */
 export function hasLink(text: string): boolean {
-  return /(https?:\/\/|www\.|t\.me\/|\.(com|ru|uz|net|org|ly)\b)/i.test(text);
+  if (!text || typeof text !== "string") return false;
+
+  // 1. Protokollar va URL schemelar (http, https, ftp, tg, telegram, whatsapp, viber va h.k.)
+  if (/(https?|ftp|tg|telegram|whatsapp|viber):\/\/[^\s]+/i.test(text)) return true;
+  if (/www\.[^\s]+/i.test(text)) return true;
+
+  // 2. Telegram havolalari va @username
+  if (/(t\.me|telegram\.me|telegra\.ph)\/[^\s]+/i.test(text)) return true;
+  if (/(?:^|\s)@[a-zA-Z0-9_]{3,32}(?=$|\s|[.,!?;:])/i.test(text)) return true;
+
+  // 3. IP manzil havolalari (masalan: 185.220.101.5/link)
+  if (/\b(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?(?:\/[^\s]*)?/i.test(text)) return true;
+
+  // 4. Lotin va Kirill TLD domenlari (Unicode u flag bilan: .shop, .xyz, .top, .online, .рф, .онлайн va boshqalar)
+  const tlds = [
+    "com", "ru", "uz", "net", "org", "ly", "shop", "xyz", "top", "online",
+    "site", "info", "biz", "cc", "io", "me", "app", "dev", "vip", "pro",
+    "link", "club", "live", "store", "work", "click", "buzz", "space", "tech",
+    "icu", "cfd", "sbs", "co", "kz", "kg", "tj", "su", "ua", "by", "pl",
+    "de", "uk", "cn", "in", "gg", "to", "tv", "tk",
+    "рф", "онлайн", "сайт", "москва", "рус", "дети", "бел", "орг"
+  ];
+  const tldRegex = new RegExp(
+    "(?:^|[\\s/.,;:!?\"'(\\[{<])([a-zA-Z0-9\\u0400-\\u04FF\\-_]{2,}\\.(" + tlds.join("|") + "))(?=$|[\\s/.,;:!?\"')\\]}>])",
+    "iu"
+  );
+  if (tldRegex.test(text)) return true;
+
+  // 5. Nuqtani ataylab yashirish usullari (masalan: site[.]com, site(dot)ru, site dot xyz)
+  if (
+    /[a-zA-Z0-9\u0400-\u04FF\-_]{2,}\s*(?:\[\.\]|\(\.\)|\[dot\]|\(dot\)|\s+dot\s+)\s*(?:com|ru|uz|net|org|shop|xyz|рф|онлайн)/iu.test(
+      text
+    )
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
