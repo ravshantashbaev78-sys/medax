@@ -15,7 +15,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useAuth } from "../context/AuthContext";
 import { useI18n } from "../context/I18nContext";
 import { sendCustomerOtp, verifyCustomerOtp, loginCustomerWithPassword } from "../api";
-import { MedaxEmblem } from "../components/Icons";
+import { MedaxEmblem, EyeIcon, EyeOffIcon } from "../components/Icons";
 import { SuccessModal } from "../components/SuccessModal";
 
 interface AuthGateScreenProps {
@@ -38,6 +38,9 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
@@ -55,10 +58,10 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
     return () => clearInterval(timer);
   }, [countdown]);
 
-  const scrollToInput = () => {
+  const scrollToInput = (yOffset = 260) => {
     setTimeout(() => {
-      scrollRef.current?.scrollTo({ y: 160, animated: true });
-    }, 150);
+      scrollRef.current?.scrollTo({ y: yOffset, animated: true });
+    }, 120);
   };
 
   const formatPhone = (text: string) => {
@@ -253,19 +256,29 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                 keyboardType="phone-pad"
                 placeholder="+998 90 123 45 67"
                 placeholderTextColor="#94a3b8"
-                onFocus={scrollToInput}
+                onFocus={() => scrollToInput(100)}
               />
 
               <Text style={styles.inputLabel}>Parolingiz</Text>
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholder="Parolni kiriting"
-                placeholderTextColor="#94a3b8"
-                onFocus={scrollToInput}
-              />
+              <View style={styles.passwordInputWrap}>
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  placeholder="Parolni kiriting"
+                  placeholderTextColor="#94a3b8"
+                  onFocus={() => scrollToInput(220)}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {showPassword ? <EyeOffIcon size={20} color="#64748b" /> : <EyeIcon size={20} color="#64748b" />}
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 style={styles.primaryBtn}
@@ -310,7 +323,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                 keyboardType="phone-pad"
                 placeholder="+998 90 123 45 67"
                 placeholderTextColor="#94a3b8"
-                onFocus={scrollToInput}
+                onFocus={() => scrollToInput(100)}
               />
 
               <Text style={styles.inputLabel}>Ism-familiyangiz (ixtiyoriy)</Text>
@@ -320,7 +333,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                 onChangeText={setName}
                 placeholder="Masalan: Dr. Alisher"
                 placeholderTextColor="#94a3b8"
-                onFocus={scrollToInput}
+                onFocus={() => scrollToInput(300)}
               />
 
               <TouchableOpacity
@@ -365,7 +378,7 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
                 placeholder="••••••"
                 placeholderTextColor="#cbd5e1"
                 autoFocus
-                onFocus={scrollToInput}
+                onFocus={() => scrollToInput(200)}
               />
 
               <TouchableOpacity
@@ -410,27 +423,47 @@ export function AuthGateScreen({ onContinue }: AuthGateScreenProps) {
               </Text>
 
               <Text style={styles.inputLabel}>Parol (kamida 6 ta belgi) *</Text>
-              <TextInput
-                style={styles.input}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
-                placeholder="Yangi parolni kiriting"
-                placeholderTextColor="#94a3b8"
-                autoFocus
-                onFocus={scrollToInput}
-              />
+              <View style={styles.passwordInputWrap}>
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={!showNewPassword}
+                  placeholder="Yangi parolni kiriting"
+                  placeholderTextColor="#94a3b8"
+                  autoFocus
+                  onFocus={() => scrollToInput(240)}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {showNewPassword ? <EyeOffIcon size={20} color="#64748b" /> : <EyeIcon size={20} color="#64748b" />}
+                </TouchableOpacity>
+              </View>
 
               <Text style={styles.inputLabel}>Parolni qayta tasdiqlang *</Text>
-              <TextInput
-                style={styles.input}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                placeholder="Parolni qayta tering"
-                placeholderTextColor="#94a3b8"
-                onFocus={scrollToInput}
-              />
+              <View style={styles.passwordInputWrap}>
+                <TextInput
+                  style={[styles.input, styles.passwordInput]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  placeholder="Parolni qayta tering"
+                  placeholderTextColor="#94a3b8"
+                  onFocus={() => scrollToInput(300)}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {showConfirmPassword ? <EyeOffIcon size={20} color="#64748b" /> : <EyeIcon size={20} color="#64748b" />}
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 style={styles.primaryBtn}
@@ -541,6 +574,26 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#0f172a",
     marginBottom: 12,
+  },
+  passwordInputWrap: {
+    position: "relative",
+    justifyContent: "center",
+    width: "100%",
+    marginBottom: 12,
+  },
+  passwordInput: {
+    marginBottom: 0,
+    paddingRight: 48,
+  },
+  eyeBtn: {
+    position: "absolute",
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+    padding: 6,
   },
   otpInput: {
     textAlign: "center",

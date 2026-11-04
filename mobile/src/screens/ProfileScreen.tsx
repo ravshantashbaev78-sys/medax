@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useFocusEffect } from "@react-navigation/native";
 import {
   View,
@@ -42,6 +42,8 @@ import {
   MapPinIcon,
   PhoneIcon,
   MailIcon,
+  EyeIcon,
+  EyeOffIcon,
 } from "../components/Icons";
 import { SuccessModal } from "../components/SuccessModal";
 
@@ -60,10 +62,21 @@ export function ProfileScreen() {
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  const scrollRef = useRef<ScrollView>(null);
+
+  const scrollToInput = (yOffset = 260) => {
+    setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: yOffset, animated: true });
+    }, 120);
+  };
 
   // Buyurtmalar holati
   const [orders, setOrders] = useState<any[]>([]);
@@ -71,12 +84,18 @@ export function ProfileScreen() {
 
   // Keyboard listener
   useEffect(() => {
-    const showSub = Keyboard.addListener("keyboardDidShow", (e) => {
-      setKeyboardHeight(e.endCoordinates.height);
-    });
-    const hideSub = Keyboard.addListener("keyboardDidHide", () => {
-      setKeyboardHeight(0);
-    });
+    const showSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
     return () => {
       showSub.remove();
       hideSub.remove();
@@ -347,12 +366,13 @@ export function ProfileScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
+        ref={scrollRef}
         style={[styles.container, { backgroundColor: colors.bg }]}
         contentContainerStyle={[
           styles.content,
           {
             paddingTop: insets.top + 14,
-            paddingBottom: keyboardHeight > 0 ? keyboardHeight + 80 : 36,
+            paddingBottom: keyboardHeight > 0 ? keyboardHeight + 140 : 60,
           },
         ]}
         showsVerticalScrollIndicator={false}
@@ -632,17 +652,37 @@ export function ProfileScreen() {
                 keyboardType="phone-pad"
                 placeholder="+998 90 123 45 67"
                 placeholderTextColor={colors.textMuted}
+                onFocus={() => scrollToInput(100)}
               />
 
               <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Parol</Text>
-              <TextInput
-                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                placeholder="Parolni kiriting"
-                placeholderTextColor={colors.textMuted}
-              />
+              <View style={styles.passwordFieldWrap}>
+                <TextInput
+                  style={[
+                    styles.inputField,
+                    styles.passwordInputField,
+                    { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+                  ]}
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  placeholder="Parolni kiriting"
+                  placeholderTextColor={colors.textMuted}
+                  onFocus={() => scrollToInput(240)}
+                />
+                <TouchableOpacity
+                  style={styles.eyeToggleBtn}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {showPassword ? (
+                    <EyeOffIcon size={20} color={colors.textMuted} />
+                  ) : (
+                    <EyeIcon size={20} color={colors.textMuted} />
+                  )}
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 style={[styles.submitBtn, { backgroundColor: colors.primary }]}
@@ -682,6 +722,7 @@ export function ProfileScreen() {
                 keyboardType="phone-pad"
                 placeholder="+998 90 123 45 67"
                 placeholderTextColor={colors.textMuted}
+                onFocus={() => scrollToInput(100)}
               />
 
               <Text style={[styles.inputLabel, { color: colors.textMuted }]}>{t("auth_name_label")}</Text>
@@ -691,6 +732,7 @@ export function ProfileScreen() {
                 onChangeText={setName}
                 placeholder="Masalan: Dr. Karimov"
                 placeholderTextColor={colors.textMuted}
+                onFocus={() => scrollToInput(300)}
               />
 
               <TouchableOpacity
@@ -737,6 +779,7 @@ export function ProfileScreen() {
                 placeholder="••••••"
                 placeholderTextColor="#cbd5e1"
                 autoFocus
+                onFocus={() => scrollToInput(200)}
               />
 
               <TouchableOpacity
@@ -776,25 +819,63 @@ export function ProfileScreen() {
           {authTab === "register" && authMode === "set_password" && (
             <View style={styles.formWidth}>
               <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Yangi parol (kamida 6 ta belgi) *</Text>
-              <TextInput
-                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                value={newPassword}
-                onChangeText={setNewPassword}
-                secureTextEntry
-                placeholder="••••••••"
-                placeholderTextColor={colors.textMuted}
-                autoFocus
-              />
+              <View style={styles.passwordFieldWrap}>
+                <TextInput
+                  style={[
+                    styles.inputField,
+                    styles.passwordInputField,
+                    { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+                  ]}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry={!showNewPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.textMuted}
+                  autoFocus
+                  onFocus={() => scrollToInput(240)}
+                />
+                <TouchableOpacity
+                  style={styles.eyeToggleBtn}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {showNewPassword ? (
+                    <EyeOffIcon size={20} color={colors.textMuted} />
+                  ) : (
+                    <EyeIcon size={20} color={colors.textMuted} />
+                  )}
+                </TouchableOpacity>
+              </View>
 
               <Text style={[styles.inputLabel, { color: colors.textMuted }]}>Parolni qayta tasdiqlang *</Text>
-              <TextInput
-                style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                placeholder="••••••••"
-                placeholderTextColor={colors.textMuted}
-              />
+              <View style={styles.passwordFieldWrap}>
+                <TextInput
+                  style={[
+                    styles.inputField,
+                    styles.passwordInputField,
+                    { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text },
+                  ]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  placeholder="••••••••"
+                  placeholderTextColor={colors.textMuted}
+                  onFocus={() => scrollToInput(300)}
+                />
+                <TouchableOpacity
+                  style={styles.eyeToggleBtn}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOffIcon size={20} color={colors.textMuted} />
+                  ) : (
+                    <EyeIcon size={20} color={colors.textMuted} />
+                  )}
+                </TouchableOpacity>
+              </View>
 
               <TouchableOpacity
                 style={[styles.submitBtn, { backgroundColor: colors.primary }]}
@@ -1045,6 +1126,26 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14.5,
     marginBottom: 12,
+  },
+  passwordFieldWrap: {
+    position: "relative",
+    justifyContent: "center",
+    width: "100%",
+    marginBottom: 12,
+  },
+  passwordInputField: {
+    marginBottom: 0,
+    paddingRight: 48,
+  },
+  eyeToggleBtn: {
+    position: "absolute",
+    right: 12,
+    top: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 10,
+    padding: 6,
   },
   otpField: {
     fontSize: 22,
