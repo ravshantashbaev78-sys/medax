@@ -1,6 +1,6 @@
 import React from "react";
 import { View, Image, StyleSheet, Text } from "react-native";
-import Svg, { Path, Circle, Rect, Line, Polyline } from "react-native-svg";
+import Svg, { Path, Circle, Rect, Line, Polyline, Defs, LinearGradient, Stop } from "react-native-svg";
 
 interface IconProps {
   size?: number;
@@ -403,6 +403,104 @@ export function CheckIcon({ size = 16, color = "#059669" }: IconProps) {
         points="20 6 9 17 4 12"
         stroke={color}
         strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// 27. Telegram rasmiy original logotipi
+export function TelegramIcon({ size = 22 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Circle cx="12" cy="12" r="12" fill="#24A1DE" />
+      <Path
+        d="M17.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.228-.461-1.901-.903-1.056-.693-1.653-1.124-2.678-1.8-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.493.339-.942.503-1.342.493-.442-.011-1.294-.25-1.927-.456-.777-.25-1.395-.383-1.343-.809.027-.22.321-.444.887-.678 3.475-1.513 5.795-2.489 6.961-3.029 3.313-1.527 4.001-1.793 4.451-1.801.098-.002.317.023.46.14.122.1.159.256.142.361z"
+        fill="#ffffff"
+      />
+    </Svg>
+  );
+}
+
+// 28. Instagram rasmiy original gradient logotipi
+export function InstagramIcon({ size = 22 }: { size?: number }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Defs>
+        <LinearGradient id="igGradient" x1="0%" y1="100%" x2="100%" y2="0%">
+          <Stop offset="0%" stopColor="#f09433" />
+          <Stop offset="25%" stopColor="#e6683c" />
+          <Stop offset="50%" stopColor="#dc2743" />
+          <Stop offset="75%" stopColor="#cc2366" />
+          <Stop offset="100%" stopColor="#bc1888" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="1" y="1" width="22" height="22" rx="6.5" fill="url(#igGradient)" />
+      <Rect x="5" y="5" width="14" height="14" rx="4" stroke="#ffffff" strokeWidth="1.8" />
+      <Circle cx="12" cy="12" r="3.4" stroke="#ffffff" strokeWidth="1.8" />
+      <Circle cx="15.8" cy="8.2" r="1.1" fill="#ffffff" />
+    </Svg>
+  );
+}
+
+// 29. Maxfiylik va Siyosat (Shield Lock)
+export function ShieldLockIcon({ size = 22, color = "#6366f1" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Rect x="8.5" y="11" width="7" height="5.5" rx="1" stroke={color} strokeWidth="1.8" />
+      <Path d="M10 11V9.5a2 2 0 0 1 4 0V11" stroke={color} strokeWidth="1.8" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+// 30. Joylashuv / Bizning manzil (Map Pin)
+export function MapPinIcon({ size = 22, color = "#059669" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx="12" cy="10" r="3" stroke={color} strokeWidth="2" />
+    </Svg>
+  );
+}
+
+// 31. Telefon qo'ng'irog'i (Phone)
+export function PhoneIcon({ size = 22, color = "#0284c7" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+// 32. Elektron pochta (Mail)
+export function MailIcon({ size = 22, color = "#d97706" }: IconProps) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+      <Rect x="2" y="4" width="20" height="16" rx="2" stroke={color} strokeWidth="2" />
+      <Path
+        d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"
+        stroke={color}
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

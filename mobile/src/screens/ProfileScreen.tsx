@@ -35,6 +35,12 @@ import {
   UserIcon,
   BoltIcon,
   CertificateIcon,
+  TelegramIcon,
+  InstagramIcon,
+  ShieldLockIcon,
+  MapPinIcon,
+  PhoneIcon,
+  MailIcon,
 } from "../components/Icons";
 import { SuccessModal } from "../components/SuccessModal";
 
@@ -870,9 +876,12 @@ export function ProfileScreen() {
         <TouchableOpacity
           style={[styles.contactItemRow, { borderTopColor: colors.border }]}
           onPress={() => Linking.openURL("tel:+998911866661")}
+          activeOpacity={0.7}
         >
-          <Text style={styles.contactItemIcon}>📞</Text>
-          <View>
+          <View style={[styles.contactIconBadge, { backgroundColor: "#0284c715" }]}>
+            <PhoneIcon size={20} color="#0284c7" />
+          </View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_phone")}</Text>
             <Text style={[styles.contactItemValue, { color: colors.text }]}>+998 91 186 66 61</Text>
           </View>
@@ -881,9 +890,12 @@ export function ProfileScreen() {
         <TouchableOpacity
           style={[styles.contactItemRow, { borderTopColor: colors.border }]}
           onPress={() => Linking.openURL("mailto:medaxuz@gmail.com?subject=Medax%20murojaat")}
+          activeOpacity={0.7}
         >
-          <Text style={styles.contactItemIcon}>✉️</Text>
-          <View>
+          <View style={[styles.contactIconBadge, { backgroundColor: "#d9770615" }]}>
+            <MailIcon size={20} color="#d97706" />
+          </View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_email")}</Text>
             <Text style={[styles.contactItemValue, { color: colors.primary }]}>medaxuz@gmail.com</Text>
           </View>
@@ -894,8 +906,10 @@ export function ProfileScreen() {
           onPress={() => Linking.openURL("https://t.me/medax_uz")}
           activeOpacity={0.7}
         >
-          <Text style={styles.contactItemIcon}>✈️</Text>
-          <View>
+          <View style={[styles.contactIconBadge, { backgroundColor: "#0284c715" }]}>
+            <TelegramIcon size={22} />
+          </View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_tg")}</Text>
             <Text style={[styles.contactItemValue, { color: "#0284c7" }]}>@medax_uz ↗</Text>
           </View>
@@ -906,8 +920,10 @@ export function ProfileScreen() {
           onPress={() => Linking.openURL("https://instagram.com/medax_uz")}
           activeOpacity={0.7}
         >
-          <Text style={styles.contactItemIcon}>📸</Text>
-          <View>
+          <View style={[styles.contactIconBadge, { backgroundColor: "#e1306c15" }]}>
+            <InstagramIcon size={22} />
+          </View>
+          <View style={{ flex: 1 }}>
             <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_insta")}</Text>
             <Text style={[styles.contactItemValue, { color: "#e1306c" }]}>@medax_uz ↗</Text>
           </View>
@@ -918,7 +934,9 @@ export function ProfileScreen() {
           onPress={() => Linking.openURL("https://maps.app.goo.gl/Fi3DDmU1kWqHVST4A")}
           activeOpacity={0.7}
         >
-          <Text style={styles.contactItemIcon}>📍</Text>
+          <View style={[styles.contactIconBadge, { backgroundColor: "#05966915" }]}>
+            <MapPinIcon size={20} color="#059669" />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_store")}</Text>
             <Text style={[styles.contactItemValue, { color: colors.text }]}>
@@ -935,7 +953,9 @@ export function ProfileScreen() {
           onPress={() => Linking.openURL("https://medax.uz/privacy")}
           activeOpacity={0.7}
         >
-          <Text style={styles.contactItemIcon}>🔒</Text>
+          <View style={[styles.contactIconBadge, { backgroundColor: "#6366f115" }]}>
+            <ShieldLockIcon size={20} color="#6366f1" />
+          </View>
           <View style={{ flex: 1 }}>
             <Text style={[styles.contactItemTitle, { color: colors.textMuted }]}>{t("contact_privacy")}</Text>
             <Text style={[styles.contactItemValue, { color: colors.primary }]}>
@@ -1104,8 +1124,14 @@ const styles = StyleSheet.create({
   contactCard: { borderRadius: 24, padding: 20, borderWidth: 1, elevation: 2 },
   contactCardTitle: { fontSize: 16, fontWeight: "800", marginBottom: 4 },
   contactDesc: { fontSize: 12.5, lineHeight: 18, marginBottom: 14 },
-  contactItemRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingTop: 12, marginTop: 12, borderTopWidth: 1 },
-  contactItemIcon: { fontSize: 20 },
+  contactItemRow: { flexDirection: "row", alignItems: "center", gap: 14, paddingTop: 12, marginTop: 12, borderTopWidth: 1 },
+  contactIconBadge: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   contactItemTitle: { fontSize: 11, fontWeight: "700", marginBottom: 2 },
   contactItemValue: { fontSize: 13.5, fontWeight: "700" },
 });
