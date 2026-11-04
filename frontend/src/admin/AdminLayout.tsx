@@ -616,6 +616,22 @@ export function Dashboard() {
           </div>
         </Link>
 
+        <Link to="/admin/customers" className="adm-kpi-card card-teal">
+          <div className="kpi-icon-box">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+          </div>
+          <div className="kpi-meta">
+            <span className="kpi-value">{s.customers || 0}</span>
+            <strong className="kpi-title">{t("stat_customers")}</strong>
+            <span className="kpi-sub">{t("stat_customers_sub")}</span>
+          </div>
+        </Link>
+
         <Link to="/admin/messages" className="adm-kpi-card card-blue">
           <div className="kpi-icon-box">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -667,6 +683,14 @@ export function Dashboard() {
               <div className="qa-text">
                 <strong>{t("action_excel_import")}</strong>
                 <small>{t("action_excel_import_sub")}</small>
+              </div>
+            </Link>
+
+            <Link to="/admin/customers" className="quick-action-btn">
+              <span className="qa-icon">👥</span>
+              <div className="qa-text">
+                <strong>{t("customers_list")}</strong>
+                <small>{t("stat_customers_sub")}</small>
               </div>
             </Link>
           </div>

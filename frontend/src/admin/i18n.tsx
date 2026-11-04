@@ -72,6 +72,8 @@ export const ADMIN_TEXTS = {
   stat_blocked_sub: { uz: "Spam telefon va IP manzillar", ru: "Спам-номера и IP-адреса", en: "Spam phones and IPs" },
   stat_inquiries: { uz: "Murojaatlar", ru: "Обращения", en: "Inquiries" },
   stat_inquiries_sub: { uz: "Yangi o'qilmagan xabarlar", ru: "Новые непрочитанные сообщения", en: "New unread messages" },
+  stat_customers: { uz: "Foydalanuvchilar (Mijozlar)", ru: "Пользователи (Клиенты)", en: "Registered Users" },
+  stat_customers_sub: { uz: "Bazada ro'yxatdan o'tgan mijozlar", ru: "Зарегистрированные клиенты", en: "Registered client accounts" },
   quick_actions: { uz: "Tezkor amallar", ru: "Быстрые действия", en: "Quick Actions" },
   action_add_product_sub: {
     uz: "Yangi tibbiy uskuna spetsifikatsiyasini kiritish",

@@ -26,17 +26,18 @@ const page = z.coerce.number().int().min(1).default(1);
 
 adminRouter.get("/stats", async (_req, res) => {
   const since = new Date(Date.now() - 30 * 24 * 3600 * 1000);
-  const [byStatus, products, blocked, last30, fake30, unreadContacts] = await Promise.all([
+  const [byStatus, products, blocked, last30, fake30, unreadContacts, customers] = await Promise.all([
     prisma.order.groupBy({ by: ["status"], _count: true }),
     prisma.product.count(),
     prisma.blocked.count(),
     prisma.order.count({ where: { createdAt: { gt: since } } }),
     prisma.order.count({ where: { createdAt: { gt: since }, status: "FAKE" } }),
     prisma.contactMessage.count({ where: { isRead: false } }),
+    prisma.customer.count(),
   ]);
   const orders: Record<string, number> = { NEW: 0, CONFIRMED: 0, DONE: 0, CANCELED: 0, FAKE: 0 };
   byStatus.forEach((r) => (orders[r.status] = r._count));
-  res.json({ orders, products, blocked, last30, fake30, unreadContacts });
+  res.json({ orders, products, customers, blocked, last30, fake30, unreadContacts });
 });
 
 /* --------------------------- Categories / Brands ------------------------- */

@@ -4094,7 +4094,9 @@ footer {
 .adm {
   display: grid;
   grid-template-columns: 240px 1fr;
-  min-height: 100vh;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
   background: var(--paper);
   color: var(--ink);
   transition: background-color 0.25s ease, color 0.25s ease;
@@ -4108,10 +4110,11 @@ footer {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  position: sticky;
-  top: 0;
   height: 100vh;
   box-sizing: border-box;
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex-shrink: 0;
   z-index: 20;
 }
 .adm-side-brand {
@@ -4213,17 +4216,19 @@ footer {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  height: 100vh;
+  max-height: 100vh;
+  overflow: hidden;
 }
 .adm-topbar {
   height: 64px;
+  flex-shrink: 0;
   background: var(--card);
   border-bottom: 1px solid var(--line);
   padding: 0 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  position: sticky;
-  top: 0;
   z-index: 10;
   transition: background-color 0.25s ease, border-color 0.25s ease;
 }
@@ -4327,6 +4332,9 @@ footer {
 .adm-content-body {
   padding: 28px 32px 60px;
   flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 .adm-content-body > h1 {
   font-size: 26px;
@@ -4405,6 +4413,7 @@ footer {
   place-items: center;
   flex-shrink: 0;
 }
+.card-teal .kpi-icon-box { background: rgba(13, 148, 136, 0.12); color: #0d9488; }
 .card-amber .kpi-icon-box { background: rgba(245, 158, 11, 0.12); color: #f59e0b; }
 .card-blue .kpi-icon-box { background: rgba(2, 132, 199, 0.12); color: #0284c7; }
 .card-green .kpi-icon-box { background: rgba(16, 185, 129, 0.12); color: #10b981; }
@@ -4763,24 +4772,37 @@ table.tbl {
 @media (max-width: 768px) {
   .adm {
     grid-template-columns: 1fr;
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+  .adm-main-wrap {
+    height: auto;
+    max-height: none;
+    overflow: visible;
   }
   .adm-side {
     position: relative;
     height: auto;
+    max-height: none;
+    overflow: visible;
     border-right: none;
     border-bottom: 1px solid var(--line);
+  }
+  .adm-topbar {
+    position: sticky;
+    top: 0;
+    padding: 0 16px;
+  }
+  .adm-content-body {
+    padding: 20px 16px 40px;
+    overflow: visible;
   }
   .adm-kpi-grid {
     grid-template-columns: 1fr;
   }
   .adm-quick-actions-list {
     grid-template-columns: 1fr;
-  }
-  .adm-topbar {
-    padding: 0 16px;
-  }
-  .adm-content-body {
-    padding: 20px 16px 40px;
   }
 }
 
@@ -4792,7 +4814,6 @@ table.tbl {
   .filters.open { display: flex; }
   .fbtn { display: inline-flex; }
   .pd, .cartpage { grid-template-columns: 1fr; }
-  .adm { grid-template-columns: 1fr; }
   .side { position: static; height: auto; flex-direction: row; flex-wrap: wrap; padding: 10px; }
   .side .logo, .side .grow { display: none; }
   .main-adm { padding: 20px 16px 48px; }
