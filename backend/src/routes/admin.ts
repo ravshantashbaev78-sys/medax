@@ -204,50 +204,88 @@ adminRouter.post("/products", async (req, res) => {
   res.status(201).json(p);
 });
 
-// Barcha mahsulotlarni yoki tanlanganlarni yo'q qilib qo'yish (yashirish / faol qilish)
+// Tanlangan mahsulotlar holatini o'zgartirish (yashirish / faol qilish)
 adminRouter.post("/products/bulk-status", requireAdmin, async (req, res) => {
   const schema = z.object({
     active: z.boolean(),
-    ids: z.array(z.number().int()).optional(),
+    ids: z.array(z.number().int().positive()).min(1, "Kamida bitta mahsulot tanlanishi shart"),
   });
   const { active, ids } = schema.parse(req.body);
-  const where: Prisma.ProductWhereInput = ids && ids.length > 0 ? { id: { in: ids } } : {};
+
   const result = await prisma.product.updateMany({
-    where,
+    where: { id: { in: ids } },
     data: { isActive: active },
   });
   res.json({ ok: true, updated: result.count, active });
 });
 
-// Barcha mahsulotlarni yoki tanlanganlarni birdaniga o'chirish
-adminRouter.post("/products/delete-all", requireAdmin, async (req, res) => {
-  const schema = z.object({
-    ids: z.array(z.number().int()).optional(),
+// Tanlangan mahsulotlarni xavfsiz o'chirish (buyurtmada qatnashgan bo'lsa yashiriladi)
+const handleBulkDelete = async (ids: number[]) => {
+  // 1. OrderItem da qatnashgan mahsulotlarni aniqlash
+  const orderProducts = await prisma.orderItem.findMany({
+    where: { productId: { in: ids } },
+    select: { productId: true },
+    distinct: ["productId"],
   });
-  const { ids } = schema.parse(req.body || {});
-  const where: Prisma.ProductWhereInput = ids && ids.length > 0 ? { id: { in: ids } } : {};
+  const protectedIds = new Set(orderProducts.map((op) => op.productId));
+  const toSoftDelete = ids.filter((pid) => protectedIds.has(pid));
+  const toHardDelete = ids.filter((pid) => !protectedIds.has(pid));
 
-  // O'chiriladigan mahsulotlar va ularning fayllarini olish
-  const products = await prisma.product.findMany({
-    where,
-    include: { images: true, documents: true },
-  });
-
-  const filePromises: Promise<any>[] = [];
-  for (const p of products) {
-    for (const img of p.images) {
-      filePromises.push(removeFile(img.url));
-      filePromises.push(removeFile(img.thumbUrl));
-    }
-    for (const doc of p.documents) {
-      filePromises.push(removeFile(doc.url));
-    }
+  let hiddenCount = 0;
+  if (toSoftDelete.length > 0) {
+    const softRes = await prisma.product.updateMany({
+      where: { id: { in: toSoftDelete } },
+      data: { isActive: false },
+    });
+    hiddenCount = softRes.count;
   }
 
-  await Promise.allSettled(filePromises);
+  let deletedCount = 0;
+  if (toHardDelete.length > 0) {
+    const productsToDelete = await prisma.product.findMany({
+      where: { id: { in: toHardDelete } },
+      include: { images: true, documents: true },
+    });
 
-  const result = await prisma.product.deleteMany({ where });
-  res.json({ ok: true, deleted: result.count });
+    const hardRes = await prisma.product.deleteMany({
+      where: { id: { in: toHardDelete } },
+    });
+    deletedCount = hardRes.count;
+
+    // Fayllarni faqat baza o'chirilgandan keyin o'chiramiz
+    const filePromises: Promise<any>[] = [];
+    for (const p of productsToDelete) {
+      for (const img of p.images) {
+        filePromises.push(removeFile(img.url));
+        filePromises.push(removeFile(img.thumbUrl));
+      }
+      for (const doc of p.documents) {
+        filePromises.push(removeFile(doc.url));
+      }
+    }
+    await Promise.allSettled(filePromises);
+  }
+
+  return { deleted: deletedCount, hidden: hiddenCount };
+};
+
+adminRouter.post("/products/bulk-delete", requireAdmin, async (req, res) => {
+  const schema = z.object({
+    ids: z.array(z.number().int().positive()).min(1, "O'chirish uchun kamida bitta mahsulot tanlanishi shart"),
+  });
+  const { ids } = schema.parse(req.body || {});
+  const result = await handleBulkDelete(ids);
+  res.json({ ok: true, ...result });
+});
+
+// Eski endpointni ham xavfsiz holda saqlaymiz (ids siz o'chirish taqiqlanadi)
+adminRouter.post("/products/delete-all", requireAdmin, async (req, res) => {
+  const schema = z.object({
+    ids: z.array(z.number().int().positive()).min(1, "O'chirish uchun kamida bitta mahsulot tanlanishi shart"),
+  });
+  const { ids } = schema.parse(req.body || {});
+  const result = await handleBulkDelete(ids);
+  res.json({ ok: true, ...result });
 });
 
 adminRouter.put("/products/:id", async (req, res) => {
