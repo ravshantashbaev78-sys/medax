@@ -103,8 +103,8 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Onboarding
     onboarding_skip: "O'tkazish",
-    onboarding_next: "Keyingisi →",
-    onboarding_start: "Boshlash ✓",
+    onboarding_next: "Keyingisi",
+    onboarding_start: "Boshlash",
     onboarding_slogan: "TIBBIY USKUNALAR",
 
     // Notifications
@@ -254,8 +254,8 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Onboarding
     onboarding_skip: "Пропустить",
-    onboarding_next: "Далее →",
-    onboarding_start: "Начать ✓",
+    onboarding_next: "Далее",
+    onboarding_start: "Начать",
     onboarding_slogan: "МЕДИЦИНСКАЯ ТЕХНИКА",
 
     // Notifications
@@ -405,8 +405,8 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Onboarding
     onboarding_skip: "Skip",
-    onboarding_next: "Next →",
-    onboarding_start: "Get Started ✓",
+    onboarding_next: "Next",
+    onboarding_start: "Get Started",
     onboarding_slogan: "MEDICAL EQUIPMENT",
 
     // Notifications

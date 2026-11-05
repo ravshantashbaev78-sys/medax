@@ -308,6 +308,21 @@ export interface Translations {
   auth_new_pwd_opt_ph: string;
   auth_new_pwd_opt_hint: string;
   auth_modal_close: string;
+  auth_forgot_title: string;
+  auth_forgot_sub: string;
+  auth_forgot_have_code: string;
+  auth_forgot_send_btn: string;
+  auth_forgot_reset_btn: string;
+  auth_cancel_login: string;
+  auth_code_sent_to: string;
+  auth_diff_number: string;
+  auth_security_note: string;
+  auth_err_phone: string;
+  auth_err_pwd: string;
+  auth_err_code: string;
+  auth_err_name: string;
+  auth_err_min_pwd: string;
+  auth_err_pwd_match: string;
 
   // Customer Account & Profile
   acc_login_prompt_title: string;
@@ -626,12 +641,12 @@ export const translations: Record<Lang, Translations> = {
     auth_pwd_label: "Parolingiz",
     auth_forgot_pwd: "Parolni unutdingizmi?",
     auth_pwd_ph: "Parolingizni kiriting",
-    auth_btn_login: "Kabinetga kirish →",
+    auth_btn_login: "Kabinetga kirish",
     auth_btn_logging: "Kirilmoqda…",
     auth_sms_login_btn: "SMS kod orqali kirish",
-    auth_open_reg: "Yangi akkaunt ochish →",
+    auth_open_reg: "Yangi akkaunt ochish",
     auth_reg_hint: "Ushbu raqamga bir martalik 6 xonali tasdiqlash kodi yuboriladi",
-    auth_btn_get_sms: "SMS kodni olish →",
+    auth_btn_get_sms: "SMS kodni olish",
     auth_btn_sending: "Yuborilmoqda…",
     auth_has_account: "Allaqachon akkauntingiz bormi?",
     auth_enter_code: "SMS kod:",
@@ -646,7 +661,7 @@ export const translations: Record<Lang, Translations> = {
     auth_pwd_hint: "Keyingi safar tizimga kirish uchun ushbu paroldan foydalanasiz",
     auth_confirm_pwd: "Parolni qayta tering",
     auth_confirm_pwd_ph: "Parolni tasdiqlang",
-    auth_btn_create: "Akkauntni yaratish va Kirish ✓",
+    auth_btn_create: "Akkauntni yaratish va Kirish",
     auth_resend: "Qayta yuborish:",
     auth_resend_btn: "Yangi kod yuborish",
     auth_terms_note: "Tizimga kirish orqali siz Medax xizmat ko'rsatish shartlariga rozilik bildirasiz.",
@@ -655,6 +670,21 @@ export const translations: Record<Lang, Translations> = {
     auth_new_pwd_opt_ph: "Parolni yangilamoqchi bo'lsangiz yozing",
     auth_new_pwd_opt_hint: "Agar parol kiritsangiz, kelgusida parol orqali kirishingiz mumkin bo'ladi",
     auth_modal_close: "Yopish",
+    auth_forgot_title: "Parolni tiklash",
+    auth_forgot_sub: "Telefon raqamingizni kiriting, tasdiqlash kodi SMS orqali yuboriladi",
+    auth_forgot_have_code: "Menda tasdiqlash kodi bor",
+    auth_forgot_send_btn: "SMS kodni olish",
+    auth_forgot_reset_btn: "Parolni yangilash va kirish",
+    auth_cancel_login: "Bekor qilish va kirish",
+    auth_code_sent_to: "Tasdiqlash kodi telefon raqamingizga yuborildi",
+    auth_diff_number: "Boshqa raqam kiritish",
+    auth_security_note: "Medax tibbiyot uskunalari markazi — xavfsiz va himoyalangan tizim",
+    auth_err_phone: "Telefon raqamingizni to'liq kiriting",
+    auth_err_pwd: "Parolingizni kiriting",
+    auth_err_code: "SMS orqali kelgan 6 xonali kodni kiriting",
+    auth_err_name: "Iltimos, ismingizni kiriting",
+    auth_err_min_pwd: "Parol kamida 6 ta belgidan iborat bo'lishi kerak",
+    auth_err_pwd_match: "Kiritilgan yangi parollar bir xil emas",
 
     acc_login_prompt_title: "Shaxsiy kabinetga xush kelibsiz",
     acc_login_prompt_desc: "Buyurtmalaringiz tarixini ko'rish va ma'lumotlaringizni boshqarish uchun tizimga kiring.",
@@ -990,15 +1020,30 @@ export const translations: Record<Lang, Translations> = {
     auth_pwd_hint: "В следующий раз вы будете использовать этот пароль для входа",
     auth_confirm_pwd: "Повторите пароль",
     auth_confirm_pwd_ph: "Подтвердите пароль",
-    auth_btn_create: "Создать аккаунт и Войти ✓",
+    auth_btn_create: "Создать аккаунт и Войти",
     auth_resend: "Отправить повторно через:",
     auth_resend_btn: "Отправить новый код",
     auth_terms_note: "Входя в систему, вы соглашаетесь с условиями обслуживания Medax.",
-    auth_back_to_pwd: "← Вернуться ко входу по паролю",
+    auth_back_to_pwd: "Вернуться ко входу по паролю",
     auth_new_pwd_opt: "Новый пароль (необязательно)",
     auth_new_pwd_opt_ph: "Введите, если хотите обновить пароль",
     auth_new_pwd_opt_hint: "Если вы укажете пароль, в будущем сможете входить по нему",
     auth_modal_close: "Закрыть",
+    auth_forgot_title: "Восстановление пароля",
+    auth_forgot_sub: "Введите ваш номер телефона, код подтверждения будет отправлен по SMS",
+    auth_forgot_have_code: "У меня уже есть код подтверждения",
+    auth_forgot_send_btn: "Получить SMS-код",
+    auth_forgot_reset_btn: "Обновить пароль и войти",
+    auth_cancel_login: "Отмена и вход",
+    auth_code_sent_to: "Код подтверждения отправлен на ваш номер",
+    auth_diff_number: "Ввести другой номер",
+    auth_security_note: "Центр медицинского оборудования Medax — надежная защита данных",
+    auth_err_phone: "Введите корректный номер телефона",
+    auth_err_pwd: "Введите пароль",
+    auth_err_code: "Введите 6-значный SMS-код",
+    auth_err_name: "Введите ваше имя",
+    auth_err_min_pwd: "Пароль должен содержать не менее 6 символов",
+    auth_err_pwd_match: "Пароли не совпадают",
 
     acc_login_prompt_title: "Добро пожаловать в личный кабинет",
     acc_login_prompt_desc: "Войдите в систему, чтобы просматривать историю заказов и управлять данными.",
@@ -1334,15 +1379,30 @@ export const translations: Record<Lang, Translations> = {
     auth_pwd_hint: "You will use this password to sign in next time",
     auth_confirm_pwd: "Confirm password",
     auth_confirm_pwd_ph: "Confirm password",
-    auth_btn_create: "Create Account & Sign In ✓",
+    auth_btn_create: "Create Account & Sign In",
     auth_resend: "Resend code in:",
     auth_resend_btn: "Send new code",
     auth_terms_note: "By signing in, you agree to the Medax Terms of Service.",
-    auth_back_to_pwd: "← Back to password login",
+    auth_back_to_pwd: "Back to password login",
     auth_new_pwd_opt: "New password (optional)",
     auth_new_pwd_opt_ph: "Enter if you want to update password",
     auth_new_pwd_opt_hint: "If you set a password, you can use it to sign in later",
     auth_modal_close: "Close",
+    auth_forgot_title: "Reset Password",
+    auth_forgot_sub: "Enter your phone number, a verification code will be sent via SMS",
+    auth_forgot_have_code: "I already have a confirmation code",
+    auth_forgot_send_btn: "Get SMS Code",
+    auth_forgot_reset_btn: "Update Password & Sign In",
+    auth_cancel_login: "Cancel and log in",
+    auth_code_sent_to: "Verification code sent to your phone",
+    auth_diff_number: "Use different number",
+    auth_security_note: "Medax Medical Equipment Center — secure and encrypted system",
+    auth_err_phone: "Please enter a valid phone number",
+    auth_err_pwd: "Please enter your password",
+    auth_err_code: "Please enter the 6-digit SMS code",
+    auth_err_name: "Please enter your name",
+    auth_err_min_pwd: "Password must be at least 6 characters",
+    auth_err_pwd_match: "Passwords do not match",
 
     acc_login_prompt_title: "Welcome to your Account",
     acc_login_prompt_desc: "Sign in to view your order history and manage your profile details.",

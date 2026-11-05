@@ -53,7 +53,7 @@ function MainApp() {
     <>
       <StatusBar style={colors.statusBar} />
       {step === "onboarding" ? (
-        <OnboardingScreen onFinish={() => setStep("auth")} />
+        <OnboardingScreen onFinish={() => setStep("app")} />
       ) : step === "auth" ? (
         <AuthGateScreen onContinue={() => setStep("app")} />
       ) : (

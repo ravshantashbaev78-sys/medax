@@ -21,7 +21,7 @@ interface CustomerAuthContextType {
   sendOtp: (phone: string, captchaToken?: string) => Promise<{ ok: boolean; resendIn: number }>;
   verifyOtp: (data: { phone: string; code: string; name?: string; organization?: string; password?: string }) => Promise<{ ok: boolean; token: string; customer: Customer }>;
   loginWithPassword: (phone: string, password: string) => Promise<{ ok: boolean; token: string; customer: Customer }>;
-  forgotPasswordOtp: (phone: string, captchaToken?: string) => Promise<{ ok: boolean; message: string }>;
+  forgotPasswordOtp: (phone: string, captchaToken?: string) => Promise<{ ok: boolean; message: string; resendIn?: number }>;
   resetPassword: (params: { phone: string; code: string; newPassword: string }) => Promise<{ ok: boolean; token: string; customer: Customer }>;
   changePassword: (data: { currentPassword?: string; newPassword: string }) => Promise<void>;
   updateProfile: (data: { name: string; organization?: string }) => Promise<void>;

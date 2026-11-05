@@ -91,13 +91,16 @@ const customerOtpLimiter = rateLimit({
   message: { error: "SMS kod so'rash limiti oshdi. Iltimos, 10 daqiqadan keyin urinib ko'ring." },
 });
 
-// Parol bilan kirish urinishlarini cheklash (brute-force himoyasi)
+// Parol bilan kirish urinishlarini cheklash (brute-force himoyasi: IP + Telefon bo'yicha)
 const customerLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => getClientIp(req),
+  keyGenerator: (req) => {
+    const rawPhone = (req.body && typeof req.body.phone === "string") ? req.body.phone.replace(/\D/g, "") : "";
+    return `${getClientIp(req)}_${rawPhone}`;
+  },
   message: { error: "Kirish urinishlari ko'payib ketdi. 15 daqiqadan keyin qayta urinib ko'ring." },
 });
 
@@ -110,6 +113,16 @@ const avatarLimiter = rateLimit({
   keyGenerator: (req) => getClientIp(req),
   message: { error: "Rasm yuklash limiti oshdi. 15 daqiqadan keyin urinib ko'ring." },
 });
+
+function validatePasswordStrength(pwd: string) {
+  if (pwd.length < 6) {
+    throw new HttpError(400, "Parol kamida 6 belgidan iborat bo'lishi kerak.");
+  }
+  const weakPasswords = ["123456", "12345678", "111111", "000000", "password", "qwerty", "medax123"];
+  if (weakPasswords.includes(pwd.toLowerCase())) {
+    throw new HttpError(400, "Bu parol juda oddiy. Iltimos, xavfsizroq parol tanlang.");
+  }
+}
 
 function createCustomerToken(c: { id: number; phone: string; name: string }) {
   const payload: CustomerAuthPayload = {
@@ -228,6 +241,9 @@ customerRouter.post("/auth/verify-otp", authLimiter, async (req, res) => {
 
   await prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: new Date() } });
 
+  if (password) {
+    validatePasswordStrength(password);
+  }
   const passwordHash = password ? await bcrypt.hash(password, 10) : undefined;
 
   // Mijozni topamiz yoki yangi ro'yxatdan o'tkazamiz
@@ -280,15 +296,8 @@ customerRouter.post("/auth/login", customerLoginLimiter, async (req, res) => {
   if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri formatda.");
 
   const customer = await prisma.customer.findUnique({ where: { phone } });
-  if (!customer) {
-    throw new HttpError(400, "Ushbu telefon raqamiga ega mijoz topilmadi. Iltimos, ro'yxatdan o'ting.");
-  }
-
-  if (!customer.passwordHash) {
-    throw new HttpError(
-      400,
-      "Ushbu akkauntda hali parol o'rnatilmagan. Iltimos, 'SMS orqali kirish' tugmasidan foydalaning va parolingizni belgilang."
-    );
+  if (!customer || !customer.passwordHash) {
+    throw new HttpError(400, "Telefon raqam yoki parol noto'g'ri.");
   }
 
   const valid = await bcrypt.compare(password, customer.passwordHash);
@@ -419,6 +428,7 @@ customerRouter.post("/auth/reset-password", authLimiter, async (req, res) => {
 
   await prisma.otpCode.update({ where: { id: otp.id }, data: { usedAt: new Date() } });
 
+  validatePasswordStrength(newPassword);
   const passwordHash = await bcrypt.hash(newPassword, 10);
   const updated = await prisma.customer.update({
     where: { id: customer.id },

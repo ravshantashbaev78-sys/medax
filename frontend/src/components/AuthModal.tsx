@@ -6,9 +6,26 @@ import { useI18n } from "../context/I18nContext";
 type AuthMode =
   | "login"            // Kirish (Telefon + Parol)
   | "register-phone"   // Ro'yxatdan o'tish: telefon kiritish
-  | "register-verify"  // Ro'yxatdan o'tish: SMS kod + Ism + Yangi parol
-  | "forgot-phone"     // Parolni unutdim: telefon kiritish (12 soatda 1 SMS)
-  | "forgot-reset";    // Parolni unutdim: SMS kod + yangi parol
+  | "register-verify"  // Ro'yxatdan o'tish: SMS kod + Ism + Parol + Parol tasdig'i
+  | "forgot-phone"     // Parolni tiklash: telefon kiritish
+  | "forgot-reset";    // Parolni tiklash: SMS kod + yangi parol
+
+function EyeIcon({ open }: { open: boolean }) {
+  if (open) {
+    return (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+        <circle cx="12" cy="12" r="3" />
+      </svg>
+    );
+  }
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+      <line x1="1" y1="1" x2="23" y2="23" />
+    </svg>
+  );
+}
 
 export function AuthModal() {
   const {
@@ -20,7 +37,7 @@ export function AuthModal() {
     forgotPasswordOtp,
     resetPassword,
   } = useCustomerAuth();
-  const { lang, t } = useI18n();
+  const { t } = useI18n();
 
   const [mode, setMode] = useState<AuthMode>("login");
   const [phone, setPhone] = useState("+998 ");
@@ -32,6 +49,7 @@ export function AuthModal() {
   const [name, setName] = useState("");
   const [organization, setOrganization] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [regConfirmPassword, setRegConfirmPassword] = useState("");
   const [showRegPassword, setShowRegPassword] = useState(false);
 
   // Forgot password fields
@@ -91,6 +109,7 @@ export function AuthModal() {
     setCode("");
     setPassword("");
     setRegPassword("");
+    setRegConfirmPassword("");
     setNewPassword("");
     setConfirmPassword("");
     setMode("login");
@@ -103,15 +122,11 @@ export function AuthModal() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!isPhoneValid()) {
-      setError(
-        lang === "ru"
-          ? "Введите корректный номер телефона"
-          : "Telefon raqamingizni to'liq kiriting (masalan: +998 90 123 45 67)"
-      );
+      setError(t("auth_err_phone"));
       return;
     }
     if (!password) {
-      setError(lang === "ru" ? "Введите пароль" : "Parolingizni kiriting");
+      setError(t("auth_err_pwd"));
       return;
     }
 
@@ -122,7 +137,7 @@ export function AuthModal() {
       await loginWithPassword(phone, password);
       handleClose();
     } catch (err: any) {
-      setError(err.message || (lang === "ru" ? "Неверный телефон или пароль" : "Telefon raqami yoki parol noto'g'ri"));
+      setError(err.message || t("auth_err_pwd"));
     } finally {
       setLoading(false);
     }
@@ -132,11 +147,7 @@ export function AuthModal() {
   const handleRequestRegOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!isPhoneValid()) {
-      setError(
-        lang === "ru"
-          ? "Введите корректный номер телефона"
-          : "Telefon raqamingizni to'liq kiriting"
-      );
+      setError(t("auth_err_phone"));
       return;
     }
 
@@ -150,7 +161,7 @@ export function AuthModal() {
       setMode("register-verify");
       setResendTimer(res.resendIn || 60);
     } catch (err: any) {
-      setError(err.message || (lang === "ru" ? "Ошибка при отправке SMS" : "SMS yuborishda xatolik yuz berdi"));
+      setError(err.message || t("auth_btn_sending"));
     } finally {
       setLoading(false);
     }
@@ -160,19 +171,19 @@ export function AuthModal() {
   const handleVerifyRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (code.trim().length !== 6) {
-      setError(lang === "ru" ? "Введите 6-значный SMS-код" : "SMS orqali kelgan 6 xonali kodni kiriting");
+      setError(t("auth_err_code"));
       return;
     }
     if (!name.trim()) {
-      setError(lang === "ru" ? "Введите ваше имя" : "Iltimos, ismingizni kiriting");
+      setError(t("auth_err_name"));
       return;
     }
     if (!regPassword || regPassword.length < 6) {
-      setError(
-        lang === "ru"
-          ? "Пароль должен содержать не менее 6 символов"
-          : "Parol kamida 6 ta belgidan iborat bo'lishi kerak"
-      );
+      setError(t("auth_err_min_pwd"));
+      return;
+    }
+    if (regPassword !== regConfirmPassword) {
+      setError(t("auth_err_pwd_match"));
       return;
     }
 
@@ -188,17 +199,17 @@ export function AuthModal() {
       });
       handleClose();
     } catch (err: any) {
-      setError(err.message || (lang === "ru" ? "Ошибка подтверждения" : "Tasdiqlashda xatolik yuz berdi"));
+      setError(err.message || t("auth_btn_sending"));
     } finally {
       setLoading(false);
     }
   };
 
-  // 4. PAROLNI UNUTDIM: 12 soatlik limit bilan SMS kod so'rash
+  // 4. PAROLNI UNUTDIM: SMS kod so'rash
   const handleRequestForgotOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!isPhoneValid()) {
-      setError(lang === "ru" ? "Введите номер телефона" : "Telefon raqamingizni to'liq kiriting");
+      setError(t("auth_err_phone"));
       return;
     }
 
@@ -209,16 +220,11 @@ export function AuthModal() {
     try {
       const res = await forgotPasswordOtp(phone);
       setCode("");
-      setInfoMessage(
-        res.message ||
-          (lang === "ru"
-            ? "SMS-код для восстановления отправлен на ваш номер"
-            : "Parolni tiklash kodi telefoningizga yuborildi")
-      );
+      setInfoMessage(res.message || t("auth_code_sent_to"));
       setMode("forgot-reset");
-      setResendTimer(60);
+      setResendTimer(res.resendIn || 60);
     } catch (err: any) {
-      setError(err.message || (lang === "ru" ? "Ошибка при отправке SMS" : "SMS yuborishda xatolik"));
+      setError(err.message || t("auth_btn_sending"));
     } finally {
       setLoading(false);
     }
@@ -228,19 +234,15 @@ export function AuthModal() {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (code.trim().length !== 6) {
-      setError(lang === "ru" ? "Введите 6-значный SMS-код" : "SMS orqali kelgan 6 xonali kodni kiriting");
+      setError(t("auth_err_code"));
       return;
     }
     if (!newPassword || newPassword.length < 6) {
-      setError(
-        lang === "ru"
-          ? "Новый пароль должен содержать не менее 6 символов"
-          : "Yangi parol kamida 6 ta belgidan iborat bo'lishi kerak"
-      );
+      setError(t("auth_err_min_pwd"));
       return;
     }
     if (newPassword !== confirmPassword) {
-      setError(lang === "ru" ? "Пароли не совпадают" : "Kiritilgan yangi parollar bir xil emas");
+      setError(t("auth_err_pwd_match"));
       return;
     }
 
@@ -254,7 +256,7 @@ export function AuthModal() {
       });
       handleClose();
     } catch (err: any) {
-      setError(err.message || (lang === "ru" ? "Ошибка при смене пароля" : "Parolni tiklashda xatolik yuz berdi"));
+      setError(err.message || t("auth_btn_sending"));
     } finally {
       setLoading(false);
     }
@@ -265,7 +267,7 @@ export function AuthModal() {
   const isLoginMode = mode === "login";
 
   return (
-    <div className="modal-backdrop" onClick={handleClose} role="dialog" aria-modal="true">
+    <div className="modal-backdrop" onClick={handleClose} role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
       <div className="auth-modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: 440, padding: "26px 24px" }}>
         {/* Yopish tugmasi */}
         <button className="modal-close-btn" onClick={handleClose} aria-label={t("auth_modal_close")}>
@@ -275,25 +277,19 @@ export function AuthModal() {
         {/* Modal Header */}
         <div className="auth-header" style={{ textAlign: "center", marginBottom: 18 }}>
           <MedaxLogo size="sm" />
-          <h2 style={{ fontSize: 20, margin: "10px 0 4px", fontWeight: 700, color: "var(--ink, #0f172a)" }}>
+          <h2 id="auth-modal-title" style={{ fontSize: 20, margin: "10px 0 4px", fontWeight: 700, color: "var(--ink, #0f172a)" }}>
             {isForgotMode
-              ? (lang === "ru" ? "Восстановление пароля" : "Parolni tiklash")
+              ? t("auth_forgot_title")
               : isRegisterMode
-              ? (lang === "ru" ? "Регистрация нового клиента" : "Yangi mijozni ro'yxatdan o'tkazish")
-              : (lang === "ru" ? "Вход в личный кабинет" : "Shaxsiy kabinetga kirish")}
+              ? t("auth_register_title")
+              : t("auth_login_title")}
           </h2>
           <p className="auth-sub" style={{ fontSize: 13, color: "var(--ink2, #64748b)", margin: 0 }}>
             {isForgotMode
-              ? (lang === "ru"
-                  ? "SMS-код будет отправлен на подтвержденный номер (1 раз в 12 часов)"
-                  : "Parolni tiklash kodi tasdiqlangan raqamga boradi (12 soatda 1 marta)")
+              ? t("auth_forgot_sub")
               : isRegisterMode
-              ? (lang === "ru"
-                  ? "Создайте аккаунт для отслеживания заказов и скидок"
-                  : "Buyurtmalarni kuzatish uchun yangi hisob oching")
-              : (lang === "ru"
-                  ? "Введите номер телефона и пароль для входа"
-                  : "Tizimga kirish uchun raqamingiz va parolingizni kiriting")}
+              ? t("auth_register_sub")
+              : t("auth_login_sub")}
           </p>
         </div>
 
@@ -322,14 +318,14 @@ export function AuthModal() {
                 fontWeight: 600,
                 border: "none",
                 borderRadius: 8,
-                background: isLoginMode ? "#fff" : "transparent",
+                background: isLoginMode ? "var(--surface-card, #fff)" : "transparent",
                 color: isLoginMode ? "var(--teal, #0d9488)" : "var(--ink2, #64748b)",
                 boxShadow: isLoginMode ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
                 cursor: "pointer",
                 transition: "all 0.2s",
               }}
             >
-              {lang === "ru" ? "Вход" : "Kirish"}
+              {t("auth_tab_pwd")}
             </button>
             <button
               type="button"
@@ -345,14 +341,14 @@ export function AuthModal() {
                 fontWeight: 600,
                 border: "none",
                 borderRadius: 8,
-                background: isRegisterMode ? "#fff" : "transparent",
+                background: isRegisterMode ? "var(--surface-card, #fff)" : "transparent",
                 color: isRegisterMode ? "var(--teal, #0d9488)" : "var(--ink2, #64748b)",
                 boxShadow: isRegisterMode ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
                 cursor: "pointer",
                 transition: "all 0.2s",
               }}
             >
-              {lang === "ru" ? "Регистрация" : "Ro'yxatdan o'tish"}
+              {t("auth_tab_reg")}
             </button>
           </div>
         )}
@@ -361,6 +357,7 @@ export function AuthModal() {
         {error && (
           <div
             className="err auth-alert"
+            role="alert"
             style={{
               padding: "10px 14px",
               background: "#fee2e2",
@@ -373,7 +370,9 @@ export function AuthModal() {
             }}
           >
             {error}
-            {error.includes("allaqachon ro'yxatdan o'tgan") && (
+            {(error.includes("allaqachon ro'yxatdan o'tgan") ||
+              error.includes("уже зарегистрирован") ||
+              error.includes("already registered")) && (
               <div style={{ marginTop: 8 }}>
                 <button
                   type="button"
@@ -385,14 +384,14 @@ export function AuthModal() {
                     background: "var(--teal, #0d9488)",
                     color: "#fff",
                     border: "none",
-                    padding: "5px 12px",
+                    padding: "6px 14px",
                     borderRadius: 6,
                     fontSize: 12.5,
                     fontWeight: 600,
                     cursor: "pointer",
                   }}
                 >
-                  {lang === "ru" ? "Войти с паролем →" : "Kirish oynasiga o'tish →"}
+                  {t("auth_tab_pwd")}
                 </button>
               </div>
             )}
@@ -423,11 +422,14 @@ export function AuthModal() {
         {mode === "login" && (
           <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 6 }}>
-                {lang === "ru" ? "Номер телефона" : "Telefon raqamingiz"}
+              <label htmlFor="login-phone" style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 6 }}>
+                {t("auth_phone_label")}
               </label>
               <input
+                id="login-phone"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => handlePhoneChange(e.target.value)}
                 placeholder="+998 90 123 45 67"
@@ -449,8 +451,8 @@ export function AuthModal() {
 
             <div>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <label style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink, #0f172a)" }}>
-                  {lang === "ru" ? "Пароль" : "Parolingiz"}
+                <label htmlFor="login-password" style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink, #0f172a)" }}>
+                  {t("auth_pwd_label")}
                 </label>
                 <button
                   type="button"
@@ -469,12 +471,14 @@ export function AuthModal() {
                     padding: 0,
                   }}
                 >
-                  {lang === "ru" ? "Забыли пароль?" : "Parolni unutdingizmi?"}
+                  {t("auth_forgot_pwd")}
                 </button>
               </div>
               <div style={{ position: "relative" }}>
                 <input
+                  id="login-password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
@@ -503,10 +507,13 @@ export function AuthModal() {
                     fontSize: 16,
                     cursor: "pointer",
                     color: "var(--ink2, #64748b)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
-                  title={showPassword ? "Yashirish" : "Ko'rsatish"}
+                  aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? "🙈" : "👁️"}
+                  <EyeIcon open={showPassword} />
                 </button>
               </div>
             </div>
@@ -527,13 +534,13 @@ export function AuthModal() {
                 cursor: loading ? "wait" : "pointer",
               }}
             >
-              {loading ? (lang === "ru" ? "Вход..." : "Kirilmoqda...") : (lang === "ru" ? "Войти" : "Kirish")}
+              {loading ? t("auth_btn_logging") : t("auth_btn_login")}
             </button>
 
             <div style={{ textAlign: "center", marginTop: 4 }}>
               <span style={{ fontSize: 13, color: "var(--ink2, #64748b)" }}>
-                {lang === "ru" ? "Нет аккаунта? " : "Hisobingiz yo'qmi? "}
-              </span>
+                {t("auth_open_reg")}
+              </span>{" "}
               <button
                 type="button"
                 onClick={() => {
@@ -551,7 +558,7 @@ export function AuthModal() {
                   padding: 0,
                 }}
               >
-                {lang === "ru" ? "Зарегистрироваться" : "Ro'yxatdan o'tish"}
+                {t("auth_tab_reg")}
               </button>
             </div>
           </form>
@@ -563,11 +570,14 @@ export function AuthModal() {
         {mode === "register-phone" && (
           <form onSubmit={handleRequestRegOtp} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 6 }}>
-                {lang === "ru" ? "Номер телефона для регистрации" : "Ro'yxatdan o'tish uchun telefon raqam"}
+              <label htmlFor="reg-phone" style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 6 }}>
+                {t("auth_phone_label")}
               </label>
               <input
+                id="reg-phone"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => handlePhoneChange(e.target.value)}
                 placeholder="+998 90 123 45 67"
@@ -586,9 +596,7 @@ export function AuthModal() {
                 }}
               />
               <span style={{ display: "block", fontSize: 12, color: "var(--ink2, #64748b)", marginTop: 4 }}>
-                {lang === "ru"
-                  ? "На этот номер будет отправлен SMS-код подтверждения."
-                  : "Ushbu raqamga tasdiqlash uchun SMS kod yuboriladi."}
+                {t("auth_reg_hint")}
               </span>
             </div>
 
@@ -608,30 +616,28 @@ export function AuthModal() {
                 cursor: loading ? "wait" : "pointer",
               }}
             >
-              {loading
-                ? (lang === "ru" ? "Отправка SMS..." : "SMS yuborilmoqda...")
-                : (lang === "ru" ? "Получить SMS-код" : "SMS kod olish")}
+              {loading ? t("auth_btn_sending") : t("auth_btn_get_sms")}
             </button>
           </form>
         )}
 
         {/* ============================================================== */}
-        {/* 3. RO'YXATDAN O'TISH: SMS KOD + ISM + PAROL                    */}
+        {/* 3. RO'YXATDAN O'TISH: SMS KOD + ISM + PAROL + TASDIQ           */}
         {/* ============================================================== */}
         {mode === "register-verify" && (
           <form onSubmit={handleVerifyRegister} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ background: "rgba(13, 148, 136, 0.08)", padding: "8px 12px", borderRadius: 8, fontSize: 13, color: "var(--teal, #0d9488)" }}>
-              {lang === "ru"
-                ? `Код отправлен на ${phone}`
-                : `Tasdiqlash kodi ${phone} raqamiga yuborildi`}
+              {t("auth_code_sent_to")}: {phone}
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
-                {lang === "ru" ? "6-значный SMS-код" : "6 xonali SMS kod"} *
+              <label htmlFor="reg-code" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
+                {t("auth_enter_code")}
               </label>
               <input
+                id="reg-code"
                 type="text"
+                inputMode="numeric"
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
@@ -656,14 +662,16 @@ export function AuthModal() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
-                {lang === "ru" ? "Ваше имя" : "Ismingiz"} *
+              <label htmlFor="reg-name" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
+                {t("auth_name_label")} *
               </label>
               <input
+                id="reg-name"
                 type="text"
+                autoComplete="name"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder={lang === "ru" ? "Например, Доктор Алишер" : "Masalan: Alisher"}
+                placeholder={t("auth_name_ph")}
                 required
                 style={{
                   width: "100%",
@@ -679,12 +687,14 @@ export function AuthModal() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
-                {lang === "ru" ? "Придумайте пароль (мин. 6 символов)" : "Yangi parol belgilang (kamida 6 ta belgi)"} *
+              <label htmlFor="reg-password" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
+                {t("auth_new_pwd")} ({t("auth_min_chars")}) *
               </label>
               <div style={{ position: "relative" }}>
                 <input
+                  id="reg-password"
                   type={showRegPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   value={regPassword}
                   onChange={(e) => setRegPassword(e.target.value)}
                   placeholder="••••••••"
@@ -713,22 +723,55 @@ export function AuthModal() {
                     border: "none",
                     fontSize: 14,
                     cursor: "pointer",
+                    color: "var(--ink2, #64748b)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
+                  aria-label={showRegPassword ? "Hide password" : "Show password"}
                 >
-                  {showRegPassword ? "🙈" : "👁️"}
+                  <EyeIcon open={showRegPassword} />
                 </button>
               </div>
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ink2, #64748b)", marginBottom: 4 }}>
-                {lang === "ru" ? "Организация / Клиника (необязательно)" : "Tashkilot / Klinika nomi (ixtiyoriy)"}
+              <label htmlFor="reg-confirm-password" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
+                {t("auth_confirm_pwd")} *
               </label>
               <input
+                id="reg-confirm-password"
+                type="password"
+                autoComplete="new-password"
+                value={regConfirmPassword}
+                onChange={(e) => setRegConfirmPassword(e.target.value)}
+                placeholder="••••••••"
+                required
+                minLength={6}
+                style={{
+                  width: "100%",
+                  height: 38,
+                  padding: "0 12px",
+                  fontSize: 14,
+                  borderRadius: 8,
+                  border: "1px solid var(--line, #cbd5e1)",
+                  outline: "none",
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            <div>
+              <label htmlFor="reg-org" style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--ink2, #64748b)", marginBottom: 4 }}>
+                {t("auth_org_label")}
+              </label>
+              <input
+                id="reg-org"
                 type="text"
+                autoComplete="organization"
                 value={organization}
                 onChange={(e) => setOrganization(e.target.value)}
-                placeholder={lang === "ru" ? "Клиника MedLife" : "Masalan: MedLife klinikasi"}
+                placeholder={t("auth_org_ph")}
                 style={{
                   width: "100%",
                   height: 38,
@@ -759,9 +802,7 @@ export function AuthModal() {
                 marginTop: 6,
               }}
             >
-              {loading
-                ? (lang === "ru" ? "Регистрация..." : "Ro'yxatdan o'tilmoqda...")
-                : (lang === "ru" ? "Завершить регистрацию" : "Ro'yxatdan o'tish")}
+              {loading ? t("auth_btn_sending") : t("auth_btn_create")}
             </button>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, marginTop: 4 }}>
@@ -774,12 +815,12 @@ export function AuthModal() {
                 }}
                 style={{ background: "none", border: "none", color: "var(--ink2, #64748b)", cursor: "pointer", padding: 0 }}
               >
-                {lang === "ru" ? "← Другой номер" : "← Boshqa raqam"}
+                ← {t("auth_diff_number")}
               </button>
 
               {resendTimer > 0 ? (
                 <span style={{ color: "var(--ink2, #94a3b8)" }}>
-                  {lang === "ru" ? `Повтор через ${resendTimer}с` : `Qayta yuborish (${resendTimer}s)`}
+                  {t("auth_resend")} {resendTimer}s
                 </span>
               ) : (
                 <button
@@ -787,7 +828,7 @@ export function AuthModal() {
                   onClick={() => handleRequestRegOtp()}
                   style={{ background: "none", border: "none", color: "var(--teal, #0d9488)", fontWeight: 600, cursor: "pointer", padding: 0 }}
                 >
-                  {lang === "ru" ? "Отправить код снова" : "Kodni qayta yuborish"}
+                  {t("auth_resend_btn")}
                 </button>
               )}
             </div>
@@ -795,16 +836,19 @@ export function AuthModal() {
         )}
 
         {/* ============================================================== */}
-        {/* 4. PAROLNI UNUTDIM: TELEFON KIRITISH (12 soatda 1 marta limit)  */}
+        {/* 4. PAROLNI UNUTDIM: TELEFON KIRITISH                            */}
         {/* ============================================================== */}
         {mode === "forgot-phone" && (
           <form onSubmit={handleRequestForgotOtp} style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <label style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 6 }}>
-                {lang === "ru" ? "Зарегистрированный номер телефона" : "Ro'yxatdan o'tgan telefon raqamingiz"}
+              <label htmlFor="forgot-phone-input" style={{ display: "block", fontSize: 12.5, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 6 }}>
+                {t("auth_phone_label")}
               </label>
               <input
+                id="forgot-phone-input"
                 type="tel"
+                inputMode="tel"
+                autoComplete="tel"
                 value={phone}
                 onChange={(e) => handlePhoneChange(e.target.value)}
                 placeholder="+998 90 123 45 67"
@@ -823,9 +867,7 @@ export function AuthModal() {
                 }}
               />
               <span style={{ display: "block", fontSize: 12, color: "var(--ink2, #64748b)", marginTop: 6, lineHeight: 1.4 }}>
-                {lang === "ru"
-                  ? "В целях безопасности SMS-код для сброса пароля отправляется не чаще 1 раза в 12 часов."
-                  : "Xavfsizlik maqsadida parolni tiklash kodi 12 soatda faqat 1 marta yuboriladi."}
+                {t("auth_forgot_sub")}
               </span>
             </div>
 
@@ -845,12 +887,30 @@ export function AuthModal() {
                 cursor: loading ? "wait" : "pointer",
               }}
             >
-              {loading
-                ? (lang === "ru" ? "Отправка SMS..." : "SMS yuborilmoqda...")
-                : (lang === "ru" ? "Отправить код для сброса" : "Tiklash kodini yuborish")}
+              {loading ? t("auth_btn_sending") : t("auth_forgot_send_btn")}
             </button>
 
-            <div style={{ textAlign: "center", marginTop: 4 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, alignItems: "center", marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setInfoMessage("");
+                  setMode("forgot-reset");
+                }}
+                style={{
+                  background: "none",
+                  border: "none",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: "var(--teal, #0d9488)",
+                  cursor: "pointer",
+                  padding: 0,
+                }}
+              >
+                {t("auth_forgot_have_code")}
+              </button>
+
               <button
                 type="button"
                 onClick={() => {
@@ -861,12 +921,13 @@ export function AuthModal() {
                 style={{
                   background: "none",
                   border: "none",
-                  fontSize: 13,
-                  color: "var(--teal, #0d9488)",
+                  fontSize: 12.5,
+                  color: "var(--ink2, #64748b)",
                   cursor: "pointer",
+                  padding: 0,
                 }}
               >
-                {lang === "ru" ? "← Вернуться ко входу" : "← Kirish oynasiga qaytish"}
+                ← {t("auth_cancel_login")}
               </button>
             </div>
           </form>
@@ -877,12 +938,18 @@ export function AuthModal() {
         {/* ============================================================== */}
         {mode === "forgot-reset" && (
           <form onSubmit={handleResetPassword} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ background: "rgba(13, 148, 136, 0.08)", padding: "8px 12px", borderRadius: 8, fontSize: 13, color: "var(--teal, #0d9488)" }}>
+              {t("auth_code_sent_to")}: {phone}
+            </div>
+
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
-                {lang === "ru" ? "6-значный SMS-код" : "6 xonali SMS kod"} *
+              <label htmlFor="forgot-code-input" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
+                {t("auth_enter_code")} *
               </label>
               <input
+                id="forgot-code-input"
                 type="text"
+                inputMode="numeric"
                 maxLength={6}
                 value={code}
                 onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
@@ -907,12 +974,14 @@ export function AuthModal() {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
-                {lang === "ru" ? "Новый пароль (мин. 6 символов)" : "Yangi parol (kamida 6 ta belgi)"} *
+              <label htmlFor="forgot-new-pwd" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
+                {t("auth_new_pwd")} ({t("auth_min_chars")}) *
               </label>
               <div style={{ position: "relative" }}>
                 <input
+                  id="forgot-new-pwd"
                   type={showNewPassword ? "text" : "password"}
+                  autoComplete="new-password"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="••••••••"
@@ -941,19 +1010,26 @@ export function AuthModal() {
                     border: "none",
                     fontSize: 14,
                     cursor: "pointer",
+                    color: "var(--ink2, #64748b)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
                   }}
+                  aria-label={showNewPassword ? "Hide password" : "Show password"}
                 >
-                  {showNewPassword ? "🙈" : "👁️"}
+                  <EyeIcon open={showNewPassword} />
                 </button>
               </div>
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
-                {lang === "ru" ? "Подтвердите новый пароль" : "Yangi parolni takrorlang"} *
+              <label htmlFor="forgot-confirm-pwd" style={{ display: "block", fontSize: 12, fontWeight: 600, color: "var(--ink, #0f172a)", marginBottom: 4 }}>
+                {t("auth_confirm_pwd")} *
               </label>
               <input
+                id="forgot-confirm-pwd"
                 type="password"
+                autoComplete="new-password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="••••••••"
@@ -989,10 +1065,36 @@ export function AuthModal() {
                 marginTop: 6,
               }}
             >
-              {loading
-                ? (lang === "ru" ? "Обновление..." : "Yangilanmoqda...")
-                : (lang === "ru" ? "Сохранить и войти" : "Parolni yangilash va kirish")}
+              {loading ? t("auth_btn_sending") : t("auth_forgot_reset_btn")}
             </button>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 12, marginTop: 4 }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setError("");
+                  setCode("");
+                  setMode("forgot-phone");
+                }}
+                style={{ background: "none", border: "none", color: "var(--ink2, #64748b)", cursor: "pointer", padding: 0 }}
+              >
+                ← {t("auth_diff_number")}
+              </button>
+
+              {resendTimer > 0 ? (
+                <span style={{ color: "var(--ink2, #94a3b8)" }}>
+                  {t("auth_resend")} {resendTimer}s
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => handleRequestForgotOtp()}
+                  style={{ background: "none", border: "none", color: "var(--teal, #0d9488)", fontWeight: 600, cursor: "pointer", padding: 0 }}
+                >
+                  {t("auth_resend_btn")}
+                </button>
+              )}
+            </div>
 
             <div style={{ textAlign: "center", marginTop: 4 }}>
               <button
@@ -1010,7 +1112,7 @@ export function AuthModal() {
                   cursor: "pointer",
                 }}
               >
-                {lang === "ru" ? "← Отмена и вход" : "← Bekor qilish va kirish"}
+                ← {t("auth_cancel_login")}
               </button>
             </div>
           </form>
@@ -1025,9 +1127,7 @@ export function AuthModal() {
             color: "var(--ink2, #94a3b8)",
           }}
         >
-          {lang === "ru"
-            ? "Безопасный доступ к Medax с защитой от SMS-спама"
-            : "Medax tibbiyot uskunalari markazi — xavfsiz va himoyalangan tizim"}
+          {t("auth_security_note")}
         </div>
       </div>
     </div>
