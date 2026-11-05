@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useState, useRef } from "react";
 import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { api, ApiError, getToken, setToken } from "../api";
 import { MedaxLogo } from "../components/MedaxLogo";
@@ -14,6 +14,39 @@ export interface Me {
   role: "OWNER" | "ADMIN" | "MANAGER";
 }
 
+function playNotificationChime() {
+  try {
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) return;
+    const ctx = new AudioContextClass();
+    const now = ctx.currentTime;
+
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = "sine";
+    osc1.frequency.setValueAtTime(587.33, now); // D5
+    osc1.frequency.exponentialRampToValueAtTime(880, now + 0.15); // A5
+    gain1.gain.setValueAtTime(0.15, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.35);
+
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = "sine";
+    osc2.frequency.setValueAtTime(880, now + 0.12);
+    osc2.frequency.exponentialRampToValueAtTime(1174.66, now + 0.3); // D6
+    gain2.gain.setValueAtTime(0.18, now + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.5);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.5);
+  } catch {}
+}
+
 function AdminLayoutInner() {
   const nav = useNavigate();
   const { lang, setLang, t } = useAdminI18n();
@@ -22,19 +55,39 @@ function AdminLayoutInner() {
   const [newCount, setNewCount] = useState(0);
   const [unreadMsg, setUnreadMsg] = useState(0);
   const [showPwdModal, setShowPwdModal] = useState(false);
+  const prevOrdersRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!getToken()) return void nav("/admin/login", { replace: true });
     api<{ user: Me }>("/auth/me", { admin: true })
       .then((r) => setMe(r.user))
       .catch(() => {});
-    const load = () =>
+
+    if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+
+    const load = () => {
+      // 1. Stats and order audio chime
       api<{ orders: Record<string, number>; unreadContacts?: number }>("/admin/stats", { admin: true })
         .then((s) => {
-          setNewCount(s.orders.NEW || 0);
+          const currentNew = s.orders.NEW || 0;
+          if (prevOrdersRef.current !== null && currentNew > prevOrdersRef.current) {
+            playNotificationChime();
+            if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+              new Notification("Yangi buyurtma!", {
+                body: `Yangi buyurtma qabul qilindi. Tasdiqlanmagan buyurtmalar: ${currentNew} ta.`,
+                icon: "/favicon.ico",
+              });
+            }
+          }
+          prevOrdersRef.current = currentNew;
+          setNewCount(currentNew);
           setUnreadMsg(s.unreadContacts || 0);
         })
         .catch(() => {});
+    };
+
     load();
     const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
@@ -471,8 +524,38 @@ export function Dashboard() {
   const [s, setS] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [healthStatus, setHealthStatus] = useState<{
+    server: boolean;
+    database: boolean;
+    lastCheck: string;
+  }>({
+    server: true,
+    database: true,
+    lastCheck: "",
+  });
 
   useEffect(() => {
+    const fetchHealth = () => {
+      fetch("/api/health")
+        .then((r) => r.json())
+        .then((data) => {
+          setHealthStatus({
+            server: data?.server === "online",
+            database: data?.database === "connected",
+            lastCheck: new Date().toLocaleTimeString(),
+          });
+        })
+        .catch(() => {
+          setHealthStatus({
+            server: false,
+            database: false,
+            lastCheck: new Date().toLocaleTimeString(),
+          });
+        });
+    };
+    fetchHealth();
+    const hTimer = setInterval(fetchHealth, 30000);
+
     Promise.all([
       api("/admin/stats", { admin: true }).catch(() => null),
       api<{ items: RecentOrder[] }>("/admin/orders?page=1", { admin: true }).catch(() => ({ items: [] })),
@@ -481,6 +564,8 @@ export function Dashboard() {
       if (ordersRes?.items) setRecentOrders(ordersRes.items.slice(0, 5));
       setLoading(false);
     });
+
+    return () => clearInterval(hTimer);
   }, []);
 
   if (loading || !s) {
@@ -721,32 +806,45 @@ export function Dashboard() {
           </div>
         </div>
 
-        {/* System Status Panel */}
+        {/* System Status Panel (Real-time live health check) */}
         <div className="adm-panel-card">
-          <div className="adm-panel-head">
+          <div className="adm-panel-head space-between">
             <h3>{t("system_health")}</h3>
+            {healthStatus.lastCheck && (
+              <small style={{ fontSize: 11, color: "var(--ink2)" }}>{healthStatus.lastCheck}</small>
+            )}
           </div>
           <div className="adm-health-list">
             <div className="health-row">
               <div className="health-info">
-                <span className="health-indicator-dot online" />
+                <span className={`health-indicator-dot ${healthStatus.server ? "online" : "offline"}`} />
                 <div>
                   <strong>{t("sys_server")}</strong>
                   <small>Node.js & Express REST API</small>
                 </div>
               </div>
-              <span className="health-status-badge">{t("sys_online")}</span>
+              <span
+                className="health-status-badge"
+                style={!healthStatus.server ? { background: "rgba(239,68,68,0.15)", color: "#ef4444" } : undefined}
+              >
+                {healthStatus.server ? t("sys_online") : "Offline"}
+              </span>
             </div>
 
             <div className="health-row">
               <div className="health-info">
-                <span className="health-indicator-dot online" />
+                <span className={`health-indicator-dot ${healthStatus.database ? "online" : "offline"}`} />
                 <div>
                   <strong>{t("sys_database")}</strong>
                   <small>Prisma ORM & PostgreSQL</small>
                 </div>
               </div>
-              <span className="health-status-badge">{t("sys_online")}</span>
+              <span
+                className="health-status-badge"
+                style={!healthStatus.database ? { background: "rgba(239,68,68,0.15)", color: "#ef4444" } : undefined}
+              >
+                {healthStatus.database ? t("sys_online") : "Offline"}
+              </span>
             </div>
 
             <div className="health-row">

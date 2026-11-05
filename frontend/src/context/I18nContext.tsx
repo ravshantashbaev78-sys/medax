@@ -150,6 +150,29 @@ export interface Translations {
   cart_success_title: string;
   cart_success_desc: string;
   cart_order_code: string;
+  cart_pickup_title: string;
+  cart_pickup_address_label: string;
+  cart_working_hours: string;
+  cart_contact_phone: string;
+  cart_open_yandex: string;
+  cart_open_google: string;
+  cart_pay_cash_title: string;
+  cart_pay_cash_desc: string;
+  cart_pay_contract_title: string;
+  cart_pay_contract_desc: string;
+  cart_perk_warranty: string;
+  cart_perk_pickup: string;
+  cart_perk_docs: string;
+  cart_guest_sms_prompt: string;
+  cart_guest_sms_resend: string;
+  cart_guest_sms_wait: string;
+  cart_btn_get_code: string;
+  cart_btn_confirm_order: string;
+  cart_btn_sending_order: string;
+  cart_negotiated: string;
+  unit_pcs: string;
+  stock_col: string;
+  out_of_stock: string;
 
   // Product Details Page
   pd_sku: string;
@@ -515,6 +538,29 @@ export const translations: Record<Lang, Translations> = {
     cart_success_title: "Buyurtmangiz qabul qilindi!",
     cart_success_desc: "Menejerimiz qisqa vaqt ichida siz bilan bog'lanadi.",
     cart_order_code: "Buyurtma kodi:",
+    cart_pickup_title: "Olib ketish joyi va ish vaqti",
+    cart_pickup_address_label: "Do'konimiz manzili:",
+    cart_working_hours: "Ish vaqti: Dushanba - Shanba, 09:00 - 18:00",
+    cart_contact_phone: "Aloqa:",
+    cart_open_yandex: "Yandex Xaritada ochish",
+    cart_open_google: "Google Maps'da ochish",
+    cart_pay_cash_title: "Do'konda to'lash (Olib ketish paytida)",
+    cart_pay_cash_desc: "Uskunani ko'rib, tekshirib qabul qilgach to'laysiz (Naqd pul, korporativ karta/terminal orqali).",
+    cart_pay_contract_title: "Shartnoma asosida (B2B / Bank o'tkazmasi)",
+    cart_pay_contract_desc: "Klinika, shifoxona va yuridik tashkilotlar uchun rasmiy shartnoma va hisob-faktura rasmiylashtiriladi.",
+    cart_perk_warranty: "Rasmiy zavod kafolati",
+    cart_perk_pickup: "Do'kondan olib ketish yoki kelishuv asosida yetkazish",
+    cart_perk_docs: "Yuridik shaxslar uchun shartnoma & hisob-faktura",
+    cart_guest_sms_prompt: "Telefon raqamingizni tasdiqlash uchun bepul SMS tasdiqlash kodi yuboriladi.",
+    cart_guest_sms_resend: "Kodni qayta yuborish",
+    cart_guest_sms_wait: "Qayta yuborish:",
+    cart_btn_get_code: "SMS kod olish va davom etish",
+    cart_btn_confirm_order: "Buyurtmani tasdiqlash va yuborish",
+    cart_btn_sending_order: "Buyurtma yuborilmoqda…",
+    cart_negotiated: "Kelishilgan narxda",
+    unit_pcs: "dona",
+    stock_col: "Omborda",
+    out_of_stock: "Omborda tugagan",
 
     pd_sku: "Artikul",
     pd_brand: "Ishlab chiqaruvchi",
@@ -874,6 +920,29 @@ export const translations: Record<Lang, Translations> = {
     cart_success_title: "Заказ успешно принят!",
     cart_success_desc: "Наш менеджер свяжется с вами в ближайшее время.",
     cart_order_code: "Код заказа:",
+    cart_pickup_title: "Пункт самовывоза и график работы",
+    cart_pickup_address_label: "Адрес нашего магазина:",
+    cart_working_hours: "График работы: Пн - Сб, 09:00 - 18:00",
+    cart_contact_phone: "Контакты:",
+    cart_open_yandex: "Открыть в Яндекс Картах",
+    cart_open_google: "Открыть в Google Maps",
+    cart_pay_cash_title: "Оплата в магазине (при получении)",
+    cart_pay_cash_desc: "Оплата наличными или банковской картой после осмотра и проверки оборудования.",
+    cart_pay_contract_title: "По договору (B2B / Безналичный расчет)",
+    cart_pay_contract_desc: "Официальный договор и счет-фактура для клиник, больниц и юридических лиц.",
+    cart_perk_warranty: "Официальная гарантия производителя",
+    cart_perk_pickup: "Самовывоз из магазина или доставка по согласованию",
+    cart_perk_docs: "Договор и счет-фактура для юридических лиц",
+    cart_guest_sms_prompt: "Для подтверждения номера вам будет отправлен бесплатный SMS-код.",
+    cart_guest_sms_resend: "Отправить код повторно",
+    cart_guest_sms_wait: "Повторный запрос через:",
+    cart_btn_get_code: "Получить SMS-код и продолжить",
+    cart_btn_confirm_order: "Подтвердить и отправить заказ",
+    cart_btn_sending_order: "Оформление заказа…",
+    cart_negotiated: "По согласованию",
+    unit_pcs: "шт",
+    stock_col: "В наличии",
+    out_of_stock: "Нет в наличии",
 
     pd_sku: "Артикул",
     pd_brand: "Производитель",
@@ -1233,6 +1302,29 @@ export const translations: Record<Lang, Translations> = {
     cart_success_title: "Order placed successfully!",
     cart_success_desc: "Our manager will contact you shortly.",
     cart_order_code: "Order code:",
+    cart_pickup_title: "Store Pickup Location & Schedule",
+    cart_pickup_address_label: "Our showroom address:",
+    cart_working_hours: "Working hours: Mon - Sat, 09:00 - 18:00",
+    cart_contact_phone: "Contact phone:",
+    cart_open_yandex: "Open in Yandex Maps",
+    cart_open_google: "Open in Google Maps",
+    cart_pay_cash_title: "Pay in Store (Upon Pickup)",
+    cart_pay_cash_desc: "Pay in cash or by corporate card/terminal after inspecting and verifying the equipment.",
+    cart_pay_contract_title: "Under Contract (B2B / Bank Transfer)",
+    cart_pay_contract_desc: "Official supply contract and invoice issued for clinics, hospitals, and legal entities.",
+    cart_perk_warranty: "Official manufacturer warranty",
+    cart_perk_pickup: "In-store pickup or coordinated delivery",
+    cart_perk_docs: "Official contract & invoices for legal entities",
+    cart_guest_sms_prompt: "A free SMS verification code will be sent to verify your phone number.",
+    cart_guest_sms_resend: "Resend code",
+    cart_guest_sms_wait: "Resend in:",
+    cart_btn_get_code: "Get SMS Code & Continue",
+    cart_btn_confirm_order: "Confirm & Submit Order",
+    cart_btn_sending_order: "Submitting order…",
+    cart_negotiated: "On request",
+    unit_pcs: "pcs",
+    stock_col: "In stock",
+    out_of_stock: "Out of stock",
 
     pd_sku: "SKU",
     pd_brand: "Manufacturer",

@@ -131,6 +131,8 @@ export interface OrderEmailData {
   customerName: string;
   phone: string;
   organization?: string;
+  paymentMethod?: string;
+  comment?: string;
   deliveryAddress?: string;
   totalAmount?: any;
   items: { productName: string; quantity: number; price?: any }[];
@@ -149,11 +151,15 @@ export async function sendNewOrderEmail(order: OrderEmailData): Promise<boolean>
     minute: "2-digit",
   });
 
-  const mailSubject = `🛒 Yangi Buyurtma #${order.code} (${order.customerName})`;
+  const mailSubject = `Yangi Buyurtma #${order.code} (${order.customerName})`;
 
   const itemsList = order.items
     .map((i) => `• ${i.productName} — ${i.quantity} dona ${i.price ? `(${Number(i.price).toLocaleString()} so'm)` : ""}`)
     .join("\n");
+
+  const payMethodTitle = order.paymentMethod?.includes("CONTRACT") || order.paymentMethod?.includes("Shartnoma")
+    ? "Shartnoma asosida (B2B / Bank o'tkazmasi)"
+    : "Do'konda to'lash (Olib ketish paytida)";
 
   const fullSummary = `
 Yangi buyurtma qabul qilindi:
@@ -161,7 +167,8 @@ Yangi buyurtma qabul qilindi:
 Buyurtma kodi: #${order.code} (№${order.id})
 Mijoz: ${order.customerName}
 Telefon: ${order.phone}
-${order.organization ? `Tashkilot: ${order.organization}\n` : ""}${order.deliveryAddress ? `Yetkazish manzili: ${order.deliveryAddress}\n` : ""}Sana: ${formattedDate}
+${order.organization ? `Tashkilot: ${order.organization}\n` : ""}To'lov usuli: ${payMethodTitle}
+${order.comment ? `Mijoz izohi: ${order.comment}\n` : ""}Sana: ${formattedDate}
 
 Mahsulotlar:
 ${itemsList}
@@ -183,7 +190,8 @@ Admin panel: https://medax.uz/admin/orders
       order_code: order.code,
       order_id: String(order.id),
       organization: order.organization || "Jismoniy shaxs",
-      delivery_address: order.deliveryAddress || "Ko'rsatilmagan",
+      payment_method: payMethodTitle,
+      comment: order.comment || "—",
       items: itemsList,
       total_amount: order.totalAmount ? Number(order.totalAmount).toLocaleString() + " so'm" : "Kelishuv asosida",
       message: fullSummary,
@@ -196,4 +204,55 @@ Admin panel: https://medax.uz/admin/orders
       admin_link: "https://medax.uz/admin/orders",
     },
   });
+}
+
+/**
+ * Yangi buyurtma tushganda menejerga Telegram orqali tezkor va ishonchli xabar yuborish
+ */
+export async function sendTelegramOrderAlert(order: OrderEmailData): Promise<boolean> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_CHAT_ID;
+  if (!token || !chatId) {
+    return false;
+  }
+
+  const itemsList = order.items
+    .map((i) => `• <b>${i.productName}</b> — ${i.quantity} dona ${i.price ? `(${Number(i.price).toLocaleString()} so'm)` : ""}`)
+    .join("\n");
+
+  const payMethodTitle = order.paymentMethod?.includes("CONTRACT") || order.paymentMethod?.includes("Shartnoma")
+    ? "Shartnoma asosida (B2B)"
+    : "Do'konda to'lash (Olib ketishda)";
+
+  const text = `
+<b>🛒 YANGI BUYURTMA #${order.code}</b>
+━━━━━━━━━━━━━━━━━━
+👤 <b>Mijoz:</b> ${order.customerName}
+📞 <b>Telefon:</b> <code>${order.phone}</code>
+${order.organization ? `🏢 <b>Tashkilot:</b> ${order.organization}\n` : ""}💳 <b>To'lov turi:</b> ${payMethodTitle}
+${order.comment ? `💬 <b>Izoh:</b> ${order.comment}\n` : ""}
+📦 <b>Mahsulotlar:</b>
+${itemsList}
+
+💰 <b>Jami summa:</b> ${order.totalAmount ? Number(order.totalAmount).toLocaleString() + " so'm" : "Kelishuv asosida"}
+━━━━━━━━━━━━━━━━━━
+🔗 <a href="https://medax.uz/admin/orders">Admin panelda ochish</a>
+  `.trim();
+
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML",
+        disable_web_page_preview: true,
+      }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("[Telegram Order Alert Error]", err);
+    return false;
+  }
 }

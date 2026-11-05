@@ -87,11 +87,11 @@ export default function Cart() {
   const [guestOtpSending, setGuestOtpSending] = useState(false);
 
   useEffect(() => {
-    let t: any;
+    let timerId: any;
     if (guestOtpTimer > 0) {
-      t = setTimeout(() => setGuestOtpTimer(guestOtpTimer - 1), 1000);
+      timerId = setTimeout(() => setGuestOtpTimer(guestOtpTimer - 1), 1000);
     }
-    return () => clearTimeout(t);
+    return () => clearTimeout(timerId);
   }, [guestOtpTimer]);
 
   const handleSendGuestOtp = async () => {
@@ -101,6 +101,8 @@ export default function Cart() {
       setError(
         lang === "ru"
           ? "Пожалуйста, введите ваше имя и фамилию (не менее 2 символов)"
+          : lang === "en"
+          ? "Please enter your full name (at least 2 characters)"
           : "Iltimos, ism va familiyangizni to'liq kiriting (kamida 2 ta belgi)"
       );
       return false;
@@ -109,6 +111,8 @@ export default function Cart() {
       setError(
         lang === "ru"
           ? "Пожалуйста, введите корректный номер телефона (+998 __ ___ __ __)"
+          : lang === "en"
+          ? "Please enter a valid phone number (+998 __ ___ __ __)"
           : "Iltimos, telefon raqamini to'liq kiriting (+998 __ ___ __ __)"
       );
       return false;
@@ -141,10 +145,6 @@ export default function Cart() {
     }
   }, [customer]);
 
-  // Calculate totals and pricing mode
-  const isEveryPriceFixed = cart.items.length > 0 && cart.items.every((i) => i.priceFrom && Number(i.priceFrom) > 0);
-  const hasUnpricedItems = cart.items.some((i) => !i.priceFrom || Number(i.priceFrom) <= 0);
-
   const totalAmount = cart.items.reduce((acc, item) => {
     if (item.priceFrom) {
       return acc + Number(item.priceFrom) * item.quantity;
@@ -154,14 +154,12 @@ export default function Cart() {
 
   const hasAnyPrice = cart.items.some((i) => i.priceFrom);
 
-  // Click "Buyurtmani rasmiylashtirish"
   const handleProceedToCheckout = () => {
     setError("");
     setStage("checkout");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  // Confirm and place the order
   const handleConfirmOrder = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
@@ -172,6 +170,8 @@ export default function Cart() {
       setError(
         lang === "ru"
           ? "Пожалуйста, введите ваше имя и фамилию (не менее 2 символов)"
+          : lang === "en"
+          ? "Please enter your full name (at least 2 characters)"
           : "Iltimos, ism va familiyangizni to'liq kiriting (kamida 2 ta belgi)"
       );
       return;
@@ -181,6 +181,8 @@ export default function Cart() {
       setError(
         lang === "ru"
           ? "Пожалуйста, введите корректный номер телефона (+998 __ ___ __ __)"
+          : lang === "en"
+          ? "Please enter a valid phone number (+998 __ ___ __ __)"
           : "Iltimos, telefon raqamini to'liq kiriting (+998 __ ___ __ __)"
       );
       return;
@@ -189,7 +191,6 @@ export default function Cart() {
     const authToken = token || localStorage.getItem(CUSTOMER_TOKEN_KEY);
     const isGuest = !customer && !authToken;
 
-    // Guest checkout requires SMS OTP verification
     if (isGuest) {
       if (!guestOtpSent) {
         await handleSendGuestOtp();
@@ -199,6 +200,8 @@ export default function Cart() {
         setError(
           lang === "ru"
             ? "Введите 6-значный код подтверждения из SMS"
+            : lang === "en"
+            ? "Enter the 6-digit confirmation code from SMS"
             : "SMS orqali yuborilgan 6 xonali tasdiqlash kodini kiriting"
         );
         return;
@@ -221,7 +224,7 @@ export default function Cart() {
           deliveryAddress: "Do'kondan olib ketish (Namangan sh., Ozod MFY, Beruniy 2-uy)",
           paymentMethod,
           comment: comment.trim(),
-          website, // honeypot
+          website,
           elapsedMs: Date.now() - startedAt.current,
           items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
           code: isGuest ? guestOtpCode.trim() : undefined,
@@ -249,7 +252,6 @@ export default function Cart() {
     }
   };
 
-  // Render: Done state
   if (stage === "done") {
     return (
       <main className="wrap">
@@ -262,13 +264,13 @@ export default function Cart() {
           </div>
           <h1>Buyurtma so'rovi qabul qilindi!</h1>
           <p className="order-subheading">
-            Medax menejeri tez orada <b>{phone}</b> raqamingizga qo'ng'iroq qilib, tovar omborda borligini tasdiqlaydi va siz uchun ajratib qo'yadi.
+            Medax menejeri tez orada <b>{phone}</b> raqamingizga qo'ng'iroq qilib, uskunani siz uchun ajratib qo'yadi.
           </p>
 
           <div className="order-number-banner">
             <span className="order-num-label">Buyurtma kodi:</span>
             <span className="order-num-value">
-              {orderCode} {createdOrderId ? <small style={{ fontSize: 15, opacity: 0.85, marginLeft: 8 }}>(Raqam:# {createdOrderId})</small> : null}
+              {orderCode} {createdOrderId ? <small style={{ fontSize: 15, opacity: 0.85, marginLeft: 8 }}>(№ {createdOrderId})</small> : null}
             </span>
           </div>
 
@@ -277,21 +279,21 @@ export default function Cart() {
               <span className="step-num">1</span>
               <div>
                 <strong>Menejer tasdiqlashi</strong>
-                <p>15 daqiqa ichida qo'ng'iroq qilinib, tovar ajratib qo'yiladi.</p>
+                <p>Menejerimiz qo'ng'iroq qilib, buyurtma tafsilotlarini tasdiqlaydi.</p>
               </div>
             </div>
             <div className="step-point">
               <span className="step-num">2</span>
               <div>
                 <strong>Do'kondan olib ketish</strong>
-                <p>Do'konimizga tashrif buyurib, uskunani ko'rib tekshirib olasiz.</p>
+                <p>Namangan markazimizga tashrif buyurib, uskunani ko'rib tekshirib olasiz.</p>
               </div>
             </div>
             <div className="step-point">
               <span className="step-num">3</span>
               <div>
                 <strong>Qulay to'lov</strong>
-                <p>Olib ketish paytida naqd, terminal yoki bank hisob-faktura orqali to'lov.</p>
+                <p>Olib ketish paytida naqd, terminal yoki rasmiy shartnoma hisob-faktura orqali to'lov.</p>
               </div>
             </div>
           </div>
@@ -312,7 +314,6 @@ export default function Cart() {
     );
   }
 
-  // Render: Empty cart
   if (cart.items.length === 0) {
     return (
       <main className="wrap">
@@ -336,10 +337,8 @@ export default function Cart() {
     );
   }
 
-  // Main Cart & Checkout Flow
   return (
     <main className="wrap">
-      {/* Breadcrumbs */}
       <div className="crumbs">
         <Link to="/">Bosh sahifa</Link> /{" "}
         <span onClick={() => setStage("cart")} style={{ cursor: "pointer", textDecoration: stage !== "cart" ? "underline" : "none" }}>
@@ -348,7 +347,6 @@ export default function Cart() {
         {stage === "checkout" && <span> / Rasmiylashtirish</span>}
       </div>
 
-      {/* Progress Steps Header */}
       <div className="checkout-pipeline-steps">
         <div className={`pipe-step ${stage === "cart" ? "active" : "completed"}`} onClick={() => setStage("cart")}>
           <span className="pipe-dot">1</span>
@@ -361,9 +359,7 @@ export default function Cart() {
       </div>
 
       <div className="cartpage">
-        {/* LEFT COLUMN */}
         <section className="cart-left-col">
-          {/* STEP 1: CART ITEMS VIEW */}
           {stage === "cart" && (
             <div>
               <div className="cart-heading-row">
@@ -371,11 +367,7 @@ export default function Cart() {
                   {lang === "ru" ? "Корзина покупок" : lang === "en" ? "Shopping Cart" : "Xaridlar savati"}
                 </h1>
                 <span className="cart-count-pill">
-                  {lang === "ru"
-                    ? `${cart.count} наим. (${cart.totalQuantity} шт)`
-                    : lang === "en"
-                    ? `${cart.count} items (${cart.totalQuantity} pcs)`
-                    : `${cart.count} xil uskuna (${cart.totalQuantity} dona)`}
+                  {cart.count} {t("unit_pcs")} ({cart.totalQuantity} {t("unit_pcs")})
                 </span>
               </div>
 
@@ -399,22 +391,14 @@ export default function Cart() {
                               <strong>{money(i.priceFrom, t("sum_currency"))}</strong>
                             </>
                           ) : (
-                            <span className="negotiated-tag">{lang === "ru" ? "Цена по запросу" : lang === "en" ? "Price on request" : "Narx so'rov bo'yicha"}</span>
+                            <span className="negotiated-tag">{t("cart_negotiated")}</span>
                           )}
                         </div>
                         {i.stock !== undefined && (
-                          <div style={{ fontSize: 12, marginTop: 4, fontWeight: 600, color: (i.stock ?? 0) > 0 ? "#0284c7" : "#dc2626" }}>
+                          <div style={{ fontSize: 12, marginTop: 4, fontWeight: 600, color: (i.stock ?? 0) > 0 ? "var(--teal, #0d9488)" : "var(--red, #ef4444)" }}>
                             {(i.stock ?? 0) > 0
-                              ? lang === "ru"
-                                ? `В наличии: ${i.stock} шт`
-                                : lang === "en"
-                                ? `In stock: ${i.stock} pcs`
-                                : `Omborda: ${i.stock} dona mavjud`
-                              : lang === "ru"
-                              ? "⚠️ Нет в наличии"
-                              : lang === "en"
-                              ? "⚠️ Out of stock"
-                              : "⚠️ Omborda tugagan"}
+                              ? `${t("stock_col")}: ${i.stock} ${t("unit_pcs")}`
+                              : t("out_of_stock")}
                           </div>
                         )}
                       </div>
@@ -465,7 +449,7 @@ export default function Cart() {
 
               <div className="cart-table-footer">
                 <Link to="/catalog" className="btn ghost sm">
-                  ← Katalogdan yana tanlash
+                  ← {t("pd_back_to_catalog")}
                 </Link>
                 <button className="btn ghost sm" onClick={() => cart.clear()}>
                   Savatni tozalash
@@ -474,14 +458,13 @@ export default function Cart() {
             </div>
           )}
 
-          {/* STEP 2: CHECKOUT DETAILS & PAYMENT */}
           {stage === "checkout" && (
             <div className="checkout-step-card">
-              <div className="step-back-link" onClick={() => setStage("cart")}>
+              <div className="step-back-link" onClick={() => setStage("cart")} style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
                 ← Savatga qaytish
               </div>
 
-              <div className="step-card-header">
+              <div className="step-card-header" style={{ marginTop: 12 }}>
                 <div className="step-icon-badge">
                   <ClinicIcon size={24} />
                 </div>
@@ -493,16 +476,13 @@ export default function Cart() {
                 </div>
               </div>
 
-              {/* Logged in vs Guest Auth Banner */}
               {customer ? (
                 <div className="customer-verified-banner">
                   <div className="ver-dot-wrap">
                     <span className="live-radar-dot" />
                   </div>
                   <div>
-                    <div className="ver-title">
-                      {lang === "ru" ? "Клиент подтвержден (SMS)" : "Foydalanuvchi tasdiqlangan (SMS)"}
-                    </div>
+                    <div className="ver-title">Foydalanuvchi tasdiqlangan</div>
                     <div className="ver-user">
                       {name || customer?.name || "Mijoz"} · <b>{phone || customer?.phone}</b>
                     </div>
@@ -511,16 +491,16 @@ export default function Cart() {
               ) : (
                 <div className="cart-auth-callout">
                   <div className="cart-auth-callout-text">
-                    <strong>{lang === "ru" ? "У вас уже есть аккаунт?" : "Sizda hisob bormi?"}</strong>
-                    <span>{lang === "ru" ? "Войдите по номеру телефона для удобного отслеживания заказа." : "Buyurtmalarni shaxsiy kabinetda qulay kuzatish uchun telefon orqali kiring."}</span>
+                    <strong>Hisobingiz bormi?</strong>
+                    <span>Buyurtmalarni shaxsiy kabinetda qulay kuzatish uchun telefon orqali kiring.</span>
                   </div>
                   <button type="button" className="btn btn-primary" onClick={() => openAuthModal()}>
-                    {lang === "ru" ? "Войти в аккаунт" : "Kabinetga kirish"}
+                    Kabinetga kirish
                   </button>
                 </div>
               )}
 
-              {error && <div className="auth-error-banner">{error}</div>}
+              {error && <div className="auth-error-banner" role="alert">{error}</div>}
 
               <form onSubmit={handleConfirmOrder} className="checkout-final-form">
                 <h3 className="section-subhead">1. Qabul qiluvchi ma'lumotlari</h3>
@@ -540,12 +520,12 @@ export default function Cart() {
                       placeholder="Masalan: Azizbek Karimov"
                       style={
                         nameTouched && !isNameValid
-                          ? { borderColor: "#ef4444", background: "rgba(239, 68, 68, 0.05)" }
+                          ? { borderColor: "var(--red, #ef4444)", background: "rgba(239, 68, 68, 0.05)" }
                           : undefined
                       }
                     />
                     {nameTouched && !isNameValid && (
-                      <span style={{ fontSize: 12, color: "#ef4444", marginTop: 4, display: "block" }}>
+                      <span style={{ fontSize: 12, color: "var(--red, #ef4444)", marginTop: 4, display: "block" }}>
                         Iltimos, ism va familiyangizni kiriting (kamida 2 ta harf)
                       </span>
                     )}
@@ -569,12 +549,12 @@ export default function Cart() {
                       placeholder="+998 90 123 45 67"
                       style={
                         phoneTouched && !isPhoneValid
-                          ? { borderColor: "#ef4444", background: "rgba(239, 68, 68, 0.05)" }
+                          ? { borderColor: "var(--red, #ef4444)", background: "rgba(239, 68, 68, 0.05)" }
                           : undefined
                       }
                     />
                     {phoneTouched && !isPhoneValid && (
-                      <span style={{ fontSize: 12, color: "#ef4444", marginTop: 4, display: "block" }}>
+                      <span style={{ fontSize: 12, color: "var(--red, #ef4444)", marginTop: 4, display: "block" }}>
                         Iltimos, to'liq telefon raqamini kiriting: +998 (__) ___-__-__
                       </span>
                     )}
@@ -597,11 +577,11 @@ export default function Cart() {
                   />
                 </div>
 
-                <h3 className="section-subhead" style={{ marginTop: 24 }}>2. Olib ketish joyi va qoidalari</h3>
+                <h3 className="section-subhead" style={{ marginTop: 24 }}>2. {t("cart_pickup_title")}</h3>
                 <div
                   style={{
-                    background: "var(--sea, #f0f9ff)",
-                    border: "1.5px solid rgba(2, 132, 199, 0.3)",
+                    background: "var(--surface-card, #f8fafc)",
+                    border: "1.5px solid var(--line, #e2e8f0)",
                     borderRadius: 16,
                     padding: "20px 24px",
                     display: "grid",
@@ -609,10 +589,15 @@ export default function Cart() {
                   }}
                 >
                   <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                    <span style={{ fontSize: 24 }}>🏢</span>
+                    <div style={{ color: "var(--teal, #0d9488)", marginTop: 2 }}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                        <polyline points="9 22 9 12 15 12 15 22" />
+                      </svg>
+                    </div>
                     <div>
-                      <strong style={{ fontSize: 16, color: "var(--ink, #0f172a)", display: "block", marginBottom: 4 }}>
-                        {lang === "ru" ? "Наш адрес:" : lang === "en" ? "Our address:" : "Bizning manzil:"}
+                      <strong style={{ fontSize: 15, color: "var(--ink, #0f172a)", display: "block", marginBottom: 4 }}>
+                        {t("cart_pickup_address_label")}
                       </strong>
                       <p style={{ margin: 0, fontSize: 14, color: "var(--ink2, #334155)" }}>
                         {lang === "ru" ? SITE_CONFIG.addressRu : lang === "en" ? SITE_CONFIG.addressEn : SITE_CONFIG.addressUz}
@@ -620,9 +605,20 @@ export default function Cart() {
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", fontSize: 13, color: "var(--ink2)" }}>
-                    <span>🕒 <b>Ish vaqti:</b> Dush - Shanba, 09:00 - 18:00</span>
-                    <span>📞 <b>Aloqa:</b> {SITE_CONFIG.phone}</span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 13, color: "var(--ink2)" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                      {t("cart_working_hours")}
+                    </span>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
+                      </svg>
+                      <b>{t("cart_contact_phone")}</b> {SITE_CONFIG.phone}
+                    </span>
                   </div>
 
                   {/* Interaktiv Yandex Xaritasi */}
@@ -630,16 +626,16 @@ export default function Cart() {
                     style={{
                       borderRadius: 12,
                       overflow: "hidden",
-                      border: "1px solid rgba(2, 132, 199, 0.25)",
+                      border: "1px solid var(--line, #e2e8f0)",
                       background: "var(--card)",
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.05)",
+                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
                     }}
                   >
                     <iframe
                       title="Medax Namangan Xaritasi"
                       src={SITE_CONFIG.yandexMapEmbedUrl}
                       width="100%"
-                      height="250"
+                      height="230"
                       style={{ border: 0, display: "block" }}
                       allowFullScreen
                       loading="lazy"
@@ -652,18 +648,18 @@ export default function Cart() {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn sm ghost"
-                      style={{ borderRadius: 8, fontSize: 12, background: "var(--card)" }}
+                      style={{ borderRadius: 8, fontSize: 12 }}
                     >
-                      📍 Yandex Xaritada ochish
+                      {t("cart_open_yandex")}
                     </a>
                     <a
                       href={SITE_CONFIG.googleMapsUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn sm ghost"
-                      style={{ borderRadius: 8, fontSize: 12, background: "var(--card)" }}
+                      style={{ borderRadius: 8, fontSize: 12 }}
                     >
-                      🗺️ Google Maps'da ochish
+                      {t("cart_open_google")}
                     </a>
                   </div>
                 </div>
@@ -695,8 +691,8 @@ export default function Cart() {
                       gap: 14,
                       padding: "16px 18px",
                       borderRadius: 14,
-                      border: paymentMethod === "Do'konda to'lash (Olib ketishda)" ? "2px solid #0284c7" : "1.5px solid var(--line)",
-                      background: paymentMethod === "Do'konda to'lash (Olib ketishda)" ? "rgba(2, 132, 199, 0.05)" : "var(--card, #fff)",
+                      border: paymentMethod === "Do'konda to'lash (Olib ketishda)" ? "2px solid var(--teal, #0d9488)" : "1.5px solid var(--line)",
+                      background: paymentMethod === "Do'konda to'lash (Olib ketishda)" ? "rgba(13, 148, 136, 0.05)" : "var(--surface-card, #fff)",
                       cursor: "pointer",
                       transition: "all 0.2s ease",
                     }}
@@ -707,17 +703,14 @@ export default function Cart() {
                       value="Do'konda to'lash (Olib ketishda)"
                       checked={paymentMethod === "Do'konda to'lash (Olib ketishda)"}
                       onChange={() => setPaymentMethod("Do'konda to'lash (Olib ketishda)")}
-                      style={{ marginTop: 4, accentColor: "#0284c7", width: 18, height: 18 }}
+                      style={{ marginTop: 4, accentColor: "var(--teal, #0d9488)", width: 18, height: 18 }}
                     />
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 20 }}>🏪</span>
-                        <strong style={{ fontSize: 16, color: "var(--ink)" }}>
-                          Do'konda to'lash (Olib ketish paytida)
-                        </strong>
-                      </div>
-                      <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink2)" }}>
-                        Uskunani ko'rib, tekshirib qabul qilgach to'laysiz (Naqd pul, korporativ karta/terminal orqali).
+                      <strong style={{ fontSize: 15, color: "var(--ink)", display: "block" }}>
+                        {t("cart_pay_cash_title")}
+                      </strong>
+                      <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink2)", lineHeight: 1.4 }}>
+                        {t("cart_pay_cash_desc")}
                       </p>
                     </div>
                   </label>
@@ -730,8 +723,8 @@ export default function Cart() {
                       gap: 14,
                       padding: "16px 18px",
                       borderRadius: 14,
-                      border: paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)" ? "2px solid #0284c7" : "1.5px solid var(--line)",
-                      background: paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)" ? "rgba(2, 132, 199, 0.05)" : "var(--card, #fff)",
+                      border: paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)" ? "2px solid var(--teal, #0d9488)" : "1.5px solid var(--line)",
+                      background: paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)" ? "rgba(13, 148, 136, 0.05)" : "var(--surface-card, #fff)",
                       cursor: "pointer",
                       transition: "all 0.2s ease",
                     }}
@@ -742,17 +735,14 @@ export default function Cart() {
                       value="Shartnoma asosida (B2B / Bank o'tkazmasi)"
                       checked={paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)"}
                       onChange={() => setPaymentMethod("Shartnoma asosida (B2B / Bank o'tkazmasi)")}
-                      style={{ marginTop: 4, accentColor: "#0284c7", width: 18, height: 18 }}
+                      style={{ marginTop: 4, accentColor: "var(--teal, #0d9488)", width: 18, height: 18 }}
                     />
                     <div>
-                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                        <span style={{ fontSize: 20 }}>📑</span>
-                        <strong style={{ fontSize: 16, color: "var(--ink)" }}>
-                          Shartnoma asosida (B2B / Bank o'tkazmasi)
-                        </strong>
-                      </div>
-                      <p style={{ margin: "6px 0 0", fontSize: 13, color: "var(--ink2)" }}>
-                        Klinika, shifoxona va yuridik tashkilotlar uchun rasmiy shartnoma va hisob-faktura rasmiylashtiriladi.
+                      <strong style={{ fontSize: 15, color: "var(--ink)", display: "block" }}>
+                        {t("cart_pay_contract_title")}
+                      </strong>
+                      <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink2)", lineHeight: 1.4 }}>
+                        {t("cart_pay_contract_desc")}
                       </p>
                     </div>
                   </label>
@@ -763,18 +753,17 @@ export default function Cart() {
                   <div
                     style={{
                       marginTop: 24,
-                      padding: "20px 22px",
-                      borderRadius: 16,
-                      background: "rgba(2, 132, 199, 0.06)",
-                      border: "2px solid rgba(2, 132, 199, 0.35)",
+                      padding: "18px 20px",
+                      borderRadius: 14,
+                      background: "rgba(13, 148, 136, 0.06)",
+                      border: "1.5px solid var(--teal, #0d9488)",
                       display: "grid",
-                      gap: 12,
+                      gap: 10,
                     }}
                   >
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <strong style={{ fontSize: 16, color: "var(--ink)", display: "flex", alignItems: "center", gap: 8 }}>
-                        <span>📩</span>
-                        <span>{lang === "ru" ? "SMS подтверждение" : "SMS orqali tasdiqlash"}</span>
+                      <strong style={{ fontSize: 15, color: "var(--ink)" }}>
+                        SMS orqali tasdiqlash
                       </strong>
                       <button
                         type="button"
@@ -785,21 +774,19 @@ export default function Cart() {
                         style={{
                           background: "none",
                           border: "none",
-                          color: "#0284c7",
+                          color: "var(--teal, #0d9488)",
                           fontSize: 13,
                           cursor: "pointer",
                           fontWeight: 600,
                           textDecoration: "underline",
                         }}
                       >
-                        {lang === "ru" ? "Изменить номер" : "Raqamni o'zgartirish"}
+                        Raqamni o'zgartirish
                       </button>
                     </div>
 
                     <p style={{ margin: 0, fontSize: 13, color: "var(--ink2)", lineHeight: 1.5 }}>
-                      {lang === "ru"
-                        ? `На номер ${phone} отправлен 6-значный код подтверждения:`
-                        : `${phone} raqamingizga buyurtmani tasdiqlash uchun 6 xonali SMS kod yuborildi:`}
+                      {phone} raqamingizga buyurtmani tasdiqlash uchun 6 xonali SMS kod yuborildi:
                     </p>
 
                     <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 4 }}>
@@ -818,21 +805,21 @@ export default function Cart() {
                         autoFocus
                         style={{
                           width: 170,
-                          height: 48,
+                          height: 46,
                           fontSize: 22,
                           fontWeight: 700,
                           letterSpacing: 6,
                           textAlign: "center",
                           borderRadius: 10,
-                          border: "2px solid #0284c7",
-                          background: "var(--card, #fff)",
+                          border: "2px solid var(--teal, #0d9488)",
+                          background: "var(--surface-card, #fff)",
                           outline: "none",
                         }}
                       />
 
                       {guestOtpTimer > 0 ? (
                         <span style={{ fontSize: 13, color: "var(--ink2)", fontWeight: 500 }}>
-                          ⏳ {lang === "ru" ? `Повторный запрос: ${guestOtpTimer} сек` : `Kodni qayta yuborish: ${guestOtpTimer} soniya`}
+                          {t("cart_guest_sms_wait")} {guestOtpTimer}s
                         </span>
                       ) : (
                         <button
@@ -842,38 +829,32 @@ export default function Cart() {
                           className="btn ghost sm"
                           style={{ height: 42, fontSize: 13, borderRadius: 8 }}
                         >
-                          {guestOtpSending
-                            ? (lang === "ru" ? "Отправка..." : "Yuborilmoqda...")
-                            : (lang === "ru" ? "🔄 Отправить код повторно" : "🔄 Kodni qayta yuborish")}
+                          {guestOtpSending ? t("auth_btn_sending") : t("cart_guest_sms_resend")}
                         </button>
                       )}
                     </div>
                   </div>
                 )}
 
-                <div style={{ marginTop: 28 }}>
+                <div style={{ marginTop: 26 }}>
                   <button
                     type="submit"
                     className="btn btn-primary-sheen"
-                    style={{ width: "100%", height: 52, fontSize: 17, fontWeight: 700 }}
+                    style={{ width: "100%", height: 50, fontSize: 16, fontWeight: 700 }}
                     disabled={busy || guestOtpSending}
                   >
                     {busy
-                      ? (lang === "ru" ? "Оформление заказа…" : "Buyurtma yuborilmoqda…")
+                      ? t("cart_btn_sending_order")
                       : guestOtpSending
-                      ? (lang === "ru" ? "Отправка SMS-кода…" : "SMS kod yuborilmoqda…")
+                      ? t("auth_btn_sending")
                       : !customer && !token && !guestOtpSent
-                      ? (lang === "ru" ? "Получить SMS-код и продолжить →" : "SMS kod olish va davom etish →")
-                      : (lang === "ru" ? "Подтвердить и отправить заказ ✓" : "Buyurtmani tasdiqlash va yuborish ✓")}
+                      ? t("cart_btn_get_code")
+                      : t("cart_btn_confirm_order")}
                   </button>
-                  <p className="note" style={{ textAlign: "center", marginTop: 12 }}>
+                  <p className="note" style={{ textAlign: "center", marginTop: 10 }}>
                     {!customer && !token && !guestOtpSent
-                      ? (lang === "ru"
-                          ? "Для подтверждения номера вам будет отправлен бесплатный SMS-код."
-                          : "Telefon raqamingizni tasdiqlash uchun bepul SMS tasdiqlash kodi yuboriladi.")
-                      : (lang === "ru"
-                          ? "Заказ будет рассмотрен администратором. После подтверждения вам поступит SMS и уведомление в приложении."
-                          : "Buyurtma admin tomonidan ko'rib chiqiladi. Tasdiqlanishi bilan sizga SMS va mobil ilovada bildirishnoma boradi.")}
+                      ? t("cart_guest_sms_prompt")
+                      : "Buyurtma admin tomonidan ko'rib chiqilib, telefon orqali tasdiqlanadi."}
                   </p>
                 </div>
               </form>
@@ -893,11 +874,7 @@ export default function Cart() {
                 {lang === "ru" ? "Количество товаров:" : lang === "en" ? "Items count:" : "Mahsulotlar soni:"}
               </span>
               <span className="summary-val">
-                {lang === "ru"
-                  ? `${cart.totalQuantity} шт (${cart.count} наим.)`
-                  : lang === "en"
-                  ? `${cart.totalQuantity} pcs (${cart.count} items)`
-                  : `${cart.totalQuantity} dona (${cart.count} xil)`}
+                {cart.totalQuantity} {t("unit_pcs")} ({cart.count} {t("unit_pcs")})
               </span>
             </div>
 
@@ -913,12 +890,12 @@ export default function Cart() {
             <div className="summary-divider" />
 
             <div className="summary-row total-row">
-              <span className="total-label">{lang === "ru" ? "Итого:" : lang === "en" ? "Total:" : "Jami:"}</span>
+              <span className="total-label">{t("cart_total")}</span>
               <div className="total-amount-box">
                 {hasAnyPrice && totalAmount > 0 ? (
                   <span className="total-price-val">{money(totalAmount, t("sum_currency"))}</span>
                 ) : (
-                  <span className="total-price-val">{lang === "ru" ? "По согласованию" : lang === "en" ? "Negotiated" : "Kelishilgan narxda"}</span>
+                  <span className="total-price-val">{t("cart_negotiated")}</span>
                 )}
               </div>
             </div>
@@ -929,29 +906,38 @@ export default function Cart() {
                 className="btn btn-primary-sheen btn-checkout-cta"
                 onClick={handleProceedToCheckout}
               >
-                {lang === "ru" ? "Оформить заказ →" : lang === "en" ? "Proceed to checkout →" : "Buyurtmani rasmiylashtirish →"}
+                {t("cart_checkout")}
               </button>
             )}
 
             <div className="summary-perks">
-              <div className="perk-item">
-                <span className="perk-icon">🛡️</span>
-                <span>Rasmiy 12 oylik kafolat va servis</span>
+              <div className="perk-item" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--teal)" }}>
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <span>{t("cart_perk_warranty")}</span>
               </div>
-              <div className="perk-item">
-                <span className="perk-icon">🚚</span>
-                <span>O'zbekiston bo'ylab yetkazib berish</span>
+              <div className="perk-item" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--teal)" }}>
+                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+                  <polyline points="9 22 9 12 15 12 15 22" />
+                </svg>
+                <span>{t("cart_perk_pickup")}</span>
               </div>
-              <div className="perk-item">
-                <span className="perk-icon">📄</span>
-                <span>Yuridik shaxslar uchun shartnoma & hisob-faktura</span>
+              <div className="perk-item" style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--teal)" }}>
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                  <polyline points="14 2 14 8 20 8" />
+                  <line x1="16" y1="13" x2="8" y2="13" />
+                  <line x1="16" y1="17" x2="8" y2="17" />
+                </svg>
+                <span>{t("cart_perk_docs")}</span>
               </div>
             </div>
           </div>
         </aside>
       </div>
 
-      {/* RECOMMENDED PRODUCTS SECTION */}
       {stage === "cart" && recommended.length > 0 && (
         <section className="cart-recommended-section">
           <div className="cart-rec-header">

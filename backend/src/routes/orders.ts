@@ -19,7 +19,7 @@ import {
 } from "../antispam";
 import { optionalCustomerAuth } from "./customer";
 import { getClientIp } from "../ip";
-import { sendNewOrderEmail } from "../email";
+import { sendNewOrderEmail, sendTelegramOrderAlert } from "../email";
 
 export const ordersRouter = Router();
 
@@ -265,13 +265,14 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
     createdOrderId = ord.id;
   });
 
-  // medaxuz@gmail.com ga yangi buyurtma xabari jo'natish
-  sendNewOrderEmail({
+  const orderAlertPayload = {
     id: createdOrderId!,
     code: orderCode,
     customerName: body.name,
     phone,
     organization: body.organization,
+    paymentMethod: body.paymentMethod,
+    comment: body.comment,
     deliveryAddress: body.deliveryAddress,
     totalAmount,
     items: items.map((i) => ({
@@ -279,7 +280,13 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
       quantity: i.quantity,
       price: prices.get(i.productId) || null,
     })),
-  }).catch((err) => console.error("[Order Email Error]", err));
+  };
+
+  // 1. Email orqali xabar jo'natish (medaxuz@gmail.com)
+  sendNewOrderEmail(orderAlertPayload).catch((err) => console.error("[Order Email Error]", err));
+
+  // 2. Telegram orqali menejerga tezkor va ishonchli xabar jo'natish
+  sendTelegramOrderAlert(orderAlertPayload).catch((err) => console.error("[Order Telegram Error]", err));
 
   res.status(201).json({ ok: true, code: orderCode, orderId: createdOrderId! });
 });

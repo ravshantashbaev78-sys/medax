@@ -4,6 +4,7 @@ import helmet from "helmet";
 import fs from "fs";
 import { ZodError } from "zod";
 import { config, validateStartupConfig } from "./config";
+import { prisma } from "./db";
 import { HttpError } from "./errors";
 import { authRouter } from "./auth";
 import { publicRouter } from "./routes/public";
@@ -69,7 +70,27 @@ app.use(express.json({ limit: "5mb" }));
 fs.mkdirSync(config.uploadDir, { recursive: true });
 app.use("/uploads", express.static(config.uploadDir, { maxAge: "30d", immutable: true }));
 
-app.get("/api/health", (_req, res) => res.json({ ok: true, version: "2.4.2", timestamp: new Date().toISOString() }));
+app.get("/api/health", async (_req, res) => {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    res.json({
+      ok: true,
+      server: "online",
+      database: "connected",
+      version: "2.4.2",
+      timestamp: new Date().toISOString(),
+    });
+  } catch (err: any) {
+    res.status(503).json({
+      ok: false,
+      server: "online",
+      database: "disconnected",
+      error: err?.message || "Database connection error",
+      version: "2.4.2",
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
 app.use("/api/auth", authRouter);
 app.use("/api/customer", customerRouter);
 app.use("/api/orders", ordersRouter);
