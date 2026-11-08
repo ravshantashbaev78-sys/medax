@@ -83,6 +83,12 @@ export interface Product {
   unit?: string | null;
   packageQty?: number | null;
   stock?: number;
+  costPrice?: number | null;
+  markupPercent?: number | null;
+  minStock?: number | null;
+  batchNumber?: string | null;
+  supplierId?: number | null;
+  warehouseId?: number | null;
   mfdDate?: string | null;
   expDate?: string | null;
   isHit: boolean;

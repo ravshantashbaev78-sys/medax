@@ -8497,18 +8497,332 @@ table.tbl {
   color: #475569;
 }
 
+/* Official Printable Invoice / Waybill (Товарная накладная) */
+.erp-invoice-sheet {
+  background: #ffffff;
+  color: #0f172a;
+  padding: 32px 36px;
+  border-radius: 8px;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  line-height: 1.45;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  margin-top: 16px;
+  border: 1px solid #e2e8f0;
+}
+
+.invoice-company-header {
+  border-bottom: 2px solid #0d9488;
+  padding-bottom: 14px;
+  margin-bottom: 18px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.invoice-brand-title {
+  font-size: 20px;
+  font-weight: 800;
+  color: #0f766e;
+  letter-spacing: 0.5px;
+  margin: 0 0 4px;
+}
+
+.invoice-company-sub {
+  font-size: 11px;
+  color: #475569;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.invoice-doc-title-block {
+  text-align: center;
+  margin: 20px 0 24px;
+}
+
+.invoice-doc-main-title {
+  font-size: 18px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #0f172a;
+  margin: 0 0 6px;
+  letter-spacing: 0.5px;
+}
+
+.invoice-doc-date {
+  font-size: 13px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.invoice-parties-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+  padding: 14px 16px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+}
+
+.invoice-party-col h5 {
+  margin: 0 0 6px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: #0d9488;
+  font-weight: 700;
+}
+
+.invoice-party-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.invoice-party-details {
+  font-size: 12px;
+  color: #475569;
+  line-height: 1.4;
+}
+
+.invoice-items-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+  font-size: 12px;
+}
+
+.invoice-items-table th {
+  background: #f1f5f9;
+  color: #1e293b;
+  font-weight: 700;
+  border: 1px solid #94a3b8;
+  padding: 8px 10px;
+  text-align: left;
+}
+
+.invoice-items-table td {
+  border: 1px solid #cbd5e1;
+  padding: 7px 10px;
+  color: #0f172a;
+}
+
+.invoice-items-table tr.total-row td {
+  background: #f8fafc;
+  font-weight: 700;
+  border-top: 2px solid #0d9488;
+  font-size: 13px;
+}
+
+.invoice-words-box {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: #1e293b;
+}
+
+.invoice-legal-note {
+  font-size: 11px;
+  color: #64748b;
+  font-style: italic;
+  margin-bottom: 30px;
+  line-height: 1.4;
+}
+
+.invoice-signatures-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 40px;
+  margin-top: 20px;
+  padding-top: 10px;
+}
+
+.invoice-sig-box {
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.invoice-sig-line {
+  border-bottom: 1px solid #64748b;
+  height: 30px;
+  margin-top: 10px;
+  margin-bottom: 4px;
+}
+
+.invoice-sig-sub {
+  font-size: 10px;
+  color: #64748b;
+  text-align: center;
+}
+
+.invoice-stamp-mark {
+  margin-top: 16px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 2px;
+}
+
+/* Cash Voucher (ПКО / РКО Kvitansiyasi) */
+.erp-cash-voucher-sheet {
+  background: #ffffff;
+  color: #0f172a;
+  padding: 24px;
+  border: 2px dashed #0d9488;
+  border-radius: 8px;
+  max-width: 580px;
+  margin: 0 auto;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+.voucher-header {
+  text-align: center;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 12px;
+  margin-bottom: 14px;
+}
+
+.voucher-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: #0f766e;
+  margin: 0 0 4px;
+  text-transform: uppercase;
+}
+
+.voucher-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 13px;
+}
+
+.voucher-label {
+  color: #64748b;
+  font-weight: 500;
+}
+
+.voucher-val {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.voucher-amount-highlight {
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  border-radius: 6px;
+  padding: 12px;
+  text-align: center;
+  margin: 14px 0;
+}
+
+.voucher-amount-val {
+  font-size: 22px;
+  font-weight: 800;
+  color: #0f766e;
+}
+
+.voucher-amount-words {
+  font-size: 12px;
+  color: #134e4a;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Shelf Price Tag / Tsennik */
+.erp-price-tag-sheet {
+  background: #ffffff;
+  color: #0f172a;
+  border: 2px solid #0f172a;
+  border-radius: 6px;
+  width: 280px;
+  padding: 16px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  margin: 0 auto;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.06);
+}
+
+.tag-brand {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #0d9488;
+  text-transform: uppercase;
+}
+
+.tag-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 6px 0 10px;
+  line-height: 1.25;
+  min-height: 38px;
+}
+
+.tag-price-box {
+  background: #0f172a;
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 8px 10px;
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.tag-price-val {
+  font-size: 24px;
+  font-weight: 900;
+  letter-spacing: 0.5px;
+}
+
+.tag-price-cur {
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.tag-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  font-size: 10px;
+  color: #475569;
+  border-top: 1px solid #e2e8f0;
+  padding-top: 8px;
+}
+
 @media print {
   body * {
-    visibility: hidden;
+    visibility: hidden !important;
   }
   .print-section, .print-section * {
-    visibility: visible;
+    visibility: visible !important;
   }
   .print-section {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  .erp-modal-window {
+    box-shadow: none !important;
+    border: none !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  .erp-modal-header, .erp-modal-footer, .erp-close-btn, .erp-view-toggle {
+    display: none !important;
   }
 }
 

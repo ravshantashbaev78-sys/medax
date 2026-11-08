@@ -609,6 +609,12 @@ const empty = {
   unit: "dona",
   packageQty: 1 as string | number,
   stock: 0 as string | number,
+  costPrice: "" as string | number,
+  markupPercent: "" as string | number,
+  minStock: 5 as string | number,
+  batchNumber: "",
+  supplierId: "" as string | number,
+  warehouseId: "" as string | number,
   mfdDate: "",
   expDate: "",
   isHit: false,
@@ -633,6 +639,8 @@ export function ProductForm() {
   const [isNegotiable, setIsNegotiable] = useState(false);
   const [cats, setCats] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
+  const [suppliers, setSuppliers] = useState<{ id: number; name: string }[]>([]);
+  const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
   const [images, setImages] = useState<Product["images"]>([]);
   const [newFiles, setNewFiles] = useState<{ file: File; preview: string }[]>([]);
   const [docs, setDocs] = useState<NonNullable<Product["documents"]>>([]);
@@ -640,6 +648,7 @@ export function ProductForm() {
   // Yig'ma bo'limlar holati (Accordion)
   const [showOtherLangs, setShowOtherLangs] = useState(false);
   const [showExtraDetails, setShowExtraDetails] = useState(false);
+  const [showErpDetails, setShowErpDetails] = useState(true);
 
   const [error, setError] = useState("");
   const [msg, setMsg] = useState("");
@@ -648,6 +657,12 @@ export function ProductForm() {
   useEffect(() => {
     api<Category[]>("/admin/categories", { admin: true }).then(setCats);
     api<Brand[]>("/admin/brands", { admin: true }).then(setBrands);
+    api<{ suppliers: { id: number; name: string }[] }>("/admin/erp/suppliers", { admin: true })
+      .then((r) => setSuppliers(r.suppliers || []))
+      .catch(() => {});
+    api<{ warehouses: { id: number; name: string }[] }>("/admin/erp/warehouses", { admin: true })
+      .then((r) => setWarehouses(r.warehouses || []))
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -678,6 +693,12 @@ export function ProductForm() {
           stock: p.stock !== undefined ? p.stock : 0,
           mfdDate: p.mfdDate ? p.mfdDate.slice(0, 10) : "",
           expDate: p.expDate ? p.expDate.slice(0, 10) : "",
+          costPrice: p.costPrice != null ? p.costPrice : "",
+          markupPercent: p.markupPercent != null ? p.markupPercent : "",
+          minStock: p.minStock != null ? p.minStock : 5,
+          batchNumber: p.batchNumber || "",
+          supplierId: p.supplierId || "",
+          warehouseId: p.warehouseId || "",
           isHit: p.isHit,
           isNew: p.isNew,
           isActive: p.isActive,
@@ -704,6 +725,42 @@ export function ProductForm() {
   }, [id, isNew]);
 
   const set = (k: keyof typeof empty, v: any) => setF((s) => ({ ...s, [k]: v }));
+
+  const handleCostPriceChange = (costVal: string) => {
+    const cost = costVal === "" ? "" : Number(costVal);
+    setF((prev) => {
+      let nextSell = prev.priceFrom;
+      if (cost !== "" && prev.markupPercent !== "") {
+        nextSell = Math.round(Number(cost) * (1 + Number(prev.markupPercent) / 100));
+      }
+      return { ...prev, costPrice: costVal, priceFrom: nextSell };
+    });
+  };
+
+  const handleMarkupChange = (markupVal: string) => {
+    const markup = markupVal === "" ? "" : Number(markupVal);
+    setF((prev) => {
+      let nextSell = prev.priceFrom;
+      if (prev.costPrice !== "" && markup !== "") {
+        nextSell = Math.round(Number(prev.costPrice) * (1 + Number(markup) / 100));
+      }
+      return { ...prev, markupPercent: markupVal, priceFrom: nextSell };
+    });
+  };
+
+  const handleSellPriceChange = (sellVal: string) => {
+    const sell = sellVal === "" ? "" : Number(sellVal);
+    setF((prev) => {
+      let nextMarkup = prev.markupPercent;
+      if (prev.costPrice !== "" && sell !== "") {
+        const cost = Number(prev.costPrice);
+        if (cost > 0) {
+          nextMarkup = Math.round(((Number(sell) - cost) / cost) * 100);
+        }
+      }
+      return { ...prev, priceFrom: sellVal, markupPercent: nextMarkup };
+    });
+  };
 
   const selectedCat = cats.find((c) => String(c.id) === String(f.categoryId));
   const catSlug = selectedCat?.slug || "";
@@ -754,6 +811,12 @@ export function ProductForm() {
     const body = {
       ...f,
       priceFrom: calculatedPrice,
+      costPrice: f.costPrice === "" ? null : Number(f.costPrice),
+      markupPercent: f.markupPercent === "" ? null : Number(f.markupPercent),
+      minStock: f.minStock === "" ? 5 : Number(f.minStock),
+      batchNumber: f.batchNumber ? String(f.batchNumber).trim() : null,
+      supplierId: f.supplierId === "" ? null : Number(f.supplierId),
+      warehouseId: f.warehouseId === "" ? null : Number(f.warehouseId),
       oldPrice: f.oldPrice === "" ? null : Number(f.oldPrice),
       discountPercent: f.discountPercent === "" ? null : Number(f.discountPercent),
       packageQty: catRule.showPackageQty ? (f.packageQty === "" ? 1 : Number(f.packageQty)) : 1,
@@ -957,7 +1020,7 @@ export function ProductForm() {
                 required={!isNegotiable}
                 placeholder={isNegotiable ? "Kelishuv asosida (narxsiz)" : "Masalan: 45000000"}
                 value={f.priceFrom}
-                onChange={(e) => set("priceFrom", e.target.value)}
+                onChange={(e) => handleSellPriceChange(e.target.value)}
                 style={isNegotiable ? { opacity: 0.6, background: "var(--surface-muted, #f1f5f9)" } : undefined}
               />
             </div>
@@ -1089,6 +1152,155 @@ export function ProductForm() {
               />
             </label>
           </div>
+        </div>
+
+        {/* ============================================================== */}
+        {/* 1C ERP: OMBOR VA NARXLAR HISOBI (Tannarx, Natsenka, Minimal qoldiq) */}
+        {/* ============================================================== */}
+        <div
+          style={{
+            background: "var(--surface-card, #f8fafc)",
+            border: "1px solid var(--line, #e2e8f0)",
+            borderRadius: 14,
+            marginBottom: 16,
+            overflow: "hidden",
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setShowErpDetails(!showErpDetails)}
+            style={{
+              width: "100%",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              padding: "14px 20px",
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 15,
+              fontWeight: 700,
+              color: "var(--teal, #0d9488)",
+              textAlign: "left",
+            }}
+          >
+            <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span>🏢</span>
+              <span>1C Ombor & Buxgalteriya parametrlari (Tannarx, Natsenka, Partiya)</span>
+            </span>
+            <span style={{ fontSize: 13, color: "var(--ink2)" }}>
+              {showErpDetails ? "▲ Yashirish" : "▼ Ko'rsatish"}
+            </span>
+          </button>
+
+          {showErpDetails && (
+            <div style={{ padding: "0 20px 18px", borderTop: "1px solid var(--line, #e2e8f0)", paddingTop: 14 }}>
+              <div className="formgrid">
+                <div className="field">
+                  <label htmlFor="costPrice">Kirim narxi / Tannarx (so'm)</label>
+                  <input
+                    id="costPrice"
+                    type="number"
+                    min={0}
+                    placeholder="Masalan: 32000000"
+                    value={f.costPrice}
+                    onChange={(e) => handleCostPriceChange(e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="markupPercent">Ustama foizi (Natsenka %)</label>
+                  <input
+                    id="markupPercent"
+                    type="number"
+                    step="any"
+                    placeholder="Masalan: 20"
+                    value={f.markupPercent}
+                    onChange={(e) => handleMarkupChange(e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="minStock">Minimal qoldiq (Kam qolgan ogohlantirish)</label>
+                  <input
+                    id="minStock"
+                    type="number"
+                    min={0}
+                    placeholder="5"
+                    value={f.minStock}
+                    onChange={(e) => set("minStock", e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="batchNumber">Partiya / Seriya raqami</label>
+                  <input
+                    id="batchNumber"
+                    type="text"
+                    placeholder="Masalan: LOT-2026-X01"
+                    value={f.batchNumber}
+                    onChange={(e) => set("batchNumber", e.target.value)}
+                  />
+                </div>
+
+                <div className="field">
+                  <label htmlFor="supplierId">Asosiy yetkazib beruvchi</label>
+                  <select
+                    id="supplierId"
+                    value={f.supplierId}
+                    onChange={(e) => set("supplierId", e.target.value)}
+                  >
+                    <option value="">Tanlanmagan</option>
+                    {suppliers.map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="field">
+                  <label htmlFor="warehouseId">Asosiy ombor</label>
+                  <select
+                    id="warehouseId"
+                    value={f.warehouseId}
+                    onChange={(e) => set("warehouseId", e.target.value)}
+                  >
+                    <option value="">Asosiy ombor</option>
+                    {warehouses.map((w) => (
+                      <option key={w.id} value={w.id}>{w.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Real-time price breakdown pill */}
+              {Boolean(f.costPrice && f.priceFrom) && (
+                <div
+                  style={{
+                    marginTop: 12,
+                    padding: "10px 14px",
+                    borderRadius: 8,
+                    background: "rgba(13, 148, 136, 0.08)",
+                    border: "1px solid rgba(13, 148, 136, 0.2)",
+                    fontSize: 13,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 16,
+                    flexWrap: "wrap",
+                  }}
+                >
+                  <div><strong>Kirim:</strong> {money(f.costPrice)}</div>
+                  <div><strong>Natsenka:</strong> {f.markupPercent ? `+${f.markupPercent}%` : "—"}</div>
+                  <div><strong>Sotuv narxi:</strong> {money(f.priceFrom)}</div>
+                  <div>
+                    <strong>Foyda:</strong>{" "}
+                    <span style={{ color: "var(--teal, #0d9488)", fontWeight: 700 }}>
+                      {money(Number(f.priceFrom) - Number(f.costPrice))}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* ============================================================== */}

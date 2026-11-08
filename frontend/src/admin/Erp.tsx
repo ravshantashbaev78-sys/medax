@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import { api, ApiError } from "../api";
 import { useAdminI18n } from "./i18n";
+import { numberToWordsUz, numberToWordsRu } from "./numberToWords";
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -127,6 +128,7 @@ export default function Erp() {
   const [docTypeFilter, setDocTypeFilter] = useState<string>("ALL");
   const [showCreateDocModal, setShowCreateDocModal] = useState(false);
   const [selectedDocDetails, setSelectedDocDetails] = useState<ErpDoc | null>(null);
+  const [docPrintFormat, setDocPrintFormat] = useState<"standard" | "nakladnaya">("nakladnaya");
 
   // Cash State
   const [cashData, setCashData] = useState<{ entries: CashEntry[]; totalIncome: number; totalExpense: number; balance: number }>({
@@ -138,6 +140,13 @@ export default function Erp() {
   const [loadingCash, setLoadingCash] = useState(false);
   const [showCashModal, setShowCashModal] = useState(false);
   const [cashModalType, setCashModalType] = useState<"INCOME" | "EXPENSE">("INCOME");
+  const [selectedCashReceipt, setSelectedCashReceipt] = useState<CashEntry | null>(null);
+
+  // Price tag & Barcode print state
+  const [priceTagProduct, setPriceTagProduct] = useState<ErpProduct | null>(null);
+
+  // Excel export state
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   // Suppliers & Clients State
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -152,6 +161,42 @@ export default function Erp() {
   const [sverkaEntityType, setSverkaEntityType] = useState<"customer" | "supplier">("supplier");
   const [sverkaEntityId, setSverkaEntityId] = useState<number>(0);
   const [customersList, setCustomersList] = useState<{ id: number; name: string; organization?: string; phone?: string; balance?: number }[]>([]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Excel Export Service                                                     */
+  /* ------------------------------------------------------------------------ */
+  const handleExport = async (endpoint: string, defaultFilename: string) => {
+    setExportingExcel(true);
+    try {
+      const token = localStorage.getItem("mt_token");
+      const res = await fetch(`/api${endpoint}`, {
+        headers: token
+          ? {
+              Authorization: `Bearer ${token}`,
+              "X-Authorization": `Bearer ${token}`,
+              "X-Admin-Token": token,
+              "X-Access-Token": token,
+            }
+          : {},
+      });
+      if (!res.ok) {
+        throw new Error("Eksport qilishda xatolik yuz berdi");
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = defaultFilename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err?.message || "Eksportda xatolik yuz berdi");
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   /* ------------------------------------------------------------------------ */
   /* Data Loaders                                                             */
@@ -829,6 +874,14 @@ export default function Erp() {
               <button
                 type="button"
                 className="btn btn-erp-secondary"
+                disabled={exportingExcel}
+                onClick={() => handleExport("/admin/erp/export/inventory", `medax-ombor-qoldiqlari-${new Date().toISOString().slice(0, 10)}.xlsx`)}
+              >
+                📥 {exportingExcel ? "Yuklanmoqda..." : "Excel (.xlsx)"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-erp-secondary"
                 onClick={() => window.print()}
               >
                 🖨️ Chop etish
@@ -898,6 +951,15 @@ export default function Erp() {
                             onClick={() => setEditingProduct(p)}
                           >
                             ✏️
+                          </button>
+                          <button
+                            type="button"
+                            className="erp-btn-icon"
+                            title="Tsennik & Shtrix-kod chop etish"
+                            onClick={() => setPriceTagProduct(p)}
+                            style={{ marginLeft: 4 }}
+                          >
+                            🏷️
                           </button>
                         </td>
                       </tr>
@@ -1012,13 +1074,29 @@ export default function Erp() {
                       <td>{formatMoney(d.paidAmount)} so'm</td>
                       <td><span className="erp-status-badge confirmed">Tasdiqlangan</span></td>
                       <td>
-                        <button
-                          type="button"
-                          className="btn-link"
-                          onClick={() => setSelectedDocDetails(d)}
-                        >
-                          Detallar →
-                        </button>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <button
+                            type="button"
+                            className="btn-link"
+                            onClick={() => {
+                              setSelectedDocDetails(d);
+                              setDocPrintFormat("standard");
+                            }}
+                          >
+                            Detallar
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-link"
+                            style={{ color: "var(--teal, #0d9488)", fontWeight: 700 }}
+                            onClick={() => {
+                              setSelectedDocDetails(d);
+                              setDocPrintFormat("nakladnaya");
+                            }}
+                          >
+                            🖨️ Nakladnaya
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -1075,6 +1153,14 @@ export default function Erp() {
               >
                 - Chiqim Kassa Orderi (РКО)
               </button>
+              <button
+                type="button"
+                className="btn btn-erp-secondary"
+                disabled={exportingExcel}
+                onClick={() => handleExport("/admin/erp/export/cash", `medax-kassa-kitobi-${new Date().toISOString().slice(0, 10)}.xlsx`)}
+              >
+                📥 {exportingExcel ? "Yuklanmoqda..." : "Kassa kitobi Excel (.xlsx)"}
+              </button>
             </div>
           </div>
 
@@ -1090,12 +1176,13 @@ export default function Erp() {
                   <th>Kontragent</th>
                   <th>Summa</th>
                   <th>Tavsif / Izoh</th>
+                  <th>Amal</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingCash ? (
                   <tr>
-                    <td colSpan={8} className="erp-empty-cell">Yuklanmoqda...</td>
+                    <td colSpan={9} className="erp-empty-cell">Yuklanmoqda...</td>
                   </tr>
                 ) : cashData.entries.length > 0 ? (
                   cashData.entries.map((c) => (
@@ -1120,11 +1207,22 @@ export default function Erp() {
                         </strong>
                       </td>
                       <td>{c.description || "—"}</td>
+                      <td>
+                        <button
+                          type="button"
+                          className="btn-link"
+                          style={{ color: "var(--teal, #0d9488)", fontWeight: 600 }}
+                          title="Kassa orderi kvitansiyasini chop etish"
+                          onClick={() => setSelectedCashReceipt(c)}
+                        >
+                          🖨️ Kvitansiya
+                        </button>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={8} className="erp-empty-cell">Kassa operatsiyalari topilmadi</td>
+                    <td colSpan={9} className="erp-empty-cell">Kassa operatsiyalari topilmadi</td>
                   </tr>
                 )}
               </tbody>
@@ -1316,13 +1414,23 @@ export default function Erp() {
               </button>
 
               {sverkaData && (
-                <button
-                  type="button"
-                  className="btn btn-erp-secondary"
-                  onClick={() => window.print()}
-                >
-                  🖨️ A4 Shaklda Chop etish
-                </button>
+                <>
+                  <button
+                    type="button"
+                    className="btn btn-erp-secondary"
+                    disabled={exportingExcel}
+                    onClick={() => handleExport(`/admin/erp/export/act-sverka?type=${sverkaEntityType}&id=${sverkaEntityId}`, `medax-akt-sverka-${new Date().toISOString().slice(0, 10)}.xlsx`)}
+                  >
+                    📥 Sverka Excel (.xlsx)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-erp-secondary"
+                    onClick={() => window.print()}
+                  >
+                    🖨️ A4 Shaklda Chop etish
+                  </button>
+                </>
               )}
             </div>
 
@@ -1389,9 +1497,19 @@ export default function Erp() {
                 <h3>📊 Товарная оборотка (Tovar oborotkasi)</h3>
                 <p>Tanlangan davr bo'yicha tovarlar harakati: Boshlang'ich qoldiq, Kirim, Chiqim va Yakuniy qoldiq</p>
               </div>
-              <button type="button" className="btn btn-erp-secondary" onClick={loadTurnover}>
-                Yangilash
-              </button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button
+                  type="button"
+                  className="btn btn-erp-secondary"
+                  disabled={exportingExcel}
+                  onClick={() => handleExport("/admin/erp/export/turnover", `medax-tovar-oborotkasi-${new Date().toISOString().slice(0, 10)}.xlsx`)}
+                >
+                  📥 {exportingExcel ? "Yuklanmoqda..." : "Oborotka Excel (.xlsx)"}
+                </button>
+                <button type="button" className="btn btn-erp-secondary" onClick={loadTurnover}>
+                  Yangilash
+                </button>
+              </div>
             </div>
 
             <div className="erp-card-table print-section">
@@ -1435,6 +1553,24 @@ export default function Erp() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+
+          {/* Customer Price List Section */}
+          <div className="erp-reports-box" style={{ marginTop: 32 }}>
+            <div className="erp-report-header space-between">
+              <div>
+                <h3>🏷️ Mijozlar va Klinikalar uchun Rasmiy Prays-list</h3>
+                <p>Barcha faol tibbiy asboblar va reaktivlarning rasmiy narxlari, artikul va mavjudlik holatini Excel formatida shakllantirish</p>
+              </div>
+              <button
+                type="button"
+                className="btn btn-erp-primary"
+                disabled={exportingExcel}
+                onClick={() => handleExport("/admin/erp/export/price-list", `medax-prays-list-${new Date().toISOString().slice(0, 10)}.xlsx`)}
+              >
+                📥 {exportingExcel ? "Yuklanmoqda..." : "Prays-list Excel (.xlsx) yuklab olish"}
+              </button>
             </div>
           </div>
         </div>
@@ -1990,55 +2126,398 @@ export default function Erp() {
       )}
 
       {/* -------------------------------------------------------------------- */}
-      {/* MODAL 5: DOCUMENT DETAILS VIEW                                       */}
+      {/* MODAL 5: DOCUMENT DETAILS VIEW & OFFICIAL NAKLADNAYA (A4 PRINT)      */}
       {/* -------------------------------------------------------------------- */}
       {selectedDocDetails && (
         <div className="erp-modal-overlay" onClick={() => setSelectedDocDetails(null)}>
-          <div className="erp-modal-window large" onClick={(e) => e.stopPropagation()}>
-            <div className="erp-modal-header">
-              <h3>Hujjat #{selectedDocDetails.docNumber} tafsilotlari</h3>
+          <div className="erp-modal-window large" style={{ maxWidth: docPrintFormat === "nakladnaya" ? 920 : 760 }} onClick={(e) => e.stopPropagation()}>
+            <div className="erp-modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <h3 style={{ margin: 0 }}>Hujjat #{selectedDocDetails.docNumber}</h3>
+                <div className="erp-view-toggle" style={{ display: "flex", gap: 6, marginTop: 8 }}>
+                  <button
+                    type="button"
+                    className={`erp-chip ${docPrintFormat === "standard" ? "active" : ""}`}
+                    onClick={() => setDocPrintFormat("standard")}
+                  >
+                    📋 Oddiy ko'rinish
+                  </button>
+                  <button
+                    type="button"
+                    className={`erp-chip success ${docPrintFormat === "nakladnaya" ? "active" : ""}`}
+                    onClick={() => setDocPrintFormat("nakladnaya")}
+                  >
+                    📄 Rasmiy Nakladnaya (A4)
+                  </button>
+                </div>
+              </div>
               <button type="button" className="erp-close-btn" onClick={() => setSelectedDocDetails(null)}>×</button>
             </div>
             <div className="erp-modal-body">
-              <div className="erp-doc-detail-grid">
-                <div>Operatsiya: <strong>{selectedDocDetails.type}</strong></div>
-                <div>Sana: <strong>{formatDate(selectedDocDetails.date)}</strong></div>
-                <div>Kontragent: <strong>{selectedDocDetails.supplier?.name || selectedDocDetails.customer?.name || selectedDocDetails.clientName || "—"}</strong></div>
-                <div>Jami summa: <strong>{formatMoney(selectedDocDetails.totalAmount)} so'm</strong></div>
-              </div>
+              {docPrintFormat === "standard" ? (
+                <>
+                  <div className="erp-doc-detail-grid">
+                    <div>Operatsiya: <strong>{selectedDocDetails.type}</strong></div>
+                    <div>Sana: <strong>{formatDate(selectedDocDetails.date)}</strong></div>
+                    <div>Kontragent: <strong>{selectedDocDetails.supplier?.name || selectedDocDetails.customer?.name || selectedDocDetails.clientName || "—"}</strong></div>
+                    <div>Jami summa: <strong>{formatMoney(selectedDocDetails.totalAmount)} so'm</strong></div>
+                  </div>
 
-              <h4 style={{ marginTop: 20, marginBottom: 10 }}>Hujjatdagi tovarlar:</h4>
-              <table className="erp-table">
-                <thead>
-                  <tr>
-                    <th>Tovar</th>
-                    <th>Miqdor</th>
-                    <th>Narx</th>
-                    <th>Seriya</th>
-                    <th>Yaroqlilik</th>
-                    <th>Jami</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {selectedDocDetails.items?.map((it, idx) => (
-                    <tr key={idx}>
-                      <td><strong>{it.productName || it.product?.name}</strong></td>
-                      <td>{it.quantity} dona</td>
-                      <td>{formatMoney(it.sellPrice || it.costPrice)} so'm</td>
-                      <td>{it.batchNumber || "—"}</td>
-                      <td>{it.expDate || "—"}</td>
-                      <td><strong>{formatMoney(it.totalPrice)} so'm</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  <h4 style={{ marginTop: 20, marginBottom: 10 }}>Hujjatdagi tovarlar:</h4>
+                  <table className="erp-table">
+                    <thead>
+                      <tr>
+                        <th>Tovar</th>
+                        <th>Miqdor</th>
+                        <th>Narx</th>
+                        <th>Seriya</th>
+                        <th>Yaroqlilik</th>
+                        <th>Jami</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedDocDetails.items?.map((it, idx) => (
+                        <tr key={idx}>
+                          <td><strong>{it.productName || it.product?.name}</strong></td>
+                          <td>{it.quantity} dona</td>
+                          <td>{formatMoney(it.sellPrice || it.costPrice)} so'm</td>
+                          <td>{it.batchNumber || "—"}</td>
+                          <td>{it.expDate || "—"}</td>
+                          <td><strong>{formatMoney(it.totalPrice)} so'm</strong></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              ) : (
+                /* OFFICIAL UZBEKISTAN NAKLADNAYA (A4 PRINTABLE) */
+                <div className="erp-invoice-sheet print-section">
+                  <div className="invoice-company-header">
+                    <div>
+                      <h4 className="invoice-brand-title">«MEDAX» MCHJ</h4>
+                      <p className="invoice-company-sub">
+                        Tibbiy asbob-uskunalar, laboratoriya reaktivlari va sarflov materiallari ulgurji hamda chakana savdosi<br />
+                        O'zbekiston Respublikasi, Namangan sh., Beruniy ko'chasi 2-uy<br />
+                        Tel: +998 (71) 200-00-00, +998 (90) 123-45-67 | Sayt: medax.uz
+                      </p>
+                    </div>
+                    <div style={{ textAlign: "right", fontSize: 11, color: "#475569" }}>
+                      <div><strong>H/r:</strong> 2020 8000 7005 1234 5001</div>
+                      <div><strong>Bank:</strong> ATIB "Ipoteka-bank"</div>
+                      <div><strong>MFO:</strong> 00440 | <strong>INN:</strong> 309876543</div>
+                    </div>
+                  </div>
+
+                  <div className="invoice-doc-title-block">
+                    <h3 className="invoice-doc-main-title">
+                      {selectedDocDetails.type === "INCOME"
+                        ? `TOVAR KIRIMI (ПРИХОДНАЯ НАКЛАДНАЯ) № ${selectedDocDetails.docNumber}`
+                        : selectedDocDetails.type === "OUTCOME"
+                        ? `TOVAR CHIQIMI VA YUK XATI (РАСХОДНАЯ НАКЛАДНАЯ) № ${selectedDocDetails.docNumber}`
+                        : selectedDocDetails.type === "TRANSFER"
+                        ? `OMBORLARARO KO'CHIRISH DALOLATNOMASI № ${selectedDocDetails.docNumber}`
+                        : selectedDocDetails.type === "RETURN_CUSTOMER"
+                        ? `MIJOZDAN QAYTARISH DALOLATNOMASI № ${selectedDocDetails.docNumber}`
+                        : selectedDocDetails.type === "RETURN_SUPPLIER"
+                        ? `TA'MINOTCHIGA QAYTARISH № ${selectedDocDetails.docNumber}`
+                        : `HISOBDAN CHIQARISH (СПИСАНИЕ) № ${selectedDocDetails.docNumber}`}
+                    </h3>
+                    <div className="invoice-doc-date">
+                      Sana: «{new Date(selectedDocDetails.date).getDate()}» {new Date(selectedDocDetails.date).toLocaleDateString("uz-UZ", { month: "long" })} {new Date(selectedDocDetails.date).getFullYear()} y.
+                    </div>
+                  </div>
+
+                  <div className="invoice-parties-grid">
+                    <div className="invoice-party-col">
+                      <h5>Yetkazib beruvchi (Jo'natuvchi):</h5>
+                      <div className="invoice-party-name">
+                        {selectedDocDetails.type === "INCOME"
+                          ? (selectedDocDetails.supplier?.name || "Ta'minotchi korxona")
+                          : "«MEDAX» MCHJ"}
+                      </div>
+                      <div className="invoice-party-details">
+                        {selectedDocDetails.type === "INCOME"
+                          ? `Asosiy yetkazib beruvchi | Ombor: ${selectedDocDetails.warehouse?.name || "Asosiy ombor"}`
+                          : "Namangan sh., Beruniy k-si 2-uy. Tel: +998 71 200-00-00, INN: 309876543"}
+                      </div>
+                    </div>
+
+                    <div className="invoice-party-col">
+                      <h5>Qabul qiluvchi (Xaridor):</h5>
+                      <div className="invoice-party-name">
+                        {selectedDocDetails.type === "INCOME"
+                          ? "«MEDAX» MCHJ Ombori"
+                          : (selectedDocDetails.customer?.name || selectedDocDetails.clientName || "Xaridor / Klinika")}
+                      </div>
+                      <div className="invoice-party-details">
+                        {selectedDocDetails.type === "INCOME"
+                          ? `Qabul qildi: Moddiy javobgar shaxs (${selectedDocDetails.warehouse?.name || "Asosiy ombor"})`
+                          : `Tel: ${selectedDocDetails.customer?.phone || "—"} | Manzil: O'zbekiston Respublikasi`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <table className="invoice-items-table">
+                    <thead>
+                      <tr>
+                        <th style={{ width: 36 }}>№</th>
+                        <th style={{ width: 80 }}>Artikul</th>
+                        <th>Mahsulot nomi</th>
+                        <th style={{ width: 90 }}>Partiya</th>
+                        <th style={{ width: 85 }}>Muddat</th>
+                        <th style={{ width: 60, textAlign: "center" }}>Birlik</th>
+                        <th style={{ width: 65, textAlign: "right" }}>Miqdor</th>
+                        <th style={{ width: 110, textAlign: "right" }}>Narx (so'm)</th>
+                        <th style={{ width: 120, textAlign: "right" }}>Summa (so'm)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedDocDetails.items?.map((it, idx) => (
+                        <tr key={idx}>
+                          <td style={{ textAlign: "center" }}>{idx + 1}</td>
+                          <td>{it.product?.sku || "—"}</td>
+                          <td><strong>{it.productName || it.product?.name}</strong></td>
+                          <td>{it.batchNumber || "—"}</td>
+                          <td>{it.expDate || "—"}</td>
+                          <td style={{ textAlign: "center" }}>dona</td>
+                          <td style={{ textAlign: "right" }}>{it.quantity}</td>
+                          <td style={{ textAlign: "right" }}>{formatMoney(it.sellPrice || it.costPrice)}</td>
+                          <td style={{ textAlign: "right" }}><strong>{formatMoney(it.totalPrice)}</strong></td>
+                        </tr>
+                      ))}
+                      <tr className="total-row">
+                        <td colSpan={6} style={{ textAlign: "right" }}><strong>JAMI TO'LOVGA:</strong></td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong>{selectedDocDetails.items?.reduce((s, x) => s + (x.quantity || 0), 0)}</strong>
+                        </td>
+                        <td></td>
+                        <td style={{ textAlign: "right" }}>
+                          <strong style={{ color: "#0f766e" }}>{formatMoney(selectedDocDetails.totalAmount)} so'm</strong>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+
+                  <div className="invoice-words-box">
+                    <strong>Summa so'z bilan (Сумма прописью):</strong> {numberToWordsUz(selectedDocDetails.totalAmount)}
+                  </div>
+
+                  <div className="invoice-legal-note">
+                    * Mazkur tovarlar sifatli, to'liq komplektatsiyada, yaroqlilik muddatlari me'yorida va shikastlanmagan holda topshirildi va qabul qilindi. Tomonlarning e'tirozlari yo'q.
+                  </div>
+
+                  <div className="invoice-signatures-grid">
+                    <div className="invoice-sig-box">
+                      <strong>Topshirdi (Отпустил):</strong>
+                      <div className="invoice-sig-line"></div>
+                      <div className="invoice-sig-sub">Moddiy javobgar shaxs (Imzo / F.I.SH)</div>
+                      <div className="invoice-stamp-mark">M.O'. (Печать)</div>
+                    </div>
+
+                    <div className="invoice-sig-box">
+                      <strong>Qabul qildi (Получил):</strong>
+                      <div className="invoice-sig-line"></div>
+                      <div className="invoice-sig-sub">Ishonchnoma № ______ / Vakil (Imzo / F.I.SH)</div>
+                      <div className="invoice-stamp-mark">M.O'. (Печать)</div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             <div className="erp-modal-footer">
               <button type="button" className="btn btn-erp-secondary" onClick={() => setSelectedDocDetails(null)}>
                 Yopish
               </button>
+              <button
+                type="button"
+                className="btn btn-erp-primary"
+                onClick={() => {
+                  setDocPrintFormat("nakladnaya");
+                  setTimeout(() => window.print(), 80);
+                }}
+              >
+                🖨️ Nakladnoyni Chop etish (A4)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* MODAL 5.1: CASH RECEIPT VOUCHER (ПКО / РКО Kvitansiyasi)             */}
+      {/* -------------------------------------------------------------------- */}
+      {selectedCashReceipt && (
+        <div className="erp-modal-overlay" onClick={() => setSelectedCashReceipt(null)}>
+          <div className="erp-modal-window" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
+            <div className="erp-modal-header">
+              <h3>Kassa Kvitansiyasi #{selectedCashReceipt.entryNumber}</h3>
+              <button type="button" className="erp-close-btn" onClick={() => setSelectedCashReceipt(null)}>×</button>
+            </div>
+            <div className="erp-modal-body">
+              <div className="erp-cash-voucher-sheet print-section">
+                <div className="voucher-header">
+                  <div style={{ fontSize: 10, letterSpacing: 1, color: "#0d9488", fontWeight: 800 }}>«MEDAX» MAS'ULIYATI CHEKLANGAN JAMIYATI</div>
+                  <h4 className="voucher-title">
+                    {selectedCashReceipt.type === "INCOME"
+                      ? "KASSA KIRIM ORDERI KVITANSIYASI (ПКО)"
+                      : "KASSA CHIQIM ORDERI (РКО)"}
+                  </h4>
+                  <div style={{ fontSize: 12, color: "#475569" }}>
+                    № {selectedCashReceipt.entryNumber} | {formatDate(selectedCashReceipt.date)}
+                  </div>
+                </div>
+
+                <div className="voucher-row">
+                  <span className="voucher-label">{selectedCashReceipt.type === "INCOME" ? "Qabul qilindi (Kimdan):" : "Berildi (Kimga):"}</span>
+                  <span className="voucher-val">{selectedCashReceipt.customer?.name || selectedCashReceipt.supplier?.name || "Mijoz / Hamkor"}</span>
+                </div>
+
+                <div className="voucher-row">
+                  <span className="voucher-label">Asos (To'lov moddasi):</span>
+                  <span className="voucher-val">{selectedCashReceipt.category}</span>
+                </div>
+
+                {selectedCashReceipt.description && (
+                  <div className="voucher-row">
+                    <span className="voucher-label">Izoh:</span>
+                    <span className="voucher-val">{selectedCashReceipt.description}</span>
+                  </div>
+                )}
+
+                <div className="voucher-row">
+                  <span className="voucher-label">To'lov shakli:</span>
+                  <span className="voucher-val">
+                    {selectedCashReceipt.paymentType === "CASH"
+                      ? "Naqd pul"
+                      : selectedCashReceipt.paymentType === "CARD"
+                      ? "Bank plastik kartasi"
+                      : "Bank hisob raqamidan o'tkazma"}
+                  </span>
+                </div>
+
+                <div className="voucher-amount-highlight">
+                  <div className="voucher-amount-val">{formatMoney(selectedCashReceipt.amount)} UZS</div>
+                  <div className="voucher-amount-words">({numberToWordsUz(selectedCashReceipt.amount)})</div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 30, marginTop: 20, paddingTop: 10, borderTop: "1px dashed #cbd5e1" }}>
+                  <div style={{ fontSize: 11 }}>
+                    <div><strong>Bosh buxgalter:</strong></div>
+                    <div style={{ borderBottom: "1px solid #475569", height: 26, margin: "6px 0 2px" }}></div>
+                    <div style={{ color: "#64748b", fontSize: 10 }}>Imzo / F.I.SH</div>
+                  </div>
+                  <div style={{ fontSize: 11 }}>
+                    <div><strong>Kassir:</strong></div>
+                    <div style={{ borderBottom: "1px solid #475569", height: 26, margin: "6px 0 2px" }}></div>
+                    <div style={{ color: "#64748b", fontSize: 10 }}>Imzo / F.I.SH</div>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: "center", marginTop: 14, fontSize: 10, color: "#94a3b8", letterSpacing: 2 }}>
+                  M.O'. (MUHR O'RNI)
+                </div>
+              </div>
+            </div>
+            <div className="erp-modal-footer">
+              <button type="button" className="btn btn-erp-secondary" onClick={() => setSelectedCashReceipt(null)}>
+                Yopish
+              </button>
               <button type="button" className="btn btn-erp-primary" onClick={() => window.print()}>
-                🖨️ Chop etish
+                🖨️ Kvitansiyani Chop etish
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* MODAL 5.2: SHELF PRICE TAG & BARCODE (Tsennik & Shtrix-kod)          */}
+      {/* -------------------------------------------------------------------- */}
+      {priceTagProduct && (
+        <div className="erp-modal-overlay" onClick={() => setPriceTagProduct(null)}>
+          <div className="erp-modal-window" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="erp-modal-header">
+              <h3>🏷️ Narx yorlig'i (Tsennik)</h3>
+              <button type="button" className="erp-close-btn" onClick={() => setPriceTagProduct(null)}>×</button>
+            </div>
+            <div className="erp-modal-body" style={{ textAlign: "center" }}>
+              <div className="erp-price-tag-sheet print-section">
+                <div className="tag-brand">MEDAX MEDICAL STORE</div>
+                <div className="tag-name">{priceTagProduct.name}</div>
+                <div className="tag-price-box">
+                  <span className="tag-price-val">{formatMoney(priceTagProduct.priceFrom)}</span>
+                  <span className="tag-price-cur">UZS</span>
+                </div>
+                
+                {/* Visual Barcode pattern */}
+                <div style={{ margin: "10px 0" }}>
+                  <svg width="200" height="40" viewBox="0 0 200 40" style={{ display: "inline-block" }}>
+                    <rect x="0" y="0" width="3" height="40" fill="#000" />
+                    <rect x="5" y="0" width="2" height="40" fill="#000" />
+                    <rect x="9" y="0" width="4" height="40" fill="#000" />
+                    <rect x="15" y="0" width="1" height="40" fill="#000" />
+                    <rect x="18" y="0" width="3" height="40" fill="#000" />
+                    <rect x="23" y="0" width="2" height="40" fill="#000" />
+                    <rect x="27" y="0" width="5" height="40" fill="#000" />
+                    <rect x="34" y="0" width="2" height="40" fill="#000" />
+                    <rect x="38" y="0" width="3" height="40" fill="#000" />
+                    <rect x="43" y="0" width="1" height="40" fill="#000" />
+                    <rect x="46" y="0" width="4" height="40" fill="#000" />
+                    <rect x="52" y="0" width="2" height="40" fill="#000" />
+                    <rect x="56" y="0" width="3" height="40" fill="#000" />
+                    <rect x="61" y="0" width="4" height="40" fill="#000" />
+                    <rect x="67" y="0" width="2" height="40" fill="#000" />
+                    <rect x="71" y="0" width="1" height="40" fill="#000" />
+                    <rect x="74" y="0" width="3" height="40" fill="#000" />
+                    <rect x="79" y="0" width="4" height="40" fill="#000" />
+                    <rect x="85" y="0" width="2" height="40" fill="#000" />
+                    <rect x="89" y="0" width="3" height="40" fill="#000" />
+                    <rect x="94" y="0" width="2" height="40" fill="#000" />
+                    <rect x="98" y="0" width="5" height="40" fill="#000" />
+                    <rect x="105" y="0" width="1" height="40" fill="#000" />
+                    <rect x="108" y="0" width="3" height="40" fill="#000" />
+                    <rect x="113" y="0" width="4" height="40" fill="#000" />
+                    <rect x="119" y="0" width="2" height="40" fill="#000" />
+                    <rect x="123" y="0" width="3" height="40" fill="#000" />
+                    <rect x="128" y="0" width="1" height="40" fill="#000" />
+                    <rect x="131" y="0" width="4" height="40" fill="#000" />
+                    <rect x="137" y="0" width="2" height="40" fill="#000" />
+                    <rect x="141" y="0" width="5" height="40" fill="#000" />
+                    <rect x="148" y="0" width="2" height="40" fill="#000" />
+                    <rect x="152" y="0" width="3" height="40" fill="#000" />
+                    <rect x="157" y="0" width="1" height="40" fill="#000" />
+                    <rect x="160" y="0" width="4" height="40" fill="#000" />
+                    <rect x="166" y="0" width="2" height="40" fill="#000" />
+                    <rect x="170" y="0" width="3" height="40" fill="#000" />
+                    <rect x="175" y="0" width="4" height="40" fill="#000" />
+                    <rect x="181" y="0" width="2" height="40" fill="#000" />
+                    <rect x="185" y="0" width="3" height="40" fill="#000" />
+                    <rect x="190" y="0" width="2" height="40" fill="#000" />
+                    <rect x="194" y="0" width="3" height="40" fill="#000" />
+                  </svg>
+                  <div style={{ fontSize: 11, letterSpacing: 2, fontFamily: "monospace", color: "#334155" }}>
+                    {priceTagProduct.sku ? priceTagProduct.sku : `MDX-${String(priceTagProduct.id).padStart(6, "0")}`}
+                  </div>
+                </div>
+
+                <div className="tag-footer">
+                  <div>
+                    <div><strong>Partiya:</strong> {priceTagProduct.batchNumber || "—"}</div>
+                    <div><strong>Muddat:</strong> {priceTagProduct.expDate || "—"}</div>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <div>Sana: {new Date().toLocaleDateString("uz-UZ")}</div>
+                    <div style={{ color: "#0d9488", fontWeight: 700 }}>medax.uz</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="erp-modal-footer">
+              <button type="button" className="btn btn-erp-secondary" onClick={() => setPriceTagProduct(null)}>
+                Yopish
+              </button>
+              <button type="button" className="btn btn-erp-primary" onClick={() => window.print()}>
+                🖨️ Tsennikni Chop etish
               </button>
             </div>
           </div>
