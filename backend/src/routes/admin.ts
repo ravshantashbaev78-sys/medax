@@ -11,9 +11,11 @@ import { memoryUpload, removeFile, saveImage, savePdf } from "../upload";
 import { uniqueSlug } from "../utils";
 import { sendSms } from "../sms";
 import { notifyOrderConfirmed, notifyOrderReady, notifyOrderCanceled, notifyOrderDone } from "../notifications";
+import { erpRouter } from "./erp";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
+adminRouter.use("/erp", erpRouter);
 
 const id = (v: unknown) => {
   const n = Number(v);
@@ -101,6 +103,10 @@ const productSchema = z.object({
   unit: z.string().trim().max(30).nullish().transform((v) => v || "dona"),
   packageQty: z.coerce.number().int().positive().default(1),
   stock: z.coerce.number().int().min(0).default(0),
+  costPrice: z.coerce.number().nonnegative().nullish(),
+  markupPercent: z.coerce.number().nullish(),
+  minStock: z.coerce.number().int().min(0).default(5),
+  batchNumber: z.string().trim().max(100).nullish(),
   mfdDate: z.string().trim().max(40).nullish(),
   expDate: z.string().trim().max(40).nullish(),
   isHit: z.boolean().default(false),
@@ -108,6 +114,8 @@ const productSchema = z.object({
   isActive: z.boolean().default(true),
   categoryId: z.coerce.number().int().positive(),
   brandId: z.coerce.number().int().positive().nullish(),
+  supplierId: z.coerce.number().int().positive().nullish(),
+  warehouseId: z.coerce.number().int().positive().nullish(),
 });
 
 function productData(d: z.infer<typeof productSchema>) {
@@ -115,6 +123,15 @@ function productData(d: z.infer<typeof productSchema>) {
   let disc = d.discountPercent ?? null;
   if (!disc && d.oldPrice && d.priceFrom && d.oldPrice > d.priceFrom) {
     disc = Math.round(((d.oldPrice - d.priceFrom) / d.oldPrice) * 100);
+  }
+
+  // Agar costPrice va markupPercent bo'lib, sotuv narxi berilmagan bo'lsa
+  let finalSellPrice = d.priceFrom ?? null;
+  let finalMarkup = d.markupPercent ?? null;
+  if (d.costPrice && d.markupPercent !== null && d.markupPercent !== undefined && !finalSellPrice) {
+    finalSellPrice = Math.round(d.costPrice * (1 + d.markupPercent / 100));
+  } else if (d.costPrice && finalSellPrice && finalMarkup === null) {
+    finalMarkup = Math.round(((finalSellPrice - d.costPrice) / d.costPrice) * 100);
   }
 
   return {
@@ -127,12 +144,16 @@ function productData(d: z.infer<typeof productSchema>) {
     descriptionEn: d.descriptionEn || null,
     specs: d.specs as Prisma.InputJsonValue,
     country: d.country || null,
-    priceFrom: d.priceFrom ?? null,
+    priceFrom: finalSellPrice,
+    costPrice: d.costPrice ?? null,
+    markupPercent: finalMarkup,
     oldPrice: d.oldPrice ?? null,
     discountPercent: disc,
     unit: d.unit || "dona",
     packageQty: d.packageQty ?? 1,
     stock: d.stock ?? 0,
+    minStock: d.minStock ?? 5,
+    batchNumber: d.batchNumber || null,
     mfdDate: d.mfdDate || null,
     expDate: d.expDate || null,
     isHit: d.isHit,
@@ -140,6 +161,8 @@ function productData(d: z.infer<typeof productSchema>) {
     isActive: (d.stock !== undefined && d.stock <= 0) ? false : d.isActive,
     categoryId: d.categoryId,
     brandId: d.brandId ?? null,
+    supplierId: d.supplierId ?? null,
+    warehouseId: d.warehouseId ?? null,
   };
 }
 

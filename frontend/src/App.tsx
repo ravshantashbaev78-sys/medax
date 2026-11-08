@@ -27,6 +27,7 @@ const ContactMessagesPage = lazy(() => import("./admin/Misc").then((m) => ({ def
 const ImportPage = lazy(() => import("./admin/Misc").then((m) => ({ default: m.ImportPage })));
 const Blocklist = lazy(() => import("./admin/Misc").then((m) => ({ default: m.Blocklist })));
 const Users = lazy(() => import("./admin/Misc").then((m) => ({ default: m.Users })));
+const ErpPage = lazy(() => import("./admin/Erp"));
 
 const AdminLoading = () => (
   <div className="wrap" style={{ padding: "60px 20px", textAlign: "center" }}>
@@ -86,6 +87,7 @@ export default function App() {
               <Route path="customers" element={<AdminCustomersPage />} />
               <Route path="products" element={<ProductList />} />
               <Route path="products/:id" element={<ProductForm />} />
+              <Route path="erp" element={<ErpPage />} />
               <Route path="taxonomy" element={<Taxonomy />} />
               <Route path="messages" element={<ContactMessagesPage />} />
               <Route path="import" element={<ImportPage />} />

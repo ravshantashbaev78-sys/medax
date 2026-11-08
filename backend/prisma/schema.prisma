@@ -27,6 +27,26 @@ enum BlockType {
   IP
 }
 
+enum ErpDocType {
+  INCOME
+  OUTCOME
+  TRANSFER
+  RETURN_CUSTOMER
+  RETURN_SUPPLIER
+  WRITE_OFF
+}
+
+enum CashType {
+  INCOME
+  EXPENSE
+}
+
+enum PaymentType {
+  CASH
+  CARD
+  BANK_TRANSFER
+}
+
 model User {
   id           Int      @id @default(autoincrement())
   email        String   @unique
@@ -70,6 +90,10 @@ model Product {
   unit            String?           @default("dona")
   packageQty      Int?              @default(1)
   stock           Int               @default(0)
+  costPrice       Decimal?          @db.Decimal(14, 2)
+  markupPercent   Decimal?          @db.Decimal(6, 2)
+  minStock        Int               @default(5)
+  batchNumber     String?
   mfdDate         String?
   expDate         String?
   isHit           Boolean           @default(false)
@@ -79,9 +103,14 @@ model Product {
   category        Category          @relation(fields: [categoryId], references: [id])
   brandId         Int?
   brand           Brand?            @relation(fields: [brandId], references: [id])
+  supplierId      Int?
+  supplier        Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  warehouseId     Int?
+  warehouse       Warehouse?        @relation(fields: [warehouseId], references: [id], onDelete: SetNull)
   images          ProductImage[]
   documents       ProductDocument[]
   orderItems      OrderItem[]
+  erpDocItems     ErpDocumentItem[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
@@ -129,6 +158,7 @@ model Order {
   isPaid          Boolean     @default(false)
   paidAt          DateTime?
   stockDeducted   Boolean     @default(false)
+  cashEntries     CashEntry[]
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
 
@@ -142,6 +172,9 @@ model Customer {
   phone                  String?        @unique
   name                   String
   organization           String?        @default("")
+  inn                    String?
+  clientCategory         String?        @default("KLINIKA")
+  balance                Decimal        @default(0) @db.Decimal(14, 2)
   avatar                 String?
   passwordHash           String?
   resetPasswordOtpSentAt DateTime?
@@ -151,6 +184,8 @@ model Customer {
   updatedAt              DateTime       @updatedAt
   orders                 Order[]
   notifications          Notification[]
+  erpDocuments           ErpDocument[]
+  cashEntries            CashEntry[]
 
   @@index([phone])
 }
@@ -217,4 +252,99 @@ model ContactMessage {
   createdAt DateTime @default(now())
 
   @@index([isRead, createdAt])
+}
+
+model Warehouse {
+  id        Int           @id @default(autoincrement())
+  name      String        // e.g. "Asosiy ombor", "Namangan do'koni", "Toshkent filiali"
+  address   String?
+  isDefault Boolean       @default(false)
+  products  Product[]
+  fromDocs  ErpDocument[] @relation("FromWarehouse")
+  toDocs    ErpDocument[] @relation("ToWarehouse")
+  createdAt DateTime      @default(now())
+}
+
+model Supplier {
+  id          Int           @id @default(autoincrement())
+  name        String        // e.g. "Юсуфхон ака", "INTERMED INNOVATION"
+  company     String?
+  phone       String?
+  inn         String?       // STIR
+  address     String?
+  balance     Decimal       @default(0) @db.Decimal(14, 2)
+  notes       String?
+  products    Product[]
+  documents   ErpDocument[]
+  cashEntries CashEntry[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model ErpDocument {
+  id                Int               @id @default(autoincrement())
+  docNumber         String            @unique // e.g. "PR-2026-0001", "RS-2026-0001"
+  type              ErpDocType
+  date              DateTime          @default(now())
+  warehouseId       Int?
+  warehouse         Warehouse?        @relation("FromWarehouse", fields: [warehouseId], references: [id], onDelete: SetNull)
+  targetWarehouseId Int?
+  targetWarehouse   Warehouse?        @relation("ToWarehouse", fields: [targetWarehouseId], references: [id], onDelete: SetNull)
+  supplierId        Int?
+  supplier          Supplier?         @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  customerId        Int?
+  customer          Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  clientName        String?
+  totalAmount       Decimal           @default(0) @db.Decimal(14, 2)
+  paidAmount        Decimal           @default(0) @db.Decimal(14, 2)
+  status            String            @default("CONFIRMED") // DRAFT, CONFIRMED
+  notes             String?
+  items             ErpDocumentItem[]
+  cashEntries       CashEntry[]
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([type, date])
+  @@index([supplierId])
+  @@index([customerId])
+}
+
+model ErpDocumentItem {
+  id          Int         @id @default(autoincrement())
+  documentId  Int
+  document    ErpDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  productId   Int
+  product     Product     @relation(fields: [productId], references: [id])
+  productName String
+  quantity    Int
+  costPrice   Decimal?    @db.Decimal(14, 2)
+  markup      Decimal?    @db.Decimal(6, 2)
+  sellPrice   Decimal?    @db.Decimal(14, 2)
+  totalPrice  Decimal     @db.Decimal(14, 2)
+  batchNumber String?
+  expDate     String?
+}
+
+model CashEntry {
+  id          Int          @id @default(autoincrement())
+  entryNumber String       @unique // e.g. "KAS-2026-0001"
+  type        CashType
+  category    String       // "MIJOZ_TOLOV", "TAMINOTCHI_TOLOV", "IJARA", "TRANSPORT", "OYLIK", "BOSHQA"
+  amount      Decimal      @db.Decimal(14, 2)
+  paymentType PaymentType  @default(CASH)
+  date        DateTime     @default(now())
+  description String?
+  customerId  Int?
+  customer    Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  supplierId  Int?
+  supplier    Supplier?    @relation(fields: [supplierId], references: [id], onDelete: SetNull)
+  documentId  Int?
+  document    ErpDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+  orderId     Int?
+  order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+
+  @@index([type, date])
+  @@index([customerId])
+  @@index([supplierId])
 }

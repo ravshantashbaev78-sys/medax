@@ -20,6 +20,13 @@ export const ADMIN_TEXTS = {
   blocklist: { uz: "Bloklanganlar", ru: "Черный список", en: "Blocklist" },
   logout: { uz: "Chiqish", ru: "Выйти", en: "Logout" },
   admin_panel: { uz: "Medax Admin", ru: "Medax Панель", en: "Medax Admin" },
+  erp_title: { uz: "Ombor & Buxgalteriya (1C)", ru: "Склад и Учет (1C)", en: "Warehouse & ERP (1C)" },
+  erp_dashboard: { uz: "Ish stoli", ru: "Рабочий стол", en: "Dashboard" },
+  erp_inventory: { uz: "Tovarlar va qoldiqlar", ru: "Товары и остатки", en: "Products & Stock" },
+  erp_documents: { uz: "Hujjatlar (Kirim/Chiqim)", ru: "Документы (Приход/Расход)", en: "Documents (In/Out)" },
+  erp_cash: { uz: "Kassa va moliya", ru: "Касса и финансы", en: "Cash & Finance" },
+  erp_suppliers: { uz: "Yetkazib beruvchilar", ru: "Поставщики", en: "Suppliers" },
+  erp_reports: { uz: "Hisobotlar & Sverka", ru: "Отчеты и Сверка", en: "Reports & Reconcile" },
   import_excel: { uz: "Excel orqali yuklash", ru: "Загрузка через Excel", en: "Import via Excel" },
   view_site: { uz: "Saytni ko'rish", ru: "Перейти на сайт", en: "View Site" },
 
