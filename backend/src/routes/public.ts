@@ -135,6 +135,21 @@ publicRouter.get("/products", async (req, res) => {
   res.json({ items, total, page: q.page, pages: Math.max(1, Math.ceil(total / q.limit)) });
 });
 
+// Savatdagi mahsulotlarning joriy narxi va qoldig'ini bitta so'rovda olish
+publicRouter.get("/products/lookup", async (req, res) => {
+  const ids = String(req.query.ids || "")
+    .split(",")
+    .map((s) => Number(s))
+    .filter((n) => Number.isInteger(n) && n > 0)
+    .slice(0, 40);
+  if (!ids.length) return void res.json({ items: [] });
+  const items = await prisma.product.findMany({
+    where: { id: { in: ids }, isActive: true },
+    select: listInclude,
+  });
+  res.json({ items });
+});
+
 publicRouter.get("/products/:slug", async (req, res) => {
   const p = await prisma.product.findFirst({
     where: { slug: String(req.params.slug), isActive: true },

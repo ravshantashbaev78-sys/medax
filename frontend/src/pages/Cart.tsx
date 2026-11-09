@@ -1,160 +1,202 @@
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError, money, Product } from "../api";
-import { useCart } from "../cart";
+import { CartItem, useCart } from "../cart";
 import { DeviceIcon, ProductCard } from "../components/Shell";
-import { useCustomerAuth, CUSTOMER_TOKEN_KEY } from "../customerAuth";
-import { ClinicIcon, OrderBoxIcon } from "../components/Icons";
+import { useCustomerAuth } from "../customerAuth";
+import { OrderBoxIcon } from "../components/Icons";
 import { useI18n } from "../context/I18nContext";
 import { localizeProductName } from "../utils/localize";
 import { SITE_CONFIG } from "../siteConfig";
 
 type CheckoutStage = "cart" | "checkout" | "done";
 
+// Backend shu qiymatlarni saqlaydi: ular buyurtma kartasida admin uchun ko'rinadi
+const PAY_STORE = "Do'konda to'lash (Olib ketishda)";
+const PAY_CONTRACT = "Shartnoma asosida (B2B / Bank o'tkazmasi)";
+const PICKUP_ADDRESS = "Do'kondan olib ketish (Namangan sh., Ozod MFY, Beruniy 2-uy)";
+
 function formatUzPhone(raw: string): string {
   const digits = raw.replace(/\D/g, "");
   if (!digits) return "+998 ";
-
-  let num = digits;
-  if (num.startsWith("998")) {
-    num = num.slice(3);
-  }
+  let num = digits.startsWith("998") ? digits.slice(3) : digits;
   num = num.slice(0, 9);
-
   let formatted = "+998";
-  if (num.length > 0) {
-    formatted += " " + num.slice(0, 2);
-  }
-  if (num.length > 2) {
-    formatted += " " + num.slice(2, 5);
-  }
-  if (num.length > 5) {
-    formatted += " " + num.slice(5, 7);
-  }
-  if (num.length > 7) {
-    formatted += " " + num.slice(7, 9);
-  }
+  if (num.length > 0) formatted += " " + num.slice(0, 2);
+  if (num.length > 2) formatted += " " + num.slice(2, 5);
+  if (num.length > 5) formatted += " " + num.slice(5, 7);
+  if (num.length > 7) formatted += " " + num.slice(7, 9);
   return formatted;
 }
 
+/** Savatdagi qatorning buyurtmaga to'sqinlik qiladigan muammosi */
+function itemProblem(i: CartItem): "unavailable" | "out" | "short" | null {
+  if (i.unavailable) return "unavailable";
+  if (i.stock !== undefined && i.stock !== null) {
+    if (i.stock <= 0) return "out";
+    if (i.quantity > i.stock) return "short";
+  }
+  return null;
+}
+
+const Icon = {
+  trash: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  ),
+  pin: (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z" />
+      <circle cx="12" cy="10" r="3" />
+    </svg>
+  ),
+  clock: (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  ),
+  check: (
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+  shield: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    </svg>
+  ),
+  doc: (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  ),
+};
+
 export default function Cart() {
   const { lang, t } = useI18n();
+  const tr = (uz: string, ru: string, en: string) => (lang === "ru" ? ru : lang === "en" ? en : uz);
   const cart = useCart();
-  const { customer, token, refreshCustomer, openAuthModal } = useCustomerAuth();
+  const { customer, refreshCustomer, openAuthModal } = useCustomerAuth();
   const startedAt = useRef(Date.now());
 
-  // Stages: cart -> checkout -> done
   const [stage, setStage] = useState<CheckoutStage>("cart");
 
-  // Form states
   const [phone, setPhone] = useState("+998 ");
   const [name, setName] = useState("");
   const [organization, setOrganization] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<string>("Do'konda to'lash (Olib ketishda)");
+  const [paymentMethod, setPaymentMethod] = useState<string>(PAY_STORE);
   const [comment, setComment] = useState("");
   const [website, setWebsite] = useState(""); // honeypot
 
-  // Validation states
   const [nameTouched, setNameTouched] = useState(false);
   const [phoneTouched, setPhoneTouched] = useState(false);
 
   const cleanDigits = phone.replace(/\D/g, "");
-  const isPhoneValid = cleanDigits.length === 12; // 998 + 9 digits = 12
+  const isPhoneValid = cleanDigits.length === 12;
   const isNameValid = name.trim().length >= 2;
 
-  // Recommended products
-  const [recommended, setRecommended] = useState<Product[]>([]);
-  useEffect(() => {
-    api<{ items: Product[] }>("/products?limit=8&isActive=true")
-      .then((res) => {
-        const inCart = new Set(cart.items.map((i) => i.productId));
-        const filtered = (res.items || []).filter((p) => !inCart.has(p.id));
-        setRecommended(filtered.slice(0, 4));
-      })
-      .catch(() => {});
-  }, [cart.items]);
-
-  // Status
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [orderCode, setOrderCode] = useState("");
-  const [createdOrderId, setCreatedOrderId] = useState<number | null>(null);
+  const [donePhone, setDonePhone] = useState("");
 
-  // Guest OTP verification states
   const [guestOtpSent, setGuestOtpSent] = useState(false);
   const [guestOtpCode, setGuestOtpCode] = useState("");
   const [guestOtpTimer, setGuestOtpTimer] = useState(0);
   const [guestOtpSending, setGuestOtpSending] = useState(false);
 
+  // Tizimga kirgan mijoz uchun backend uning tasdiqlangan raqamini ishlatadi, shuning uchun
+  // mehmonlik faqat "customer" yo'qligi bilan aniqlanadi (eskirgan token bilan qotib qolmaslik uchun).
+  const isGuest = !customer;
+
+  // Savatni serverdagi joriy narx va qoldiq bilan yangilash
+  const idsKey = cart.items.map((i) => i.productId).sort((a, b) => a - b).join(",");
+  const refreshItems = () => {
+    if (!idsKey) return;
+    api<{ items: Product[] }>(`/products/lookup?ids=${idsKey}`)
+      .then((res) => cart.sync(res.items || []))
+      .catch(() => {});
+  };
+  useEffect(refreshItems, [idsKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const [recommended, setRecommended] = useState<Product[]>([]);
   useEffect(() => {
-    let timerId: any;
-    if (guestOtpTimer > 0) {
-      timerId = setTimeout(() => setGuestOtpTimer(guestOtpTimer - 1), 1000);
-    }
-    return () => clearTimeout(timerId);
+    api<{ items: Product[] }>("/products?limit=8")
+      .then((res) => {
+        const inCart = new Set(idsKey.split(",").map(Number));
+        setRecommended((res.items || []).filter((p) => !inCart.has(p.id) && (p.stock ?? 1) > 0).slice(0, 4));
+      })
+      .catch(() => {});
+  }, [idsKey]);
+
+  useEffect(() => {
+    if (guestOtpTimer <= 0) return;
+    const id = setTimeout(() => setGuestOtpTimer((s) => s - 1), 1000);
+    return () => clearTimeout(id);
   }, [guestOtpTimer]);
 
-  const handleSendGuestOtp = async () => {
+  useEffect(() => {
+    if (!customer) return;
+    if (customer.name && !name) setName(customer.name);
+    if (customer.phone) setPhone(formatUzPhone(customer.phone));
+    if (customer.organization && !organization) setOrganization(customer.organization);
+  }, [customer]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const totals = useMemo(() => {
+    let sum = 0;
+    let unpriced = 0;
+    for (const i of cart.items) {
+      if (i.unavailable) continue;
+      if (i.priceFrom && Number(i.priceFrom) > 0) sum += Number(i.priceFrom) * i.quantity;
+      else unpriced += 1;
+    }
+    return { sum, unpriced };
+  }, [cart.items]);
+
+  const problems = cart.items.filter((i) => itemProblem(i));
+  const canCheckout = cart.items.length > 0 && problems.length === 0;
+
+  const msgName = tr(
+    "Ism va familiyangizni kiriting (kamida 2 ta harf)",
+    "Введите имя и фамилию (не менее 2 букв)",
+    "Enter your full name (at least 2 letters)"
+  );
+  const msgPhone = tr(
+    "Telefon raqamini to'liq kiriting: +998 __ ___ __ __",
+    "Введите номер полностью: +998 __ ___ __ __",
+    "Enter the full number: +998 __ ___ __ __"
+  );
+
+  const validateContact = () => {
     setNameTouched(true);
     setPhoneTouched(true);
-    if (!isNameValid) {
-      setError(
-        lang === "ru"
-          ? "Пожалуйста, введите ваше имя и фамилию (не менее 2 символов)"
-          : lang === "en"
-          ? "Please enter your full name (at least 2 characters)"
-          : "Iltimos, ism va familiyangizni to'liq kiriting (kamida 2 ta belgi)"
-      );
-      return false;
-    }
-    if (!isPhoneValid) {
-      setError(
-        lang === "ru"
-          ? "Пожалуйста, введите корректный номер телефона (+998 __ ___ __ __)"
-          : lang === "en"
-          ? "Please enter a valid phone number (+998 __ ___ __ __)"
-          : "Iltimos, telefon raqamini to'liq kiriting (+998 __ ___ __ __)"
-      );
-      return false;
-    }
+    if (!isNameValid) return setError(msgName), false;
+    if (!isPhoneValid) return setError(msgPhone), false;
+    return true;
+  };
 
-    const cleanPhone = "+998" + cleanDigits.slice(3);
+  const handleSendGuestOtp = async () => {
+    if (!validateContact()) return;
     setGuestOtpSending(true);
     setError("");
     try {
       const res = await api<{ ok: boolean; resendIn?: number }>("/orders/otp", {
-        json: { phone: cleanPhone },
+        json: { phone: "+998" + cleanDigits.slice(3) },
       });
       setGuestOtpSent(true);
       setGuestOtpTimer(res.resendIn || 60);
-      return true;
-    } catch (err: any) {
-      setError(err?.message || "SMS kod yuborishda xatolik yuz berdi");
-      return false;
+    } catch (err) {
+      setError((err as ApiError)?.message || tr("SMS yuborishda xatolik", "Ошибка отправки SMS", "Failed to send SMS"));
     } finally {
       setGuestOtpSending(false);
     }
   };
 
-  // Sync logged in customer info
-  useEffect(() => {
-    if (customer) {
-      if (customer.name && !name) setName(customer.name);
-      if (customer.phone && (phone === "+998 " || !phone)) setPhone(formatUzPhone(customer.phone));
-      if (customer.organization && !organization) setOrganization(customer.organization);
-    }
-  }, [customer]);
-
-  const totalAmount = cart.items.reduce((acc, item) => {
-    if (item.priceFrom) {
-      return acc + Number(item.priceFrom) * item.quantity;
-    }
-    return acc;
-  }, 0);
-
-  const hasAnyPrice = cart.items.some((i) => i.priceFrom);
-
-  const handleProceedToCheckout = () => {
+  const goCheckout = () => {
+    if (!canCheckout) return;
     setError("");
     setStage("checkout");
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -163,76 +205,42 @@ export default function Cart() {
   const handleConfirmOrder = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    setNameTouched(true);
-    setPhoneTouched(true);
-
-    if (!isNameValid) {
-      setError(
-        lang === "ru"
-          ? "Пожалуйста, введите ваше имя и фамилию (не менее 2 символов)"
-          : lang === "en"
-          ? "Please enter your full name (at least 2 characters)"
-          : "Iltimos, ism va familiyangizni to'liq kiriting (kamida 2 ta belgi)"
-      );
+    if (!canCheckout) {
+      setStage("cart");
       return;
     }
-
-    if (!isPhoneValid) {
-      setError(
-        lang === "ru"
-          ? "Пожалуйста, введите корректный номер телефона (+998 __ ___ __ __)"
-          : lang === "en"
-          ? "Please enter a valid phone number (+998 __ ___ __ __)"
-          : "Iltimos, telefon raqamini to'liq kiriting (+998 __ ___ __ __)"
-      );
-      return;
-    }
-
-    const authToken = token || localStorage.getItem(CUSTOMER_TOKEN_KEY);
-    const isGuest = !customer && !authToken;
+    if (!validateContact()) return;
 
     if (isGuest) {
       if (!guestOtpSent) {
         await handleSendGuestOtp();
         return;
       }
-      if (guestOtpCode.trim().length !== 6) {
-        setError(
-          lang === "ru"
-            ? "Введите 6-значный код подтверждения из SMS"
-            : lang === "en"
-            ? "Enter the 6-digit confirmation code from SMS"
-            : "SMS orqali yuborilgan 6 xonali tasdiqlash kodini kiriting"
-        );
+      if (guestOtpCode.length !== 6) {
+        setError(tr("SMS orqali kelgan 6 xonali kodni kiriting", "Введите 6-значный код из SMS", "Enter the 6-digit code from SMS"));
         return;
       }
     }
 
-    const cleanPhone = "+998" + cleanDigits.slice(3);
-
     setBusy(true);
     try {
-      const headers: Record<string, string> = {};
-      if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
-
       const res = await api<{ code: string; orderId?: number; payUrl?: string }>("/orders", {
-        headers,
         json: {
           name: name.trim(),
-          phone: cleanPhone,
+          phone: "+998" + cleanDigits.slice(3),
           organization: organization.trim(),
-          deliveryAddress: "Do'kondan olib ketish (Namangan sh., Ozod MFY, Beruniy 2-uy)",
+          deliveryAddress: PICKUP_ADDRESS,
           paymentMethod,
           comment: comment.trim(),
           website,
           elapsedMs: Date.now() - startedAt.current,
           items: cart.items.map((i) => ({ productId: i.productId, quantity: i.quantity })),
-          code: isGuest ? guestOtpCode.trim() : undefined,
+          code: isGuest ? guestOtpCode : undefined,
         },
       });
 
       setOrderCode(res.code);
-      if (res.orderId) setCreatedOrderId(res.orderId);
+      setDonePhone(phone);
       cart.clear();
       setGuestOtpSent(false);
       setGuestOtpCode("");
@@ -242,71 +250,62 @@ export default function Cart() {
         window.location.href = res.payUrl;
         return;
       }
-
       setStage("done");
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
-      setError((err as ApiError).message || "Buyurtmani rasmiylashtirishda xatolik yuz berdi");
+      setError((err as ApiError).message || tr("Buyurtma yuborilmadi. Qayta urinib ko'ring.", "Заказ не отправлен. Попробуйте ещё раз.", "Order was not sent. Please try again."));
+      // Qoldiq yoki narx o'zgargan bo'lishi mumkin: savatni yangilaymiz
+      refreshItems();
     } finally {
       setBusy(false);
     }
   };
 
+  /* ---------- Muvaffaqiyat ---------- */
   if (stage === "done") {
     return (
       <main className="wrap">
-        <div className="order-success-card">
-          <div className="success-anim-badge">
-            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          </div>
-          <h1>Buyurtma so'rovi qabul qilindi!</h1>
-          <p className="order-subheading">
-            Medax menejeri tez orada <b>{phone}</b> raqamingizga qo'ng'iroq qilib, uskunani siz uchun ajratib qo'yadi.
+        <div className="co-done">
+          <div className="co-done-badge">{Icon.check}</div>
+          <h1>{tr("Buyurtmangiz qabul qilindi", "Ваш заказ принят", "Your order has been received")}</h1>
+          <p className="co-done-sub">
+            {tr("Menejerimiz", "Наш менеджер позвонит на", "Our manager will call")} <b>{donePhone}</b>{" "}
+            {tr(
+              "raqamiga qo'ng'iroq qilib, buyurtmani tasdiqlaydi.",
+              "и подтвердит заказ.",
+              "to confirm the order."
+            )}
           </p>
 
-          <div className="order-number-banner">
-            <span className="order-num-label">Buyurtma kodi:</span>
-            <span className="order-num-value">
-              {orderCode} {createdOrderId ? <small style={{ fontSize: 15, opacity: 0.85, marginLeft: 8 }}>(№ {createdOrderId})</small> : null}
-            </span>
+          <div className="co-done-code">
+            <span>{tr("Buyurtma raqami", "Номер заказа", "Order number")}</span>
+            <strong>{orderCode}</strong>
           </div>
 
-          <div className="order-next-steps">
-            <div className="step-point">
-              <span className="step-num">1</span>
-              <div>
-                <strong>Menejer tasdiqlashi</strong>
-                <p>Menejerimiz qo'ng'iroq qilib, buyurtma tafsilotlarini tasdiqlaydi.</p>
-              </div>
-            </div>
-            <div className="step-point">
-              <span className="step-num">2</span>
-              <div>
-                <strong>Do'kondan olib ketish</strong>
-                <p>Namangan markazimizga tashrif buyurib, uskunani ko'rib tekshirib olasiz.</p>
-              </div>
-            </div>
-            <div className="step-point">
-              <span className="step-num">3</span>
-              <div>
-                <strong>Qulay to'lov</strong>
-                <p>Olib ketish paytida naqd, terminal yoki rasmiy shartnoma hisob-faktura orqali to'lov.</p>
-              </div>
-            </div>
-          </div>
+          <ol className="co-done-steps">
+            <li>
+              <strong>{tr("Tasdiqlash", "Подтверждение", "Confirmation")}</strong>
+              <span>{tr("Menejer qo'ng'iroq qilib, mavjudlik va narxni tasdiqlaydi.", "Менеджер позвонит и подтвердит наличие и цену.", "A manager calls to confirm availability and price.")}</span>
+            </li>
+            <li>
+              <strong>{tr("Olib ketish", "Самовывоз", "Pickup")}</strong>
+              <span>{lang === "ru" ? SITE_CONFIG.addressRu : lang === "en" ? SITE_CONFIG.addressEn : SITE_CONFIG.addressUz}</span>
+            </li>
+            <li>
+              <strong>{tr("To'lov", "Оплата", "Payment")}</strong>
+              <span>{tr("Olib ketishda naqd, karta yoki shartnoma asosida.", "При получении: наличные, карта или по договору.", "On pickup: cash, card or by contract.")}</span>
+            </li>
+          </ol>
 
-          <div className="order-actions-bar">
+          <div className="co-done-actions">
             {customer && (
               <Link className="btn btn-primary-sheen" to="/account">
                 <OrderBoxIcon size={18} />
-                Shaxsiy kabinetda ko'rish
+                {tr("Buyurtmalarim", "Мои заказы", "My orders")}
               </Link>
             )}
             <Link className="btn ghost" to="/catalog">
-              Katalogga qaytish
+              {tr("Xaridni davom ettirish", "Продолжить покупки", "Continue shopping")}
             </Link>
           </div>
         </div>
@@ -314,6 +313,7 @@ export default function Cart() {
     );
   }
 
+  /* ---------- Bo'sh savat ---------- */
   if (cart.items.length === 0) {
     return (
       <main className="wrap">
@@ -330,54 +330,81 @@ export default function Cart() {
             {t("cart_empty_desc")}
           </p>
           <Link className="btn btn-primary-sheen" to="/catalog">
-            {t("cart_go_catalog")} →
+            {t("cart_go_catalog")}
           </Link>
         </div>
       </main>
     );
   }
 
-  return (
-    <main className="wrap">
-      <div className="crumbs">
-        <Link to="/">Bosh sahifa</Link> /{" "}
-        <span onClick={() => setStage("cart")} style={{ cursor: "pointer", textDecoration: stage !== "cart" ? "underline" : "none" }}>
-          Savat
-        </span>
-        {stage === "checkout" && <span> / Rasmiylashtirish</span>}
-      </div>
+  const countLabel = tr(
+    `${cart.count} ta mahsulot · ${cart.totalQuantity} dona`,
+    `${cart.count} товар(а) · ${cart.totalQuantity} шт`,
+    `${cart.count} item(s) · ${cart.totalQuantity} pcs`
+  );
 
-      <div className="checkout-pipeline-steps">
-        <div className={`pipe-step ${stage === "cart" ? "active" : "completed"}`} onClick={() => setStage("cart")}>
-          <span className="pipe-dot">1</span>
-          <span className="pipe-title">Savat</span>
-        </div>
-        <div className={`pipe-step ${stage === "checkout" ? "active" : ""}`}>
-          <span className="pipe-dot">2</span>
-          <span className="pipe-title">Rasmiylashtirish & To'lov</span>
-        </div>
+  const totalBlock = (
+    <>
+      <div className="co-total">
+        <span>{tr("Jami", "Итого", "Total")}</span>
+        <strong>{totals.sum > 0 ? money(totals.sum, t("sum_currency")) : t("cart_negotiated")}</strong>
       </div>
+      {totals.sum > 0 && totals.unpriced > 0 && (
+        <p className="co-total-note">
+          {tr(
+            `+ ${totals.unpriced} ta mahsulot narxi menejer bilan kelishiladi`,
+            `+ цена ${totals.unpriced} товар(ов) уточняется у менеджера`,
+            `+ price of ${totals.unpriced} item(s) is agreed with a manager`
+          )}
+        </p>
+      )}
+    </>
+  );
+
+  const problemText = (i: CartItem) => {
+    const p = itemProblem(i);
+    if (p === "unavailable") return tr("Sotuvda yo'q. Savatdan olib tashlang.", "Нет в продаже. Удалите из корзины.", "No longer available. Remove it.");
+    if (p === "out") return tr("Omborda qolmagan. Savatdan olib tashlang.", "Нет на складе. Удалите из корзины.", "Out of stock. Remove it.");
+    if (p === "short") return tr(`Omborda faqat ${i.stock} dona bor`, `На складе только ${i.stock} шт`, `Only ${i.stock} in stock`);
+    return "";
+  };
+
+  return (
+    <main className="wrap co-page">
+      <ol className="co-steps" aria-label={tr("Bosqichlar", "Этапы", "Steps")}>
+        <li className={stage === "cart" ? "co-step-active" : "co-step-done"}>
+          <button type="button" onClick={() => setStage("cart")}>
+            <span>1</span>
+            {tr("Savat", "Корзина", "Cart")}
+          </button>
+        </li>
+        <li className={stage === "checkout" ? "co-step-active" : ""}>
+          <button type="button" onClick={goCheckout} disabled={!canCheckout}>
+            <span>2</span>
+            {tr("Rasmiylashtirish", "Оформление", "Checkout")}
+          </button>
+        </li>
+      </ol>
 
       <div className="cartpage">
         <section className="cart-left-col">
           {stage === "cart" && (
             <div>
               <div className="cart-heading-row">
-                <h1 style={{ fontSize: 28, margin: 0 }}>
-                  {lang === "ru" ? "Корзина покупок" : lang === "en" ? "Shopping Cart" : "Xaridlar savati"}
-                </h1>
-                <span className="cart-count-pill">
-                  {cart.count} {t("unit_pcs")} ({cart.totalQuantity} {t("unit_pcs")})
-                </span>
+                <h1 style={{ fontSize: 28, margin: 0 }}>{tr("Savat", "Корзина", "Cart")}</h1>
+                <span className="cart-count-pill">{countLabel}</span>
               </div>
 
               <div className="cart-items-table">
                 {cart.items.map((i) => {
-                  const itemTotal = i.priceFrom ? Number(i.priceFrom) * i.quantity : null;
+                  const priced = i.priceFrom && Number(i.priceFrom) > 0;
+                  const itemTotal = priced ? Number(i.priceFrom) * i.quantity : null;
+                  const problem = itemProblem(i);
+                  const maxQty = Math.max(1, Math.min(100, i.stock ?? 100));
                   return (
-                    <div className="line cart-table-row" key={i.productId}>
+                    <div className={`line cart-table-row${problem ? " has-problem" : ""}`} key={i.productId}>
                       <div className="th">
-                        {i.thumb ? <img src={i.thumb} alt={localizeProductName(i, lang)} /> : <DeviceIcon />}
+                        {i.thumb ? <img src={i.thumb} alt="" /> : <DeviceIcon />}
                       </div>
 
                       <div className="cart-item-info">
@@ -385,61 +412,67 @@ export default function Cart() {
                           {localizeProductName(i, lang)}
                         </Link>
                         <div className="cart-item-unit-price">
-                          {i.priceFrom ? (
+                          {priced ? (
                             <>
-                              <span className="unit-label">{lang === "ru" ? "Цена за ед:" : lang === "en" ? "Unit price:" : "Dona narxi:"}</span>
-                              <strong>{money(i.priceFrom, t("sum_currency"))}</strong>
+                              <span className="unit-label">{tr("Dona narxi:", "Цена за шт:", "Unit price:")}</span>
+                              <strong>{money(i.priceFrom!, t("sum_currency"))}</strong>
                             </>
                           ) : (
                             <span className="negotiated-tag">{t("cart_negotiated")}</span>
                           )}
                         </div>
-                        {i.stock !== undefined && (
-                          <div style={{ fontSize: 12, marginTop: 4, fontWeight: 600, color: (i.stock ?? 0) > 0 ? "var(--teal, #0d9488)" : "var(--red, #ef4444)" }}>
-                            {(i.stock ?? 0) > 0
-                              ? `${t("stock_col")}: ${i.stock} ${t("unit_pcs")}`
-                              : t("out_of_stock")}
-                          </div>
-                        )}
+                        {problem ? (
+                          <div className="co-item-warn" role="alert">{problemText(i)}</div>
+                        ) : i.stock !== undefined && i.stock !== null && i.stock <= 5 ? (
+                          <div className="co-item-stock">{tr(`Omborda ${i.stock} dona qoldi`, `Осталось ${i.stock} шт`, `${i.stock} left in stock`)}</div>
+                        ) : null}
                       </div>
 
                       <div className="acts cart-item-actions">
                         <div className="qty-and-subtotal">
-                          <div className="qty">
-                            <button onClick={() => cart.setQty(i.productId, i.quantity - 1)} aria-label="Kamaytirish">−</button>
-                            <input
-                              type="number"
-                              min={1}
-                              max={i.stock ?? 100}
-                              value={i.quantity}
-                              onChange={(e) => {
-                                const val = Number(e.target.value);
-                                const maxStock = i.stock ?? 100;
-                                cart.setQty(i.productId, Math.min(maxStock, Math.max(1, val)));
-                              }}
-                              aria-label="Soni"
-                            />
-                            <button
-                              disabled={i.stock !== undefined && i.quantity >= i.stock}
-                              onClick={() => cart.setQty(i.productId, i.quantity + 1)}
-                              aria-label="Ko'paytirish"
-                            >
-                              +
-                            </button>
-                          </div>
-
-                          {itemTotal !== null && (
-                            <div className="item-subtotal-price">
-                              {money(itemTotal, t("sum_currency"))}
+                          {problem === "unavailable" || problem === "out" ? null : (
+                            <div className="qty">
+                              <button
+                                type="button"
+                                disabled={i.quantity <= 1}
+                                onClick={() => cart.setQty(i.productId, i.quantity - 1)}
+                                aria-label={tr("Kamaytirish", "Уменьшить", "Decrease")}
+                              >
+                                −
+                              </button>
+                              <input
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                max={maxQty}
+                                value={i.quantity}
+                                onChange={(e) => {
+                                  const val = Number(e.target.value);
+                                  if (val >= 1) cart.setQty(i.productId, Math.min(maxQty, val));
+                                }}
+                                aria-label={tr("Soni", "Количество", "Quantity")}
+                              />
+                              <button
+                                type="button"
+                                disabled={i.quantity >= maxQty}
+                                onClick={() => cart.setQty(i.productId, i.quantity + 1)}
+                                aria-label={tr("Ko'paytirish", "Увеличить", "Increase")}
+                              >
+                                +
+                              </button>
                             </div>
                           )}
+                          {itemTotal !== null && !problem && <div className="item-subtotal-price">{money(itemTotal, t("sum_currency"))}</div>}
                         </div>
 
-                        <button className="btn-del-item" onClick={() => cart.remove(i.productId)} title="Savatdan o'chirish">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <polyline points="3 6 5 6 21 6" />
-                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                          </svg>
+                        <button
+                          type="button"
+                          className="btn-del-item"
+                          onClick={() => cart.remove(i.productId)}
+                          title={tr("Savatdan o'chirish", "Удалить", "Remove")}
+                          aria-label={tr("Savatdan o'chirish", "Удалить", "Remove")}
+                        >
+                          {Icon.trash}
                         </button>
                       </div>
                     </div>
@@ -449,10 +482,16 @@ export default function Cart() {
 
               <div className="cart-table-footer">
                 <Link to="/catalog" className="btn ghost sm">
-                  ← {t("pd_back_to_catalog")}
+                  {tr("Xaridni davom ettirish", "Продолжить покупки", "Continue shopping")}
                 </Link>
-                <button className="btn ghost sm" onClick={() => cart.clear()}>
-                  Savatni tozalash
+                <button
+                  type="button"
+                  className="co-link-danger"
+                  onClick={() => {
+                    if (window.confirm(tr("Savatdagi barcha mahsulotlar o'chirilsinmi?", "Удалить все товары из корзины?", "Remove all items from the cart?"))) cart.clear();
+                  }}
+                >
+                  {tr("Savatni tozalash", "Очистить корзину", "Clear cart")}
                 </button>
               </div>
             </div>
@@ -460,82 +499,58 @@ export default function Cart() {
 
           {stage === "checkout" && (
             <div className="checkout-step-card">
-              <div className="step-back-link" onClick={() => setStage("cart")} style={{ cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                ← Savatga qaytish
-              </div>
-
-              <div className="step-card-header" style={{ marginTop: 12 }}>
-                <div className="step-icon-badge">
-                  <ClinicIcon size={24} />
-                </div>
-                <div>
-                  <h2 style={{ fontSize: 24, margin: "0 0 4px" }}>Buyurtmani rasmiylashtirish</h2>
-                  <p className="muted" style={{ margin: 0 }}>
-                    Ma'lumotlaringizni kiriting va to'lov usulini tanlang.
-                  </p>
-                </div>
-              </div>
+              <button type="button" className="co-back" onClick={() => setStage("cart")}>
+                ← {tr("Savatga qaytish", "Назад в корзину", "Back to cart")}
+              </button>
+              <h1 className="co-title">{tr("Buyurtmani rasmiylashtirish", "Оформление заказа", "Checkout")}</h1>
 
               {customer ? (
-                <div className="customer-verified-banner">
-                  <div className="ver-dot-wrap">
-                    <span className="live-radar-dot" />
-                  </div>
-                  <div>
-                    <div className="ver-title">Foydalanuvchi tasdiqlangan</div>
-                    <div className="ver-user">
-                      {name || customer?.name || "Mijoz"} · <b>{phone || customer?.phone}</b>
-                    </div>
-                  </div>
+                <div className="co-signed">
+                  {Icon.shield}
+                  <span>
+                    {tr("Hisobingiz orqali buyurtma beryapsiz:", "Вы оформляете заказ через аккаунт:", "Ordering with your account:")} <b>{phone}</b>
+                  </span>
                 </div>
               ) : (
-                <div className="cart-auth-callout">
-                  <div className="cart-auth-callout-text">
-                    <strong>Hisobingiz bormi?</strong>
-                    <span>Buyurtmalarni shaxsiy kabinetda qulay kuzatish uchun telefon orqali kiring.</span>
-                  </div>
-                  <button type="button" className="btn btn-primary" onClick={() => openAuthModal()}>
-                    Kabinetga kirish
+                <div className="co-signin">
+                  <span>{tr("Hisobingiz bormi? Kirsangiz, buyurtma holatini kabinetda kuzatasiz.", "Есть аккаунт? Войдите, чтобы отслеживать заказ.", "Have an account? Sign in to track your order.")}</span>
+                  <button type="button" onClick={() => openAuthModal()}>
+                    {tr("Kirish", "Войти", "Sign in")}
                   </button>
                 </div>
               )}
 
-              {error && <div className="auth-error-banner" role="alert">{error}</div>}
-
-              <form onSubmit={handleConfirmOrder} className="checkout-final-form">
-                <h3 className="section-subhead">1. Qabul qiluvchi ma'lumotlari</h3>
+              <form onSubmit={handleConfirmOrder} className="checkout-final-form" noValidate>
+                <h2 className="co-section">{tr("1. Aloqa ma'lumotlari", "1. Контактные данные", "1. Contact details")}</h2>
                 <div className="form-grid-2">
                   <div className="field">
-                    <label htmlFor="ord-name">Ism va familiya *</label>
+                    <label htmlFor="ord-name">{tr("Ism va familiya", "Имя и фамилия", "Full name")}</label>
                     <input
                       id="ord-name"
                       type="text"
+                      autoComplete="name"
                       value={name}
+                      aria-invalid={nameTouched && !isNameValid}
                       onBlur={() => setNameTouched(true)}
                       onChange={(e) => {
                         setName(e.target.value);
                         if (error) setError("");
                       }}
-                      required
-                      placeholder="Masalan: Azizbek Karimov"
-                      style={
-                        nameTouched && !isNameValid
-                          ? { borderColor: "var(--red, #ef4444)", background: "rgba(239, 68, 68, 0.05)" }
-                          : undefined
-                      }
+                      placeholder={tr("Masalan: Azizbek Karimov", "Например: Азизбек Каримов", "e.g. Azizbek Karimov")}
+                      className={nameTouched && !isNameValid ? "is-invalid" : undefined}
                     />
-                    {nameTouched && !isNameValid && (
-                      <span style={{ fontSize: 12, color: "var(--red, #ef4444)", marginTop: 4, display: "block" }}>
-                        Iltimos, ism va familiyangizni kiriting (kamida 2 ta harf)
-                      </span>
-                    )}
+                    {nameTouched && !isNameValid && <span className="co-field-err">{msgName}</span>}
                   </div>
                   <div className="field">
-                    <label htmlFor="ord-phone">Telefon raqam *</label>
+                    <label htmlFor="ord-phone">{tr("Telefon raqam", "Телефон", "Phone")}</label>
                     <input
                       id="ord-phone"
                       type="tel"
+                      autoComplete="tel"
+                      inputMode="tel"
                       value={phone}
+                      readOnly={!!customer}
+                      aria-invalid={phoneTouched && !isPhoneValid}
                       onBlur={() => setPhoneTouched(true)}
                       onChange={(e) => {
                         setPhone(formatUzPhone(e.target.value));
@@ -545,290 +560,121 @@ export default function Cart() {
                         }
                         if (error) setError("");
                       }}
-                      required
                       placeholder="+998 90 123 45 67"
-                      style={
-                        phoneTouched && !isPhoneValid
-                          ? { borderColor: "var(--red, #ef4444)", background: "rgba(239, 68, 68, 0.05)" }
-                          : undefined
-                      }
+                      className={phoneTouched && !isPhoneValid ? "is-invalid" : undefined}
                     />
-                    {phoneTouched && !isPhoneValid && (
-                      <span style={{ fontSize: 12, color: "var(--red, #ef4444)", marginTop: 4, display: "block" }}>
-                        Iltimos, to'liq telefon raqamini kiriting: +998 (__) ___-__-__
-                      </span>
-                    )}
+                    {phoneTouched && !isPhoneValid && <span className="co-field-err">{msgPhone}</span>}
                   </div>
                 </div>
 
                 <div className="field">
                   <label htmlFor="ord-org">
-                    Tashkilot / Klinika yoki Shaxs turi{" "}
-                    <span style={{ fontSize: 12, fontWeight: "normal", color: "var(--ink2)" }}>
-                      (Ixtiyoriy — Jismoniy shaxs bo'lsangiz bo'sh qoldiring)
-                    </span>
+                    {tr("Tashkilot yoki klinika", "Организация или клиника", "Organization or clinic")}{" "}
+                    <span className="co-optional">{tr("ixtiyoriy", "необязательно", "optional")}</span>
                   </label>
                   <input
                     id="ord-org"
                     type="text"
+                    autoComplete="organization"
                     value={organization}
                     onChange={(e) => setOrganization(e.target.value)}
-                    placeholder="Masalan: Jismoniy shaxs (yoki City Med MCHJ)"
+                    placeholder={tr("Jismoniy shaxs bo'lsangiz bo'sh qoldiring", "Оставьте пустым, если вы физлицо", "Leave empty if ordering as an individual")}
                   />
                 </div>
 
-                <h3 className="section-subhead" style={{ marginTop: 24 }}>2. {t("cart_pickup_title")}</h3>
-                <div
-                  style={{
-                    background: "var(--surface-card, #f8fafc)",
-                    border: "1.5px solid var(--line, #e2e8f0)",
-                    borderRadius: 16,
-                    padding: "20px 24px",
-                    display: "grid",
-                    gap: 14,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                    <div style={{ color: "var(--teal, #0d9488)", marginTop: 2 }}>
-                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                        <polyline points="9 22 9 12 15 12 15 22" />
-                      </svg>
+                <h2 className="co-section">{tr("2. Olib ketish", "2. Самовывоз", "2. Pickup")}</h2>
+                <div className="co-pickup">
+                  <div className="co-pickup-icon">{Icon.pin}</div>
+                  <div className="co-pickup-body">
+                    <strong>Medax, {tr("Namangan", "Наманган", "Namangan")}</strong>
+                    <p>{lang === "ru" ? SITE_CONFIG.addressRu : lang === "en" ? SITE_CONFIG.addressEn : SITE_CONFIG.addressUz}</p>
+                    <p className="co-pickup-meta">
+                      {Icon.clock} {t("cart_working_hours")}
+                    </p>
+                    <div className="co-pickup-links">
+                      <a href={SITE_CONFIG.yandexMapsUrl} target="_blank" rel="noopener noreferrer">
+                        {t("cart_open_yandex")}
+                      </a>
+                      <a href={SITE_CONFIG.googleMapsUrl} target="_blank" rel="noopener noreferrer">
+                        {t("cart_open_google")}
+                      </a>
                     </div>
-                    <div>
-                      <strong style={{ fontSize: 15, color: "var(--ink, #0f172a)", display: "block", marginBottom: 4 }}>
-                        {t("cart_pickup_address_label")}
-                      </strong>
-                      <p style={{ margin: 0, fontSize: 14, color: "var(--ink2, #334155)" }}>
-                        {lang === "ru" ? SITE_CONFIG.addressRu : lang === "en" ? SITE_CONFIG.addressEn : SITE_CONFIG.addressUz}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap", fontSize: 13, color: "var(--ink2)" }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <circle cx="12" cy="12" r="10" />
-                        <polyline points="12 6 12 12 16 14" />
-                      </svg>
-                      {t("cart_working_hours")}
-                    </span>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" />
-                      </svg>
-                      <b>{t("cart_contact_phone")}</b> {SITE_CONFIG.phone}
-                    </span>
-                  </div>
-
-                  {/* Interaktiv Yandex Xaritasi */}
-                  <div
-                    style={{
-                      borderRadius: 12,
-                      overflow: "hidden",
-                      border: "1px solid var(--line, #e2e8f0)",
-                      background: "var(--card)",
-                      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.05)",
-                    }}
-                  >
-                    <iframe
-                      title="Medax Namangan Xaritasi"
-                      src={SITE_CONFIG.yandexMapEmbedUrl}
-                      width="100%"
-                      height="230"
-                      style={{ border: 0, display: "block" }}
-                      allowFullScreen
-                      loading="lazy"
-                    />
-                  </div>
-
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <a
-                      href={SITE_CONFIG.yandexMapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn sm ghost"
-                      style={{ borderRadius: 8, fontSize: 12 }}
-                    >
-                      {t("cart_open_yandex")}
-                    </a>
-                    <a
-                      href={SITE_CONFIG.googleMapsUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn sm ghost"
-                      style={{ borderRadius: 8, fontSize: 12 }}
-                    >
-                      {t("cart_open_google")}
-                    </a>
                   </div>
                 </div>
 
-                <div className="field" style={{ marginTop: 20 }}>
-                  <label htmlFor="ord-comment">Qo'shimcha izoh yoki texnik talablar (ixtiyoriy)</label>
+                <h2 className="co-section">{tr("3. To'lov usuli", "3. Способ оплаты", "3. Payment")}</h2>
+                <div className="co-pay">
+                  {[
+                    { v: PAY_STORE, title: t("cart_pay_cash_title"), desc: t("cart_pay_cash_desc") },
+                    { v: PAY_CONTRACT, title: t("cart_pay_contract_title"), desc: t("cart_pay_contract_desc") },
+                  ].map((o) => (
+                    <label key={o.v} className={`co-pay-opt${paymentMethod === o.v ? " selected" : ""}`}>
+                      <input type="radio" name="paymentMethod" value={o.v} checked={paymentMethod === o.v} onChange={() => setPaymentMethod(o.v)} />
+                      <span>
+                        <strong>{o.title}</strong>
+                        <small>{o.desc}</small>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                <div className="field" style={{ marginTop: 18 }}>
+                  <label htmlFor="ord-comment">
+                    {tr("Izoh", "Комментарий", "Comment")} <span className="co-optional">{tr("ixtiyoriy", "необязательно", "optional")}</span>
+                  </label>
                   <textarea
                     id="ord-comment"
                     rows={2}
+                    maxLength={1000}
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder="Masalan: Uskunani soat 14:00 larda borib olib ketamiz, oldindan tayyorlab qo'ying"
+                    placeholder={tr("Masalan: ertaga soat 14:00 da olib ketaman", "Например: заберу завтра в 14:00", "e.g. I'll pick it up tomorrow at 2 pm")}
                   />
                 </div>
 
-                {/* Honeypot field */}
                 <div className="hp" aria-hidden="true" style={{ display: "none" }}>
                   <input type="text" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
                 </div>
 
-                <h3 className="section-subhead" style={{ marginTop: 24 }}>3. To'lov va buyurtma shartlari</h3>
-
-                <div style={{ display: "grid", gap: 12 }}>
-                  {/* Option 1: Cash / Store pickup */}
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 14,
-                      padding: "16px 18px",
-                      borderRadius: 14,
-                      border: paymentMethod === "Do'konda to'lash (Olib ketishda)" ? "2px solid var(--teal, #0d9488)" : "1.5px solid var(--line)",
-                      background: paymentMethod === "Do'konda to'lash (Olib ketishda)" ? "rgba(13, 148, 136, 0.05)" : "var(--surface-card, #fff)",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="Do'konda to'lash (Olib ketishda)"
-                      checked={paymentMethod === "Do'konda to'lash (Olib ketishda)"}
-                      onChange={() => setPaymentMethod("Do'konda to'lash (Olib ketishda)")}
-                      style={{ marginTop: 4, accentColor: "var(--teal, #0d9488)", width: 18, height: 18 }}
-                    />
-                    <div>
-                      <strong style={{ fontSize: 15, color: "var(--ink)", display: "block" }}>
-                        {t("cart_pay_cash_title")}
-                      </strong>
-                      <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink2)", lineHeight: 1.4 }}>
-                        {t("cart_pay_cash_desc")}
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Option 2: Bank transfer / B2B */}
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 14,
-                      padding: "16px 18px",
-                      borderRadius: 14,
-                      border: paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)" ? "2px solid var(--teal, #0d9488)" : "1.5px solid var(--line)",
-                      background: paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)" ? "rgba(13, 148, 136, 0.05)" : "var(--surface-card, #fff)",
-                      cursor: "pointer",
-                      transition: "all 0.2s ease",
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="paymentMethod"
-                      value="Shartnoma asosida (B2B / Bank o'tkazmasi)"
-                      checked={paymentMethod === "Shartnoma asosida (B2B / Bank o'tkazmasi)"}
-                      onChange={() => setPaymentMethod("Shartnoma asosida (B2B / Bank o'tkazmasi)")}
-                      style={{ marginTop: 4, accentColor: "var(--teal, #0d9488)", width: 18, height: 18 }}
-                    />
-                    <div>
-                      <strong style={{ fontSize: 15, color: "var(--ink)", display: "block" }}>
-                        {t("cart_pay_contract_title")}
-                      </strong>
-                      <p style={{ margin: "4px 0 0", fontSize: 13, color: "var(--ink2)", lineHeight: 1.4 }}>
-                        {t("cart_pay_contract_desc")}
-                      </p>
-                    </div>
-                  </label>
-                </div>
-
-                {/* Guest OTP verification input */}
-                {!customer && !token && guestOtpSent && (
-                  <div
-                    style={{
-                      marginTop: 24,
-                      padding: "18px 20px",
-                      borderRadius: 14,
-                      background: "rgba(13, 148, 136, 0.06)",
-                      border: "1.5px solid var(--teal, #0d9488)",
-                      display: "grid",
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                      <strong style={{ fontSize: 15, color: "var(--ink)" }}>
-                        SMS orqali tasdiqlash
-                      </strong>
+                {isGuest && guestOtpSent && (
+                  <div className="co-otp">
+                    <div className="co-otp-head">
+                      <strong>{tr("SMS kodni kiriting", "Введите код из SMS", "Enter the SMS code")}</strong>
                       <button
                         type="button"
                         onClick={() => {
                           setGuestOtpSent(false);
                           setGuestOtpCode("");
-                        }}
-                        style={{
-                          background: "none",
-                          border: "none",
-                          color: "var(--teal, #0d9488)",
-                          fontSize: 13,
-                          cursor: "pointer",
-                          fontWeight: 600,
-                          textDecoration: "underline",
+                          document.getElementById("ord-phone")?.focus();
                         }}
                       >
-                        Raqamni o'zgartirish
+                        {tr("Raqamni o'zgartirish", "Изменить номер", "Change number")}
                       </button>
                     </div>
-
-                    <p style={{ margin: 0, fontSize: 13, color: "var(--ink2)", lineHeight: 1.5 }}>
-                      {phone} raqamingizga buyurtmani tasdiqlash uchun 6 xonali SMS kod yuborildi:
+                    <p>
+                      {tr(`Kod ${phone} raqamiga yuborildi.`, `Код отправлен на ${phone}.`, `The code was sent to ${phone}.`)}
                     </p>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", marginTop: 4 }}>
+                    <div className="co-otp-row">
                       <input
                         type="text"
                         inputMode="numeric"
-                        pattern="[0-9]*"
+                        autoComplete="one-time-code"
                         maxLength={6}
                         value={guestOtpCode}
                         onChange={(e) => {
-                          const val = e.target.value.replace(/\D/g, "").slice(0, 6);
-                          setGuestOtpCode(val);
+                          setGuestOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6));
                           if (error) setError("");
                         }}
-                        placeholder="123456"
+                        placeholder="000000"
                         autoFocus
-                        style={{
-                          width: 170,
-                          height: 46,
-                          fontSize: 22,
-                          fontWeight: 700,
-                          letterSpacing: 6,
-                          textAlign: "center",
-                          borderRadius: 10,
-                          border: "2px solid var(--teal, #0d9488)",
-                          background: "var(--surface-card, #fff)",
-                          outline: "none",
-                        }}
+                        aria-label={tr("SMS kod", "SMS-код", "SMS code")}
                       />
-
                       {guestOtpTimer > 0 ? (
-                        <span style={{ fontSize: 13, color: "var(--ink2)", fontWeight: 500 }}>
+                        <span className="co-otp-wait">
                           {t("cart_guest_sms_wait")} {guestOtpTimer}s
                         </span>
                       ) : (
-                        <button
-                          type="button"
-                          onClick={handleSendGuestOtp}
-                          disabled={guestOtpSending}
-                          className="btn ghost sm"
-                          style={{ height: 42, fontSize: 13, borderRadius: 8 }}
-                        >
+                        <button type="button" onClick={handleSendGuestOtp} disabled={guestOtpSending} className="btn ghost sm">
                           {guestOtpSending ? t("auth_btn_sending") : t("cart_guest_sms_resend")}
                         </button>
                       )}
@@ -836,47 +682,38 @@ export default function Cart() {
                   </div>
                 )}
 
-                <div style={{ marginTop: 26 }}>
-                  <button
-                    type="submit"
-                    className="btn btn-primary-sheen"
-                    style={{ width: "100%", height: 50, fontSize: 16, fontWeight: 700 }}
-                    disabled={busy || guestOtpSending}
-                  >
-                    {busy
-                      ? t("cart_btn_sending_order")
-                      : guestOtpSending
-                      ? t("auth_btn_sending")
-                      : !customer && !token && !guestOtpSent
-                      ? t("cart_btn_get_code")
-                      : t("cart_btn_confirm_order")}
-                  </button>
-                  <p className="note" style={{ textAlign: "center", marginTop: 10 }}>
-                    {!customer && !token && !guestOtpSent
-                      ? t("cart_guest_sms_prompt")
-                      : "Buyurtma admin tomonidan ko'rib chiqilib, telefon orqali tasdiqlanadi."}
-                  </p>
-                </div>
+                {error && (
+                  <div className="auth-error-banner" role="alert" style={{ marginTop: 18 }}>
+                    {error}
+                  </div>
+                )}
+
+                <button type="submit" className="btn btn-primary-sheen co-submit" disabled={busy || guestOtpSending}>
+                  {busy
+                    ? t("cart_btn_sending_order")
+                    : guestOtpSending
+                    ? t("auth_btn_sending")
+                    : isGuest && !guestOtpSent
+                    ? t("cart_btn_get_code")
+                    : t("cart_btn_confirm_order")}
+                </button>
+                <p className="co-submit-note">
+                  {isGuest && !guestOtpSent
+                    ? t("cart_guest_sms_prompt")
+                    : tr(
+                        "Hozir to'lov olinmaydi. Menejer qo'ng'iroq qilib, buyurtmani tasdiqlaydi.",
+                        "Сейчас оплата не списывается. Менеджер позвонит и подтвердит заказ.",
+                        "No payment is taken now. A manager will call to confirm the order."
+                      )}
+                </p>
               </form>
             </div>
           )}
         </section>
 
-        {/* RIGHT COLUMN: Order Summary Box */}
         <aside className="cart-summary-panel">
           <div className="summary-card">
-            <h2 className="summary-title">
-              {lang === "ru" ? "Итог заказа" : lang === "en" ? "Order Summary" : "Buyurtma xulosasi"}
-            </h2>
-
-            <div className="summary-row">
-              <span className="summary-label">
-                {lang === "ru" ? "Количество товаров:" : lang === "en" ? "Items count:" : "Mahsulotlar soni:"}
-              </span>
-              <span className="summary-val">
-                {cart.totalQuantity} {t("unit_pcs")} ({cart.count} {t("unit_pcs")})
-              </span>
-            </div>
+            <h2 className="summary-title">{tr("Buyurtmangiz", "Ваш заказ", "Your order")}</h2>
 
             <div className="summary-items-preview">
               {cart.items.map((i) => (
@@ -888,49 +725,36 @@ export default function Cart() {
             </div>
 
             <div className="summary-divider" />
-
-            <div className="summary-row total-row">
-              <span className="total-label">{t("cart_total")}</span>
-              <div className="total-amount-box">
-                {hasAnyPrice && totalAmount > 0 ? (
-                  <span className="total-price-val">{money(totalAmount, t("sum_currency"))}</span>
-                ) : (
-                  <span className="total-price-val">{t("cart_negotiated")}</span>
-                )}
-              </div>
-            </div>
+            {totalBlock}
 
             {stage === "cart" && (
-              <button
-                type="button"
-                className="btn btn-primary-sheen btn-checkout-cta"
-                onClick={handleProceedToCheckout}
-              >
-                {t("cart_checkout")}
-              </button>
+              <>
+                <button type="button" className="btn btn-primary-sheen btn-checkout-cta" onClick={goCheckout} disabled={!canCheckout}>
+                  {t("cart_checkout")}
+                </button>
+                {!canCheckout && (
+                  <p className="co-blocked">
+                    {tr(
+                      "Davom etish uchun belgilangan mahsulotlarni tuzating.",
+                      "Чтобы продолжить, исправьте отмеченные товары.",
+                      "Fix the highlighted items to continue."
+                    )}
+                  </p>
+                )}
+              </>
             )}
 
             <div className="summary-perks">
-              <div className="perk-item" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--teal)" }}>
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-                </svg>
+              <div className="perk-item">
+                {Icon.shield}
                 <span>{t("cart_perk_warranty")}</span>
               </div>
-              <div className="perk-item" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--teal)" }}>
-                  <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-                  <polyline points="9 22 9 12 15 12 15 22" />
-                </svg>
+              <div className="perk-item">
+                {Icon.pin}
                 <span>{t("cart_perk_pickup")}</span>
               </div>
-              <div className="perk-item" style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ color: "var(--teal)" }}>
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                </svg>
+              <div className="perk-item">
+                {Icon.doc}
                 <span>{t("cart_perk_docs")}</span>
               </div>
             </div>
@@ -938,26 +762,26 @@ export default function Cart() {
         </aside>
       </div>
 
+      {stage === "cart" && (
+        <div className="co-mobile-bar">
+          <div>
+            <small>{countLabel}</small>
+            <strong>{totals.sum > 0 ? money(totals.sum, t("sum_currency")) : t("cart_negotiated")}</strong>
+          </div>
+          <button type="button" className="btn btn-primary-sheen" onClick={goCheckout} disabled={!canCheckout}>
+            {tr("Rasmiylashtirish", "Оформить", "Checkout")}
+          </button>
+        </div>
+      )}
+
       {stage === "cart" && recommended.length > 0 && (
         <section className="cart-recommended-section">
           <div className="cart-rec-header">
-            <div>
-              <h2 className="cart-rec-title">
-                {lang === "ru" ? "Рекомендуемые товары" : lang === "en" ? "Recommended products" : "Tavsiya etiladigan uskunalar"}
-              </h2>
-              <p className="cart-rec-sub">
-                {lang === "ru"
-                  ? "Популярные медицинские аппараты и принадлежности к вашему заказу"
-                  : lang === "en"
-                  ? "Popular medical equipment and accessories for your order"
-                  : "Xaridingizga mos qo'shimcha tibbiy uskunalar va sarflov materiallari"}
-              </p>
-            </div>
+            <h2 className="cart-rec-title">{tr("Sizga ham kerak bo'lishi mumkin", "Вам также может пригодиться", "You may also need")}</h2>
             <Link to="/catalog" className="btn ghost sm">
-              {lang === "ru" ? "Весь каталог →" : lang === "en" ? "Full catalog →" : "Barcha uskunalar →"}
+              {tr("Barcha mahsulotlar", "Весь каталог", "All products")}
             </Link>
           </div>
-
           <div className="grid cart-rec-grid">
             {recommended.map((p) => (
               <ProductCard key={p.id} p={p} />

@@ -913,3 +913,57 @@ a.dash-kpi:hover {
   background: var(--a-hover);
   color: var(--a-text);
 }
+
+/* ---------- ERP: yangi hujjat oynasi ---------- */
+.adm .doc-type-seg { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 10px; background: var(--a-surface-2); border: 1px solid var(--a-border); width: fit-content; max-width: 100%; }
+.adm .doc-type-seg button { height: 32px; padding: 0 12px; border: 0; border-radius: 7px; background: transparent; color: var(--a-text-2); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.adm .doc-type-seg button:hover { color: var(--a-text); }
+.adm .doc-type-seg button.active { background: var(--a-surface); color: var(--a-text); box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 0 0 1px var(--a-border); }
+.adm .doc-type-hint { margin: 10px 0 16px; padding: 10px 12px; border-radius: 8px; background: var(--a-info-soft); color: var(--a-text); font-size: 13px; line-height: 1.45; }
+.adm .doc-add-prod { flex: 1; max-width: 460px; }
+.adm .doc-add-prod input { width: 100%; height: 36px; }
+.adm .doc-table-scroll { overflow-x: auto; }
+.adm .doc-create-table th.num, .adm .doc-create-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .doc-create-table input { width: 100%; min-width: 0; height: 32px; padding: 0 8px; font-variant-numeric: tabular-nums; }
+.adm .doc-create-table input[type="number"] { text-align: right; }
+.adm .doc-after { display: block; font-size: 11px; color: var(--a-text-3); }
+.adm .doc-create-table tr.row-short td { background: var(--a-danger-soft); }
+.adm .doc-create-table tr.row-short input[aria-invalid="true"] { border-color: var(--a-danger); }
+.adm .doc-totals { display: grid; gap: 8px; padding: 12px 14px; border: 1px solid var(--a-border); border-radius: 10px; background: var(--a-surface-2); }
+.adm .doc-totals-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13.5px; color: var(--a-text-2); }
+.adm .doc-totals-row strong { color: var(--a-text); font-size: 15px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .doc-totals-row strong.debt { color: var(--a-warn); }
+.adm .doc-paid-input { display: flex; gap: 6px; }
+.adm .doc-paid-input input { width: 150px; height: 32px; text-align: right; font-variant-numeric: tabular-nums; }
+.adm .btn-mini { height: 32px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--a-border-strong); background: var(--a-surface); color: var(--a-text); font: inherit; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+.adm .btn-mini:disabled { opacity: .5; cursor: not-allowed; }
+.adm .doc-warn { margin: 0; font-size: 12.5px; color: var(--a-warn); line-height: 1.4; }
+.adm .doc-error { margin-top: 14px; padding: 10px 12px; border-radius: 8px; background: var(--a-danger-soft); color: var(--a-danger); font-size: 13.5px; font-weight: 600; }
+@media (max-width: 760px) {
+  .adm .doc-paid-input input { width: 110px; }
+  .adm .doc-create-table { min-width: 720px; }
+}
+.adm .erp-doc-footer-grid { grid-template-columns: 1fr minmax(320px, 1fr); align-items: start; margin-top: 16px; }
+@media (max-width: 760px) { .adm .erp-doc-footer-grid { grid-template-columns: 1fr; } }
+.adm .erp-modal-window.large:has(.doc-create-table) { max-width: min(1240px, calc(100vw - 32px)); }
+.adm .doc-create-table td:first-child { min-width: 180px; }
+.adm .erp-table th.num, .adm .erp-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.adm .erp-table td.nowrap { white-space: nowrap; }
+.adm .erp-table .mono { font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.adm .erp-table tr.row-click { cursor: pointer; }
+.adm .erp-table tr.row-click:hover td { background: var(--a-hover); }
+.adm .txt-warn { color: var(--a-warn); font-weight: 600; }
+.adm .erp-card-table { overflow-x: auto; }
+.adm .erp-doc-pill { white-space: nowrap; text-transform: none; }
+.adm .erp-doc-pill.INCOME { background: var(--a-success-soft); color: var(--a-success); }
+.adm .erp-doc-pill.OUTCOME { background: var(--a-info-soft); color: var(--a-info); }
+.adm .erp-doc-pill.RETURN_CUSTOMER, .adm .erp-doc-pill.RETURN_SUPPLIER, .adm .erp-doc-pill.TRANSFER { background: var(--a-warn-soft); color: var(--a-warn); }
+.adm .erp-doc-pill.WRITE_OFF { background: var(--a-danger-soft); color: var(--a-danger); }
+.adm .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.adm .erp-1c-table .cell-sku { display: block; margin-top: 2px; font-size: 12px; font-weight: 400; color: var(--a-text-3); }
+.adm .erp-doc-pill.EXPENSE { background: var(--a-danger-soft); color: var(--a-danger); }
+.adm .erp-table td.cell-desc { max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--a-text-2); }
+.adm .erp-kpi-card.danger .erp-kpi-value { color: var(--a-danger); }
+.adm .kpi-note { display: block; margin-top: 6px; font-size: 12px; color: var(--a-text-3); }
+.adm .text-success { color: var(--a-success); }
+.adm .text-danger { color: var(--a-danger); }

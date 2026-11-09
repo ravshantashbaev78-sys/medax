@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
+import { useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { useAdminI18n } from "./i18n";
 import { numberToWordsUz, numberToWordsRu } from "./numberToWords";
@@ -9,6 +10,10 @@ import { numberToWordsUz, numberToWordsRu } from "./numberToWords";
 function formatMoney(n: number | string | null | undefined): string {
   if (n === null || n === undefined || isNaN(Number(n))) return "0";
   return Number(n).toLocaleString("ru-RU").replace(/,/g, " ");
+}
+
+function docOptionLabel(p: { name: string; sku: string | null; stock: number }): string {
+  return `${p.name}${p.sku ? ` [${p.sku}]` : ""} · qoldiq ${p.stock}`;
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -63,6 +68,99 @@ interface ErpProduct {
   supplier?: { id: number; name: string };
 }
 
+type DocType = "INCOME" | "OUTCOME" | "TRANSFER" | "RETURN_CUSTOMER" | "RETURN_SUPPLIER" | "WRITE_OFF";
+
+interface DocLine {
+  productId: number;
+  productName: string;
+  /** Hujjat ochilgan paytdagi ombor qoldig'i */
+  stock: number;
+  quantity: number;
+  costPrice: number;
+  markup: number;
+  sellPrice: number;
+  batchNumber: string;
+  expDate: string;
+}
+
+/** Har bir hujjat turi ombor, narx va kassaga qanday ta'sir qiladi (backend mantiqiga mos) */
+const DOC_TYPES: Record<
+  DocType,
+  { label: string; title: string; hint: string; stock: "in" | "out" | "none"; basis: "cost" | "sell"; party: "supplier" | "customer" | "none"; payment: boolean }
+> = {
+  INCOME: {
+    label: "Kirim",
+    title: "Tovar kirimi",
+    hint: "Tovar omborga qo'shiladi, tannarx va sotuv narxi yangilanadi. To'lanmagan qism ta'minotchi qarziga yoziladi.",
+    stock: "in",
+    basis: "cost",
+    party: "supplier",
+    payment: true,
+  },
+  OUTCOME: {
+    label: "Sotuv (chiqim)",
+    title: "Tovar sotuvi",
+    hint: "Tovar ombordan chiqariladi. To'langan summa kassaga kirim bo'ladi, qolgani mijoz qarziga yoziladi.",
+    stock: "out",
+    basis: "sell",
+    party: "customer",
+    payment: true,
+  },
+  RETURN_CUSTOMER: {
+    label: "Mijozdan qaytim",
+    title: "Mijozdan qaytgan tovar",
+    hint: "Tovar omborga qaytadi. Mijozga pul qaytarilsa, uni Kassa bo'limida chiqim sifatida kiriting.",
+    stock: "in",
+    basis: "sell",
+    party: "customer",
+    payment: false,
+  },
+  RETURN_SUPPLIER: {
+    label: "Ta'minotchiga qaytarish",
+    title: "Ta'minotchiga qaytarish",
+    hint: "Tovar ombordan chiqariladi (tannarxda). Ta'minotchidan pul qaytsa, Kassa bo'limida kirim qiling.",
+    stock: "out",
+    basis: "cost",
+    party: "supplier",
+    payment: false,
+  },
+  WRITE_OFF: {
+    label: "Hisobdan chiqarish",
+    title: "Hisobdan chiqarish",
+    hint: "Yaroqsiz, singan yoki muddati o'tgan tovar ombordan chiqariladi. Pul harakati bo'lmaydi.",
+    stock: "out",
+    basis: "cost",
+    party: "none",
+    payment: false,
+  },
+  TRANSFER: {
+    label: "Ko'chirish",
+    title: "Omborlararo ko'chirish",
+    hint: "Qoldiqqa ta'sir qilmaydi.",
+    stock: "none",
+    basis: "cost",
+    party: "none",
+    payment: false,
+  },
+};
+
+/** Kassa toifalari: bazada kod saqlanadi, ekranda odam tushunadigan nom */
+const CASH_CATEGORIES: Record<string, string> = {
+  MIJOZ_TOLOV: "Mijozdan to'lov",
+  DOQON_SOTUV: "Do'kondagi sotuv",
+  BOSHQA_KIRIM: "Boshqa tushum",
+  TAMINOTCHI_TOLOV: "Ta'minotchiga to'lov",
+  IJARA: "Ijara",
+  OYLIK: "Oylik maosh",
+  TRANSPORT: "Transport",
+  KOMMUNAL: "Kommunal va internet",
+  BOSHQA_CHIQIM: "Boshqa xarajat",
+};
+const cashCategoryLabel = (c: string) => CASH_CATEGORIES[c] || c;
+
+/** Yangi hujjatda tanlash mumkin bo'lgan turlar (ko'chirish bitta omborda ma'nosiz) */
+const DOC_TYPE_CHOICES: DocType[] = ["INCOME", "OUTCOME", "RETURN_CUSTOMER", "RETURN_SUPPLIER", "WRITE_OFF"];
+
 interface ErpDoc {
   id: number;
   docNumber: string;
@@ -102,9 +200,16 @@ interface Supplier {
   _count?: { documents: number; products: number };
 }
 
+type ErpTab = "overview" | "inventory" | "documents" | "cash" | "suppliers" | "reports";
+const ERP_TABS: ErpTab[] = ["overview", "inventory", "documents", "cash", "suppliers", "reports"];
+
 export default function Erp() {
   const { lang } = useAdminI18n();
-  const [activeTab, setActiveTab] = useState<"overview" | "inventory" | "documents" | "cash" | "suppliers" | "reports">("overview");
+  // Faol bo'lim URL'da saqlanadi: sahifa yangilanganda yoki havola ulashilganda shu bo'lim ochiladi
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get("tab") as ErpTab | null;
+  const activeTab: ErpTab = tabParam && ERP_TABS.includes(tabParam) ? tabParam : "overview";
+  const setActiveTab = (t: ErpTab) => setSearchParams(t === "overview" ? {} : { tab: t }, { replace: true });
 
   // Overview State
   const [overview, setOverview] = useState<OverviewData | null>(null);
@@ -312,7 +417,7 @@ export default function Erp() {
         markupPercent: Number(editingProduct.markupPercent) || 0,
         priceFrom: Number(editingProduct.priceFrom) || 0,
         stock: Number(editingProduct.stock) || 0,
-        minStock: Number(editingProduct.minStock) || 5,
+        minStock: Math.max(0, Number(editingProduct.minStock) || 0),
         batchNumber: editingProduct.batchNumber || null,
         expDate: editingProduct.expDate || null,
       },
@@ -330,23 +435,14 @@ export default function Erp() {
   /* New Document Modal State                                                 */
   /* ------------------------------------------------------------------------ */
   const [docForm, setDocForm] = useState<{
-    type: "INCOME" | "OUTCOME" | "TRANSFER" | "RETURN_CUSTOMER" | "RETURN_SUPPLIER" | "WRITE_OFF";
+    type: DocType;
     supplierId: number | "";
     customerId: number | "";
     clientName: string;
     paidAmount: number;
     paymentType: "CASH" | "CARD" | "BANK_TRANSFER";
     notes: string;
-    items: {
-      productId: number;
-      productName: string;
-      quantity: number;
-      costPrice: number;
-      markup: number;
-      sellPrice: number;
-      batchNumber: string;
-      expDate: string;
-    }[];
+    items: DocLine[];
   }>({
     type: "INCOME",
     supplierId: "",
@@ -358,47 +454,91 @@ export default function Erp() {
     items: [],
   });
 
-  const handleAddItemToDoc = (prod: ErpProduct) => {
-    const cost = Number(prod.costPrice) || (Number(prod.priceFrom) ? Number(prod.priceFrom) * 0.8 : 0);
-    const sell = Number(prod.priceFrom) || (cost ? cost * 1.2 : 0);
-    const markup = cost ? Math.round(((sell - cost) / cost) * 100) : 20;
+  const emptyDocForm = (type: DocType): typeof docForm => ({
+    type,
+    supplierId: "",
+    customerId: "",
+    clientName: "",
+    paidAmount: 0,
+    paymentType: "CASH",
+    notes: "",
+    items: [],
+  });
 
-    setDocForm((prev) => ({
-      ...prev,
-      items: [
-        ...prev.items,
-        {
-          productId: prod.id,
-          productName: prod.name,
-          quantity: 1,
-          costPrice: Math.round(cost),
-          markup,
-          sellPrice: Math.round(sell),
-          batchNumber: prod.batchNumber || "",
-          expDate: prod.expDate || "",
-        },
-      ],
-    }));
+  // Hujjat oynasi uchun to'liq tovar ro'yxati (Tovarlar bo'limidagi filtrga bog'liq emas)
+  const [docCatalog, setDocCatalog] = useState<ErpProduct[]>([]);
+  const [docSaving, setDocSaving] = useState(false);
+  const [docError, setDocError] = useState("");
+  const [docSearch, setDocSearch] = useState("");
+
+  const openDocModal = (type: DocType) => {
+    setDocForm(emptyDocForm(type));
+    setDocError("");
+    setDocSearch("");
+    setShowCreateDocModal(true);
+    api<{ items: ErpProduct[] }>("/admin/erp/inventory?status=all&limit=300", { admin: true })
+      .then((r) => setDocCatalog(r.items || []))
+      .catch(() => {});
   };
+
+  const handleAddItemToDoc = (prod: ErpProduct) => {
+    setDocForm((prev) => {
+      // Bir tovar ikki qatorda bo'lmasin: mavjud bo'lsa miqdorini oshiramiz
+      if (prev.items.some((i) => i.productId === prod.id)) {
+        return { ...prev, items: prev.items.map((i) => (i.productId === prod.id ? { ...i, quantity: i.quantity + 1 } : i)) };
+      }
+      const cost = Number(prod.costPrice) || 0;
+      const sell = Number(prod.priceFrom) || 0;
+      const markup = cost && sell ? Math.round(((sell - cost) / cost) * 100) : Number(prod.markupPercent) || 0;
+      return {
+        ...prev,
+        items: [
+          ...prev.items,
+          {
+            productId: prod.id,
+            productName: prod.name,
+            stock: prod.stock,
+            quantity: 1,
+            costPrice: Math.round(cost),
+            markup,
+            sellPrice: Math.round(sell),
+            batchNumber: prod.batchNumber || "",
+            expDate: prod.expDate || "",
+          },
+        ],
+      };
+    });
+    setDocError("");
+  };
+
+  const updateDocItem = (idx: number, patch: Partial<DocLine>) =>
+    setDocForm((prev) => ({ ...prev, items: prev.items.map((it, i) => (i === idx ? { ...it, ...patch } : it)) }));
+
+  const docMeta = DOC_TYPES[docForm.type];
+  // Backend bilan bir xil: asosiy narx 0 bo'lsa, ikkinchisi olinadi
+  const docUnitPrice = (it: DocLine) => (docMeta.basis === "cost" ? it.costPrice || it.sellPrice : it.sellPrice || it.costPrice);
+  const docLineTotal = (it: DocLine) => docUnitPrice(it) * (Number(it.quantity) || 0);
+  const docTotal = docForm.items.reduce((s, it) => s + docLineTotal(it), 0);
+  const docShortItems = docMeta.stock === "out" ? docForm.items.filter((it) => it.quantity > it.stock) : [];
 
   const handleSaveDocument = (e: React.FormEvent) => {
     e.preventDefault();
-    if (docForm.items.length === 0) {
-      alert("Kamida bitta tovar qo'shing!");
-      return;
-    }
+    if (docForm.items.length === 0) return setDocError("Kamida bitta tovar qo'shing.");
+    if (docForm.items.some((i) => !(i.quantity >= 1))) return setDocError("Har bir tovar miqdori kamida 1 bo'lishi kerak.");
+    if (docShortItems.length) return setDocError(`Omborda yetarli emas: ${docShortItems.map((i) => i.productName).join(", ")}`);
+    if (docMeta.payment && docForm.paidAmount > docTotal) return setDocError("To'langan summa hujjat summasidan oshmasligi kerak.");
 
     const payload = {
       type: docForm.type,
-      supplierId: docForm.supplierId ? Number(docForm.supplierId) : undefined,
-      customerId: docForm.customerId ? Number(docForm.customerId) : undefined,
+      supplierId: docMeta.party === "supplier" && docForm.supplierId ? Number(docForm.supplierId) : undefined,
+      customerId: docMeta.party === "customer" && docForm.customerId ? Number(docForm.customerId) : undefined,
       clientName: docForm.clientName || undefined,
-      paidAmount: Number(docForm.paidAmount) || 0,
+      paidAmount: docMeta.payment ? Number(docForm.paidAmount) || 0 : 0,
       paymentType: docForm.paymentType,
       notes: docForm.notes || undefined,
       items: docForm.items.map((i) => ({
         productId: i.productId,
-        quantity: Number(i.quantity) || 1,
+        quantity: Math.max(1, Math.floor(Number(i.quantity) || 1)),
         costPrice: Number(i.costPrice) || 0,
         markup: Number(i.markup) || 0,
         sellPrice: Number(i.sellPrice) || 0,
@@ -407,25 +547,21 @@ export default function Erp() {
       })),
     };
 
+    setDocSaving(true);
+    setDocError("");
     api("/admin/erp/documents", { admin: true, json: payload })
       .then(() => {
         setShowCreateDocModal(false);
-        setDocForm({
-          type: "INCOME",
-          supplierId: "",
-          customerId: "",
-          clientName: "",
-          paidAmount: 0,
-          paymentType: "CASH",
-          notes: "",
-          items: [],
-        });
+        setDocForm(emptyDocForm("INCOME"));
         loadDocs();
         loadInventory();
         loadOverview();
         loadAlerts();
+        loadSuppliers();
+        loadCustomers();
       })
-      .catch((err: any) => alert(err.message || "Xatolik"));
+      .catch((err: any) => setDocError(err.message || "Hujjat saqlanmadi"))
+      .finally(() => setDocSaving(false));
   };
 
   /* ------------------------------------------------------------------------ */
@@ -503,7 +639,6 @@ export default function Erp() {
       {/* Top Header & Breadcrumb */}
       <div className="erp-top-header">
         <div className="erp-header-left">
-          <div className="erp-badge-pill">1C: Enterprise & ERP</div>
           <h1 className="erp-main-title">Ombor va buxgalteriya</h1>
           <p className="erp-subtitle">Tovarlar kirim-chiqimi, partiyalar, yaroqlilik muddati, kassa va o'zaro hisob-kitoblar</p>
         </div>
@@ -512,8 +647,7 @@ export default function Erp() {
             type="button"
             className="btn btn-erp-primary"
             onClick={() => {
-              setDocForm((p) => ({ ...p, type: "INCOME" }));
-              setShowCreateDocModal(true);
+              openDocModal("INCOME");
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -526,8 +660,7 @@ export default function Erp() {
             type="button"
             className="btn btn-erp-secondary"
             onClick={() => {
-              setDocForm((p) => ({ ...p, type: "OUTCOME" }));
-              setShowCreateDocModal(true);
+              openDocModal("OUTCOME");
             }}
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -698,8 +831,7 @@ export default function Erp() {
             <div
               className="erp-module-box"
               onClick={() => {
-                setDocForm((p) => ({ ...p, type: "INCOME" }));
-                setShowCreateDocModal(true);
+                openDocModal("INCOME");
               }}
             >
               <div className="erp-mod-icon incoming"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 17v3h16v-3" /></svg></div>
@@ -712,8 +844,7 @@ export default function Erp() {
             <div
               className="erp-module-box"
               onClick={() => {
-                setDocForm((p) => ({ ...p, type: "OUTCOME" }));
-                setShowCreateDocModal(true);
+                openDocModal("OUTCOME");
               }}
             >
               <div className="erp-mod-icon outgoing"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 15V3" /><path d="M7 8l5-5 5 5" /><path d="M4 17v3h16v-3" /></svg></div>
@@ -763,7 +894,7 @@ export default function Erp() {
               <div className="erp-mod-icon stock"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg></div>
               <div className="erp-mod-text">
                 <strong>Tovar qoldiqlari</strong>
-                <span>1C uslubidagi to'liq narx va muddatlar jadvali</span>
+                <span>Narx, qoldiq va yaroqlilik muddatlari jadvali</span>
               </div>
             </div>
           </div>
@@ -779,35 +910,33 @@ export default function Erp() {
             <table className="erp-table">
               <thead>
                 <tr>
-                  <th>Hujjat kodi</th>
+                  <th>Raqam</th>
                   <th>Turi</th>
                   <th>Sana</th>
                   <th>Kontragent</th>
-                  <th>Summa</th>
-                  <th>To'langan</th>
-                  <th>Holati</th>
+                  <th className="num">Summa</th>
+                  <th className="num">To'langan</th>
                 </tr>
               </thead>
               <tbody>
                 {overview?.recentDocs && overview.recentDocs.length > 0 ? (
                   overview.recentDocs.map((d) => (
                     <tr key={d.id}>
-                      <td><strong>#{d.docNumber}</strong></td>
+                      <td><strong className="mono">{d.docNumber}</strong></td>
                       <td>
                         <span className={`erp-doc-pill ${d.type}`}>
-                          {d.type === "INCOME" ? "Kirim" : d.type === "OUTCOME" ? "Sotuv" : d.type === "WRITE_OFF" ? "Hisobdan chiqarish" : d.type === "RETURN_CUSTOMER" ? "Mijozdan qaytim" : d.type === "RETURN_SUPPLIER" ? "Ta'minotchiga qaytim" : d.type === "TRANSFER" ? "Ko'chirish" : d.type}
+                          {DOC_TYPES[d.type as DocType]?.label || d.type}
                         </span>
                       </td>
-                      <td>{formatDate(d.date)}</td>
+                      <td className="nowrap">{formatDate(d.date)}</td>
                       <td>{d.supplier?.name || d.customer?.name || d.clientName || "—"}</td>
-                      <td><strong>{formatMoney(d.totalAmount)} so'm</strong></td>
-                      <td>{formatMoney(d.paidAmount)} so'm</td>
-                      <td><span className="erp-status-badge confirmed">Tasdiqlangan</span></td>
+                      <td className="num"><strong>{formatMoney(d.totalAmount)}</strong></td>
+                      <td className="num">{DOC_TYPES[d.type as DocType]?.payment ? formatMoney(d.paidAmount) : "—"}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="erp-empty-cell">Hozircha operatsiyalar mavjud emas</td>
+                    <td colSpan={6} className="erp-empty-cell">Hozircha operatsiyalar mavjud emas</td>
                   </tr>
                 )}
               </tbody>
@@ -829,7 +958,7 @@ export default function Erp() {
               </svg>
               <input
                 type="text"
-                placeholder="Tovar nomi, kodi, seriya yoki artikul bo'yicha qidirish (Ctrl+F)..."
+                placeholder="Nomi, artikul yoki seriya bo'yicha qidirish"
                 value={invSearch}
                 onChange={(e) => setInvSearch(e.target.value)}
               />
@@ -842,21 +971,21 @@ export default function Erp() {
                 className={`erp-chip ${invFilter === "all" ? "active" : ""}`}
                 onClick={() => setInvFilter("all")}
               >
-                Barchasi ({products.length})
+                Barchasi
               </button>
               <button
                 type="button"
                 className={`erp-chip warning ${invFilter === "low" ? "active" : ""}`}
                 onClick={() => setInvFilter("low")}
               >
-                Kam qolganlar (Min qoldiq)
+                Kam qolgan
               </button>
               <button
                 type="button"
                 className={`erp-chip danger ${invFilter === "out" ? "active" : ""}`}
                 onClick={() => setInvFilter("out")}
               >
-                Omborda tugaganlar (0)
+                Tugagan
               </button>
             </div>
 
@@ -865,11 +994,10 @@ export default function Erp() {
                 type="button"
                 className="btn btn-erp-primary"
                 onClick={() => {
-                  setDocForm((p) => ({ ...p, type: "INCOME" }));
-                  setShowCreateDocModal(true);
+                  openDocModal("INCOME");
                 }}
               >
-                Kirim
+                Tovar kirimi
               </button>
               <button
                 type="button"
@@ -894,33 +1022,30 @@ export default function Erp() {
             <table className="erp-table erp-1c-table">
               <thead>
                 <tr>
-                  <th style={{ width: 60 }}>Kod</th>
-                  <th>Tovarlar (Nomi va Modeli)</th>
-                  <th style={{ width: 90, textAlign: "center" }}>Qoldiq</th>
-                  <th style={{ width: 130, textAlign: "right" }}>Kirim narxi</th>
-                  <th style={{ width: 90, textAlign: "center" }}>Nats. %</th>
-                  <th style={{ width: 140, textAlign: "right" }}>Sotuv narxi</th>
-                  <th style={{ width: 110 }}>Seriya</th>
-                  <th style={{ width: 100 }}>Srok (Muddati)</th>
-                  <th style={{ width: 140 }}>Yetkazib beruvchi</th>
-                  <th style={{ width: 80, textAlign: "center" }}>Amal</th>
+                  <th>Tovar</th>
+                  <th style={{ width: 100, textAlign: "center" }}>Qoldiq</th>
+                  <th className="num" style={{ width: 130 }}>Tannarx</th>
+                  <th style={{ width: 80, textAlign: "center" }}>Ustama</th>
+                  <th className="num" style={{ width: 140 }}>Sotuv narxi</th>
+                  <th style={{ width: 140 }}>Partiya / muddat</th>
+                  <th style={{ width: 150 }}>Ta'minotchi</th>
+                  <th style={{ width: 96 }}><span className="sr-only">Amallar</span></th>
                 </tr>
               </thead>
               <tbody>
                 {loadingProducts ? (
                   <tr>
-                    <td colSpan={10} className="erp-empty-cell">Yuklanmoqda...</td>
+                    <td colSpan={8} className="erp-empty-cell">Yuklanmoqda...</td>
                   </tr>
                 ) : products.length > 0 ? (
                   products.map((p) => {
-                    const isLow = p.stock <= (p.minStock || 5);
+                    const isLow = p.stock <= (p.minStock ?? 5);
                     const isOut = p.stock <= 0;
                     return (
                       <tr key={p.id} className={isOut ? "row-out" : isLow ? "row-low" : ""}>
-                        <td className="cell-code">#{p.id}</td>
                         <td className="cell-name">
                           <strong>{p.name}</strong>
-                          {p.sku && <small className="cell-sku">Art: {p.sku}</small>}
+                          <small className="cell-sku">#{p.id}{p.sku ? ` · ${p.sku}` : ""}</small>
                         </td>
                         <td className="cell-stock" style={{ textAlign: "center" }}>
                           <span className={`erp-stock-badge ${isOut ? "out" : isLow ? "low" : "good"}`}>
@@ -938,16 +1063,22 @@ export default function Erp() {
                         <td className="cell-price sell" style={{ textAlign: "right" }}>
                           <strong>{formatMoney(p.priceFrom)}</strong> <small>so'm</small>
                         </td>
-                        <td className="cell-batch">{p.batchNumber || "—"}</td>
-                        <td className="cell-exp">
-                          <span className="erp-date-badge">{p.expDate || "—"}</span>
+                        <td className="cell-batch">
+                          {p.batchNumber || p.expDate ? (
+                            <>
+                              {p.batchNumber || "—"}
+                              {p.expDate && <small className="cell-sku">{p.expDate} gacha</small>}
+                            </>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="cell-supplier">{p.supplier?.name || "—"}</td>
-                        <td style={{ textAlign: "center" }}>
+                        <td className="nowrap" style={{ textAlign: "right" }}>
                           <button
                             type="button"
                             className="erp-btn-icon"
-                            title="Tezkor tahrirlash"
+                            title="Narx va qoldiqni tahrirlash"
                             aria-label="Tezkor tahrirlash"
                             onClick={() => setEditingProduct(p)}
                           >
@@ -956,7 +1087,7 @@ export default function Erp() {
                           <button
                             type="button"
                             className="erp-btn-icon"
-                            title="Tsennik & Shtrix-kod chop etish"
+                            title="Narx yorlig'i va shtrix-kod"
                             onClick={() => setPriceTagProduct(p)}
                             style={{ marginLeft: 4 }}
                             aria-label="Narx yorlig'ini chop etish"
@@ -969,7 +1100,7 @@ export default function Erp() {
                   })
                 ) : (
                   <tr>
-                    <td colSpan={10} className="erp-empty-cell">Hech qanday tovar topilmadi</td>
+                    <td colSpan={8} className="erp-empty-cell">Hech qanday tovar topilmadi</td>
                   </tr>
                 )}
               </tbody>
@@ -985,49 +1116,23 @@ export default function Erp() {
         <div className="erp-view-content">
           <div className="erp-inv-toolbar">
             <div className="erp-filter-chips">
-              <button
-                type="button"
-                className={`erp-chip ${docTypeFilter === "ALL" ? "active" : ""}`}
-                onClick={() => setDocTypeFilter("ALL")}
-              >
-                Barcha hujjatlar
-              </button>
-              <button
-                type="button"
-                className={`erp-chip success ${docTypeFilter === "INCOME" ? "active" : ""}`}
-                onClick={() => setDocTypeFilter("INCOME")}
-              >
-                Kirim
-              </button>
-              <button
-                type="button"
-                className={`erp-chip ${docTypeFilter === "OUTCOME" ? "active" : ""}`}
-                onClick={() => setDocTypeFilter("OUTCOME")}
-              >
-                Chiqim / sotuv
-              </button>
-              <button
-                type="button"
-                className={`erp-chip warning ${docTypeFilter === "TRANSFER" ? "active" : ""}`}
-                onClick={() => setDocTypeFilter("TRANSFER")}
-              >
-                Ko'chirish
-              </button>
-              <button
-                type="button"
-                className={`erp-chip danger ${docTypeFilter === "WRITE_OFF" ? "active" : ""}`}
-                onClick={() => setDocTypeFilter("WRITE_OFF")}
-              >
-                Hisobdan chiqarish
-              </button>
+              {(["ALL", ...DOC_TYPE_CHOICES] as const).map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className={`erp-chip ${docTypeFilter === t ? "active" : ""}`}
+                  onClick={() => setDocTypeFilter(t)}
+                >
+                  {t === "ALL" ? "Barchasi" : DOC_TYPES[t].label}
+                </button>
+              ))}
             </div>
 
             <button
               type="button"
               className="btn btn-erp-primary"
               onClick={() => {
-                setDocForm((p) => ({ ...p, type: "INCOME" }));
-                setShowCreateDocModal(true);
+                openDocModal("INCOME");
               }}
             >
               Yangi hujjat
@@ -1038,73 +1143,56 @@ export default function Erp() {
             <table className="erp-table">
               <thead>
                 <tr>
-                  <th>Hujjat raqami</th>
-                  <th>Operatsiya turi</th>
+                  <th>Raqam</th>
+                  <th>Turi</th>
                   <th>Sana</th>
-                  <th>Kontragent (Mijoz / Ta'minotchi)</th>
-                  <th>Pozitsiyalar</th>
-                  <th>Jami summa</th>
-                  <th>To'langan</th>
-                  <th>Holati</th>
-                  <th>Amallar</th>
+                  <th>Kontragent</th>
+                  <th className="num">Tovarlar</th>
+                  <th className="num">Summa</th>
+                  <th className="num">To'langan</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
                 {loadingDocs ? (
                   <tr>
-                    <td colSpan={9} className="erp-empty-cell">Yuklanmoqda...</td>
+                    <td colSpan={8} className="erp-empty-cell">Yuklanmoqda...</td>
                   </tr>
                 ) : docs.length > 0 ? (
                   docs.map((d) => (
-                    <tr key={d.id}>
-                      <td><strong>#{d.docNumber}</strong></td>
+                    <tr key={d.id} className="row-click" onClick={() => { setSelectedDocDetails(d); setDocPrintFormat("standard"); }}>
+                      <td><strong className="mono">{d.docNumber}</strong></td>
                       <td>
-                        <span className={`erp-doc-pill ${d.type}`}>
-                          {d.type === "INCOME"
-                            ? "Kirim"
-                            : d.type === "OUTCOME"
-                            ? "Sotuv"
-                            : d.type === "TRANSFER"
-                            ? "Ko'chirish"
-                            : d.type}
-                        </span>
+                        <span className={`erp-doc-pill ${d.type}`}>{DOC_TYPES[d.type]?.label || d.type}</span>
                       </td>
-                      <td>{formatDate(d.date)}</td>
+                      <td className="nowrap">{formatDate(d.date)}</td>
                       <td>{d.supplier?.name || d.customer?.name || d.clientName || "—"}</td>
-                      <td>{d.items?.length || 0} xil tovar</td>
-                      <td><strong>{formatMoney(d.totalAmount)} so'm</strong></td>
-                      <td>{formatMoney(d.paidAmount)} so'm</td>
-                      <td><span className="erp-status-badge confirmed">Tasdiqlangan</span></td>
-                      <td>
-                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                          <button
-                            type="button"
-                            className="btn-link"
-                            onClick={() => {
-                              setSelectedDocDetails(d);
-                              setDocPrintFormat("standard");
-                            }}
-                          >
-                            Detallar
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-link"
-                            style={{ color: "var(--teal, #0d9488)", fontWeight: 700 }}
-                            onClick={() => {
-                              setSelectedDocDetails(d);
-                              setDocPrintFormat("nakladnaya");
-                            }}
-                          >
-                            Nakladnoy
-                          </button>
-                        </div>
+                      <td className="num">{d.items?.length || 0}</td>
+                      <td className="num"><strong>{formatMoney(d.totalAmount)}</strong></td>
+                      <td className="num">
+                        {DOC_TYPES[d.type]?.payment ? (
+                          <span className={Number(d.paidAmount) < Number(d.totalAmount) ? "txt-warn" : ""}>{formatMoney(d.paidAmount)}</span>
+                        ) : (
+                          "—"
+                        )}
+                      </td>
+                      <td className="nowrap" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="btn-link"
+                          onClick={() => {
+                            setSelectedDocDetails(d);
+                            setDocPrintFormat("nakladnaya");
+                          }}
+                        >
+                          Nakladnoy
+                        </button>
                       </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={9} className="erp-empty-cell">Hujjatlar topilmadi</td>
+                    <td colSpan={8} className="erp-empty-cell">Hujjatlar topilmadi</td>
                   </tr>
                 )}
               </tbody>
@@ -1119,17 +1207,18 @@ export default function Erp() {
       {activeTab === "cash" && (
         <div className="erp-view-content">
           <div className="erp-kpi-grid">
-            <div className="erp-kpi-card highlight">
-              <span className="erp-kpi-label">Joriy kassa qoldig'i</span>
+            <div className={`erp-kpi-card ${cashData.balance < 0 ? "danger" : "highlight"}`}>
+              <span className="erp-kpi-label">Kassa qoldig'i</span>
               <div className="erp-kpi-value">{formatMoney(cashData.balance)} <small>so'm</small></div>
+              {cashData.balance < 0 && <small className="kpi-note">Chiqim kirimdan ko'p: kassaga tushumlar kiritilmagan bo'lishi mumkin</small>}
             </div>
             <div className="erp-kpi-card success">
-              <span className="erp-kpi-label">Jami kirim tushumlar</span>
-              <div className="erp-kpi-value">+{formatMoney(cashData.totalIncome)} <small>so'm</small></div>
+              <span className="erp-kpi-label">Jami kirim</span>
+              <div className="erp-kpi-value">{formatMoney(cashData.totalIncome)} <small>so'm</small></div>
             </div>
             <div className="erp-kpi-card danger">
-              <span className="erp-kpi-label">Jami chiqim xarajatlar</span>
-              <div className="erp-kpi-value">-{formatMoney(cashData.totalExpense)} <small>so'm</small></div>
+              <span className="erp-kpi-label">Jami chiqim</span>
+              <div className="erp-kpi-value">{formatMoney(cashData.totalExpense)} <small>so'm</small></div>
             </div>
           </div>
 
@@ -1170,15 +1259,15 @@ export default function Erp() {
             <table className="erp-table">
               <thead>
                 <tr>
-                  <th>Order raqami</th>
+                  <th>Raqam</th>
                   <th>Turi</th>
                   <th>Sana</th>
-                  <th>Kategoriya</th>
-                  <th>To'lov shakli</th>
+                  <th>Toifa</th>
+                  <th>To'lov</th>
                   <th>Kontragent</th>
-                  <th>Summa</th>
-                  <th>Tavsif / Izoh</th>
-                  <th>Amal</th>
+                  <th className="num">Summa</th>
+                  <th>Izoh</th>
+                  <th></th>
                 </tr>
               </thead>
               <tbody>
@@ -1195,20 +1284,20 @@ export default function Erp() {
                           {c.type === "INCOME" ? "Kirim" : "Chiqim"}
                         </span>
                       </td>
-                      <td>{formatDate(c.date)}</td>
-                      <td>{c.category}</td>
+                      <td className="nowrap">{formatDate(c.date)}</td>
+                      <td>{cashCategoryLabel(c.category)}</td>
                       <td>
                         <span className="erp-tag">
                           {c.paymentType === "CASH" ? "Naqd" : c.paymentType === "CARD" ? "Karta" : "Bank o'tkazmasi"}
                         </span>
                       </td>
                       <td>{c.customer?.name || c.supplier?.name || "—"}</td>
-                      <td>
+                      <td className="num">
                         <strong className={c.type === "INCOME" ? "text-success" : "text-danger"}>
-                          {c.type === "INCOME" ? "+" : "-"}{formatMoney(c.amount)} so'm
+                          {c.type === "INCOME" ? "+" : "−"}{formatMoney(c.amount)}
                         </strong>
                       </td>
-                      <td>{c.description || "—"}</td>
+                      <td className="cell-desc" title={c.description || ""}>{c.description || "—"}</td>
                       <td>
                         <button
                           type="button"
@@ -1497,7 +1586,7 @@ export default function Erp() {
             <div className="erp-report-header space-between">
               <div>
                 <h3>Tovar aylanmasi (oborotka)</h3>
-                <p>Tanlangan davr bo'yicha tovarlar harakati: Boshlang'ich qoldiq, Kirim, Chiqim va Yakuniy qoldiq</p>
+                <p>So'nggi 30 kun: boshlang'ich qoldiq, kirim, chiqim (sayt buyurtmalari bilan) va hozirgi qoldiq</p>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
                 <button
@@ -1539,9 +1628,9 @@ export default function Erp() {
                         <td><strong>{r.name}</strong></td>
                         <td>{r.sku}</td>
                         <td style={{ textAlign: "center" }}>{r.openingStock} {r.unit}</td>
-                        <td style={{ textAlign: "right", color: "#10b981" }}>+{r.incomeQty}</td>
+                        <td className={r.incomeQty ? "num text-success" : "num"}>{r.incomeQty ? `+${r.incomeQty}` : "—"}</td>
                         <td style={{ textAlign: "right" }}>{formatMoney(r.incomeSum)} so'm</td>
-                        <td style={{ textAlign: "right", color: "#ef4444" }}>-{r.outcomeQty}</td>
+                        <td className={r.outcomeQty ? "num text-danger" : "num"}>{r.outcomeQty ? `−${r.outcomeQty}` : "—"}</td>
                         <td style={{ textAlign: "right" }}>{formatMoney(r.outcomeSum)} so'm</td>
                         <td style={{ textAlign: "center" }}>
                           <strong>{r.closingStock} {r.unit}</strong>
@@ -1582,259 +1671,293 @@ export default function Erp() {
       {/* MODAL 1: CREATE DOCUMENT (Приход / Расход / Перемещение)             */}
       {/* -------------------------------------------------------------------- */}
       {showCreateDocModal && (
-        <div className="erp-modal-overlay" onClick={() => setShowCreateDocModal(false)}>
-          <div className="erp-modal-window large" onClick={(e) => e.stopPropagation()}>
+        <div className="erp-modal-overlay">
+          <div className="erp-modal-window large" role="dialog" aria-modal="true" aria-labelledby="doc-modal-title">
             <div className="erp-modal-header">
-              <h3>
-                {docForm.type === "INCOME"
-                  ? "Yangi tovar kirimi"
-                  : docForm.type === "OUTCOME"
-                  ? "Yangi tovar chiqimi / sotuv"
-                  : "Yangi hujjat"}
-              </h3>
-              <button type="button" className="erp-close-btn" onClick={() => setShowCreateDocModal(false)}>×</button>
+              <h3 id="doc-modal-title">Yangi hujjat: {docMeta.title}</h3>
+              <button type="button" className="erp-close-btn" aria-label="Yopish" onClick={() => setShowCreateDocModal(false)}>×</button>
             </div>
 
             <form onSubmit={handleSaveDocument}>
               <div className="erp-modal-body">
-                <div className="erp-form-grid-3">
-                  <div className="field">
-                    <label>Hujjat turi:</label>
-                    <select
-                      value={docForm.type}
-                      onChange={(e) => setDocForm({ ...docForm, type: e.target.value as any })}
+                <div className="doc-type-seg" role="radiogroup" aria-label="Hujjat turi">
+                  {DOC_TYPE_CHOICES.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      role="radio"
+                      aria-checked={docForm.type === t}
+                      className={docForm.type === t ? "active" : ""}
+                      onClick={() => {
+                        setDocForm((p) => ({ ...p, type: t, paidAmount: DOC_TYPES[t].payment ? p.paidAmount : 0 }));
+                        setDocError("");
+                      }}
                     >
-                      <option value="INCOME">Kirim</option>
-                      <option value="OUTCOME">Chiqim / sotuv</option>
-                      <option value="TRANSFER">Omborlararo ko'chirish</option>
-                      <option value="RETURN_CUSTOMER">Mijozdan qaytim</option>
-                      <option value="RETURN_SUPPLIER">Ta'minotchiga qaytarish</option>
-                      <option value="WRITE_OFF">Hisobdan chiqarish</option>
-                    </select>
-                  </div>
+                      {DOC_TYPES[t].label}
+                    </button>
+                  ))}
+                </div>
+                <p className="doc-type-hint">{docMeta.hint}</p>
 
-                  {docForm.type === "INCOME" || docForm.type === "RETURN_SUPPLIER" ? (
+                <div className="erp-form-grid-3">
+                  {docMeta.party === "supplier" && (
                     <div className="field">
-                      <label>Yetkazib beruvchi:</label>
+                      <label htmlFor="doc-supplier">Ta'minotchi</label>
                       <select
+                        id="doc-supplier"
                         value={docForm.supplierId}
                         onChange={(e) => setDocForm({ ...docForm, supplierId: Number(e.target.value) || "" })}
                       >
-                        <option value="">— Yetkazib beruvchini tanlang —</option>
+                        <option value="">Tanlanmagan</option>
                         {suppliers.map((s) => (
-                          <option key={s.id} value={s.id}>{s.name} {s.company ? `(${s.company})` : ""}</option>
-                        ))}
-                      </select>
-                    </div>
-                  ) : (
-                    <div className="field">
-                      <label>Mijoz / Klinika:</label>
-                      <select
-                        value={docForm.customerId}
-                        onChange={(e) => setDocForm({ ...docForm, customerId: Number(e.target.value) || "" })}
-                      >
-                        <option value="">— Mijozni tanlang —</option>
-                        {customersList.map((c) => (
-                          <option key={c.id} value={c.id}>{c.name} {c.organization ? `(${c.organization})` : ""}</option>
+                          <option key={s.id} value={s.id}>{s.name}{s.company ? ` (${s.company})` : ""}</option>
                         ))}
                       </select>
                     </div>
                   )}
-
-                  <div className="field">
-                    <label>To'lov usuli:</label>
-                    <select
-                      value={docForm.paymentType}
-                      onChange={(e) => setDocForm({ ...docForm, paymentType: e.target.value as any })}
-                    >
-                      <option value="CASH">Naqd pul (Do'konda/Kassada)</option>
-                      <option value="CARD">Karta / Terminal</option>
-                      <option value="BANK_TRANSFER">Hisob-raqam (B2B Shartnoma)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Items selection box */}
-                <div className="erp-doc-items-box">
-                  <div className="erp-doc-items-head">
-                    <strong>Hujjat tarkibidagi tovarlar ({docForm.items.length})</strong>
-                    <div className="erp-add-prod-select">
+                  {docMeta.party === "customer" && (
+                    <div className="field">
+                      <label htmlFor="doc-customer">Mijoz</label>
                       <select
-                        onChange={(e) => {
-                          const pid = Number(e.target.value);
-                          if (!pid) return;
-                          const found = products.find((p) => p.id === pid);
-                          if (found) handleAddItemToDoc(found);
-                          e.target.value = "";
-                        }}
+                        id="doc-customer"
+                        value={docForm.customerId}
+                        onChange={(e) => setDocForm({ ...docForm, customerId: Number(e.target.value) || "" })}
                       >
-                        <option value="">+ Katalogdan tovar qo'shish...</option>
-                        {products.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name} (Qoldiq: {p.stock})</option>
+                        <option value="">Chakana xaridor (tanlanmagan)</option>
+                        {customersList.map((c) => (
+                          <option key={c.id} value={c.id}>{c.name || c.phone}{c.organization ? ` (${c.organization})` : ""}</option>
                         ))}
                       </select>
                     </div>
-                  </div>
-
-                  <table className="erp-table doc-create-table">
-                    <thead>
-                      <tr>
-                        <th>Tovar nomi</th>
-                        <th style={{ width: 80 }}>Miqdor</th>
-                        <th style={{ width: 120 }}>Kirim narxi</th>
-                        <th style={{ width: 80 }}>Nats. %</th>
-                        <th style={{ width: 120 }}>Sotuv narxi</th>
-                        <th style={{ width: 100 }}>Seriya</th>
-                        <th style={{ width: 110 }}>Muddat</th>
-                        <th style={{ width: 120 }}>Jami</th>
-                        <th style={{ width: 50 }}></th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {docForm.items.length > 0 ? (
-                        docForm.items.map((it, idx) => {
-                          const lineTotal = (docForm.type === "INCOME" ? it.costPrice : it.sellPrice) * it.quantity;
-                          return (
-                            <tr key={idx}>
-                              <td><strong>{it.productName}</strong></td>
-                              <td>
-                                <input
-                                  type="number"
-                                  min={1}
-                                  value={it.quantity}
-                                  onChange={(e) => {
-                                    const q = Number(e.target.value) || 1;
-                                    const copy = [...docForm.items];
-                                    copy[idx].quantity = q;
-                                    setDocForm({ ...docForm, items: copy });
-                                  }}
-                                />
-                              </td>
-                              <td>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={it.costPrice}
-                                  onChange={(e) => {
-                                    const cost = Number(e.target.value) || 0;
-                                    const copy = [...docForm.items];
-                                    copy[idx].costPrice = cost;
-                                    if (copy[idx].markup) {
-                                      copy[idx].sellPrice = Math.round(cost * (1 + copy[idx].markup / 100));
-                                    }
-                                    setDocForm({ ...docForm, items: copy });
-                                  }}
-                                />
-                              </td>
-                              <td>
-                                <input
-                                  type="number"
-                                  value={it.markup}
-                                  onChange={(e) => {
-                                    const m = Number(e.target.value) || 0;
-                                    const copy = [...docForm.items];
-                                    copy[idx].markup = m;
-                                    copy[idx].sellPrice = Math.round(copy[idx].costPrice * (1 + m / 100));
-                                    setDocForm({ ...docForm, items: copy });
-                                  }}
-                                />
-                              </td>
-                              <td>
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={it.sellPrice}
-                                  onChange={(e) => {
-                                    const sell = Number(e.target.value) || 0;
-                                    const copy = [...docForm.items];
-                                    copy[idx].sellPrice = sell;
-                                    if (copy[idx].costPrice) {
-                                      copy[idx].markup = Math.round(((sell - copy[idx].costPrice) / copy[idx].costPrice) * 100);
-                                    }
-                                    setDocForm({ ...docForm, items: copy });
-                                  }}
-                                />
-                              </td>
-                              <td>
-                                <input
-                                  type="text"
-                                  placeholder="Seriya #"
-                                  value={it.batchNumber}
-                                  onChange={(e) => {
-                                    const copy = [...docForm.items];
-                                    copy[idx].batchNumber = e.target.value;
-                                    setDocForm({ ...docForm, items: copy });
-                                  }}
-                                />
-                              </td>
-                              <td>
-                                <input
-                                  type="text"
-                                  placeholder="YYYY-MM"
-                                  value={it.expDate}
-                                  onChange={(e) => {
-                                    const copy = [...docForm.items];
-                                    copy[idx].expDate = e.target.value;
-                                    setDocForm({ ...docForm, items: copy });
-                                  }}
-                                />
-                              </td>
-                              <td><strong>{formatMoney(lineTotal)} so'm</strong></td>
-                              <td>
-                                <button
-                                  type="button"
-                                  className="erp-delete-btn"
-                                  onClick={() => {
-                                    setDocForm({ ...docForm, items: docForm.items.filter((_, i) => i !== idx) });
-                                  }}
-                                >
-                                  ×
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr>
-                          <td colSpan={9} className="erp-empty-cell">
-                            Hujjatga hali tovar qo'shilmadi. Yuqoridagi ro'yxatdan tovar tanlang.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
+                  )}
+                  {docMeta.payment && (
+                    <div className="field">
+                      <label htmlFor="doc-paytype">To'lov usuli</label>
+                      <select
+                        id="doc-paytype"
+                        value={docForm.paymentType}
+                        onChange={(e) => setDocForm({ ...docForm, paymentType: e.target.value as any })}
+                      >
+                        <option value="CASH">Naqd pul</option>
+                        <option value="CARD">Karta / terminal</option>
+                        <option value="BANK_TRANSFER">Bank o'tkazmasi</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
-                {/* Bottom summary and payment */}
+                <div className="erp-doc-items-box">
+                  <div className="erp-doc-items-head">
+                    <strong>Tovarlar ({docForm.items.length})</strong>
+                    <div className="doc-add-prod">
+                      <input
+                        type="search"
+                        list="doc-catalog-list"
+                        placeholder="Tovar nomi yoki SKU bo'yicha qidiring va tanlang"
+                        value={docSearch}
+                        aria-label="Tovar qo'shish"
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          const found = docCatalog.find((p) => docOptionLabel(p) === v);
+                          if (found) {
+                            if (docMeta.stock === "out" && found.stock <= 0) {
+                              setDocError(`"${found.name}" omborda yo'q`);
+                            } else {
+                              handleAddItemToDoc(found);
+                            }
+                            setDocSearch("");
+                          } else {
+                            setDocSearch(v);
+                          }
+                        }}
+                      />
+                      <datalist id="doc-catalog-list">
+                        {docCatalog.map((p) => (
+                          <option key={p.id} value={docOptionLabel(p)} />
+                        ))}
+                      </datalist>
+                    </div>
+                  </div>
+
+                  <div className="doc-table-scroll">
+                    <table className="erp-table doc-create-table">
+                      <thead>
+                        <tr>
+                          <th>Tovar</th>
+                          <th className="num" style={{ width: 80 }}>Qoldiq</th>
+                          <th className="num" style={{ width: 90 }}>Miqdor</th>
+                          {(docMeta.basis === "cost" || docForm.type === "INCOME") && <th className="num" style={{ width: 130 }}>Tannarx</th>}
+                          {docForm.type === "INCOME" && <th className="num" style={{ width: 80 }}>Ustama %</th>}
+                          {(docMeta.basis === "sell" || docForm.type === "INCOME") && <th className="num" style={{ width: 130 }}>Sotuv narxi</th>}
+                          {docForm.type === "INCOME" && <th style={{ width: 110 }}>Seriya</th>}
+                          {docForm.type === "INCOME" && <th style={{ width: 120 }}>Yaroqlilik</th>}
+                          <th className="num" style={{ width: 140 }}>Summa</th>
+                          <th style={{ width: 40 }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {docForm.items.length > 0 ? (
+                          docForm.items.map((it, idx) => {
+                            const short = docMeta.stock === "out" && it.quantity > it.stock;
+                            return (
+                              <tr key={it.productId} className={short ? "row-short" : undefined}>
+                                <td><strong>{it.productName}</strong></td>
+                                <td className="num">
+                                  {it.stock}
+                                  {docMeta.stock !== "none" && (
+                                    <small className="doc-after">→ {docMeta.stock === "in" ? it.stock + it.quantity : it.stock - it.quantity}</small>
+                                  )}
+                                </td>
+                                <td>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={docMeta.stock === "out" ? it.stock : undefined}
+                                    value={it.quantity || ""}
+                                    aria-invalid={short}
+                                    onChange={(e) => updateDocItem(idx, { quantity: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+                                  />
+                                </td>
+                                {(docMeta.basis === "cost" || docForm.type === "INCOME") && (
+                                  <td>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={it.costPrice}
+                                      onChange={(e) => {
+                                        const cost = Math.max(0, Number(e.target.value) || 0);
+                                        updateDocItem(idx, docForm.type === "INCOME" && it.markup
+                                          ? { costPrice: cost, sellPrice: Math.round(cost * (1 + it.markup / 100)) }
+                                          : { costPrice: cost });
+                                      }}
+                                    />
+                                  </td>
+                                )}
+                                {docForm.type === "INCOME" && (
+                                  <td>
+                                    <input
+                                      type="number"
+                                      value={it.markup}
+                                      onChange={(e) => {
+                                        const m = Number(e.target.value) || 0;
+                                        updateDocItem(idx, { markup: m, sellPrice: Math.round(it.costPrice * (1 + m / 100)) });
+                                      }}
+                                    />
+                                  </td>
+                                )}
+                                {(docMeta.basis === "sell" || docForm.type === "INCOME") && (
+                                  <td>
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={it.sellPrice}
+                                      onChange={(e) => {
+                                        const sell = Math.max(0, Number(e.target.value) || 0);
+                                        updateDocItem(idx, it.costPrice
+                                          ? { sellPrice: sell, markup: Math.round(((sell - it.costPrice) / it.costPrice) * 100) }
+                                          : { sellPrice: sell });
+                                      }}
+                                    />
+                                  </td>
+                                )}
+                                {docForm.type === "INCOME" && (
+                                  <td>
+                                    <input type="text" placeholder="Seriya" value={it.batchNumber} onChange={(e) => updateDocItem(idx, { batchNumber: e.target.value })} />
+                                  </td>
+                                )}
+                                {docForm.type === "INCOME" && (
+                                  <td>
+                                    <input type="month" value={/^\d{4}-\d{2}$/.test(it.expDate) ? it.expDate : ""} onChange={(e) => updateDocItem(idx, { expDate: e.target.value })} />
+                                  </td>
+                                )}
+                                <td className="num"><strong>{formatMoney(docLineTotal(it))}</strong></td>
+                                <td>
+                                  <button
+                                    type="button"
+                                    className="erp-delete-btn"
+                                    aria-label={`${it.productName} ni olib tashlash`}
+                                    onClick={() => setDocForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }))}
+                                  >
+                                    ×
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr>
+                            <td colSpan={10} className="erp-empty-cell">
+                              Hujjatda hali tovar yo'q. Yuqoridagi qidiruv orqali tovar qo'shing.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
                 <div className="erp-doc-footer-grid">
                   <div className="field">
-                    <label>Izoh yoki shartnoma raqami:</label>
+                    <label htmlFor="doc-notes">Izoh yoki shartnoma raqami</label>
                     <input
+                      id="doc-notes"
                       type="text"
-                      placeholder="Qo'shimcha izoh..."
+                      placeholder="Ixtiyoriy"
                       value={docForm.notes}
                       onChange={(e) => setDocForm({ ...docForm, notes: e.target.value })}
                     />
                   </div>
 
-                  <div className="field">
-                    <label>Hozir to'langan summa (so'm):</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={docForm.paidAmount}
-                      onChange={(e) => setDocForm({ ...docForm, paidAmount: Number(e.target.value) || 0 })}
-                    />
+                  <div className="doc-totals">
+                    <div className="doc-totals-row">
+                      <span>Hujjat summasi</span>
+                      <strong>{formatMoney(docTotal)} so'm</strong>
+                    </div>
+                    {docMeta.payment && (
+                      <>
+                        <div className="doc-totals-row doc-paid">
+                          <label htmlFor="doc-paid">{docForm.type === "INCOME" ? "Ta'minotchiga to'landi" : "Mijoz to'ladi"}</label>
+                          <div className="doc-paid-input">
+                            <input
+                              id="doc-paid"
+                              type="number"
+                              min={0}
+                              max={docTotal}
+                              value={docForm.paidAmount || ""}
+                              placeholder="0"
+                              onChange={(e) => setDocForm({ ...docForm, paidAmount: Math.max(0, Number(e.target.value) || 0) })}
+                            />
+                            <button type="button" className="btn-mini" onClick={() => setDocForm({ ...docForm, paidAmount: docTotal })} disabled={!docTotal}>
+                              To'liq
+                            </button>
+                          </div>
+                        </div>
+                        <div className="doc-totals-row">
+                          <span>{docForm.type === "INCOME" ? "Ta'minotchiga qarz" : "Mijoz qarzi"}</span>
+                          <strong className={docTotal - docForm.paidAmount > 0 ? "debt" : ""}>
+                            {formatMoney(Math.max(0, docTotal - docForm.paidAmount))} so'm
+                          </strong>
+                        </div>
+                        {docTotal - docForm.paidAmount > 0 &&
+                          ((docForm.type === "INCOME" && !docForm.supplierId) || (docForm.type === "OUTCOME" && !docForm.customerId)) && (
+                            <p className="doc-warn">
+                              Qarz hech kimga yozilmaydi: {docForm.type === "INCOME" ? "ta'minotchini" : "mijozni"} tanlang yoki to'liq summani kiriting.
+                            </p>
+                          )}
+                      </>
+                    )}
                   </div>
                 </div>
+
+                {docError && <div className="doc-error" role="alert">{docError}</div>}
               </div>
 
               <div className="erp-modal-footer">
                 <button type="button" className="btn btn-erp-secondary" onClick={() => setShowCreateDocModal(false)}>
                   Bekor qilish
                 </button>
-                <button type="submit" className="btn btn-erp-primary" disabled={docForm.items.length === 0}>
-                  Hujjatni saqlash
+                <button type="submit" className="btn btn-erp-primary" disabled={docSaving || docForm.items.length === 0 || docShortItems.length > 0}>
+                  {docSaving ? "Saqlanmoqda..." : "Hujjatni o'tkazish"}
                 </button>
               </div>
             </form>
@@ -1900,7 +2023,8 @@ export default function Erp() {
                     <input
                       type="number"
                       value={editingProduct.stock}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, stock: Number(e.target.value) || 0 })}
+                      min={0}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, stock: Math.max(0, Number(e.target.value) || 0) })}
                     />
                   </div>
                   <div className="field">
@@ -1908,7 +2032,7 @@ export default function Erp() {
                     <input
                       type="number"
                       value={editingProduct.minStock}
-                      onChange={(e) => setEditingProduct({ ...editingProduct, minStock: Number(e.target.value) || 5 })}
+                      onChange={(e) => setEditingProduct({ ...editingProduct, minStock: Math.max(0, Number(e.target.value) || 0) })}
                     />
                   </div>
                   <div className="field">
@@ -2376,7 +2500,7 @@ export default function Erp() {
 
                 <div className="voucher-row">
                   <span className="voucher-label">Asos (To'lov moddasi):</span>
-                  <span className="voucher-val">{selectedCashReceipt.category}</span>
+                  <span className="voucher-val">{cashCategoryLabel(selectedCashReceipt.category)}</span>
                 </div>
 
                 {selectedCashReceipt.description && (

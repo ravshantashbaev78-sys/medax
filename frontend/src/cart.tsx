@@ -11,6 +11,8 @@ export interface CartItem {
   priceFrom?: string | null;
   stock?: number;
   quantity: number;
+  /** Server bo'yicha mahsulot endi sotuvda yo'q (o'chirilgan yoki yashirilgan) */
+  unavailable?: boolean;
 }
 
 export interface CartToastItem {
@@ -33,6 +35,8 @@ interface CartCtx {
   setQty: (productId: number, qty: number) => void;
   remove: (productId: number) => void;
   clear: () => void;
+  /** Savatni serverdagi joriy narx, nom va qoldiq bilan yangilaydi */
+  sync: (fresh: Product[]) => void;
 }
 
 const Ctx = createContext<CartCtx | null>(null);
@@ -113,6 +117,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
         ),
       remove: (productId) => setItems((cur) => cur.filter((i) => i.productId !== productId)),
       clear: () => setItems([]),
+      sync: (fresh) =>
+        setItems((cur) => {
+          const byId = new Map(fresh.map((p) => [p.id, p]));
+          return cur.map((i) => {
+            const p = byId.get(i.productId);
+            if (!p) return { ...i, unavailable: true };
+            return {
+              ...i,
+              unavailable: false,
+              slug: p.slug,
+              name: p.name,
+              nameRu: p.nameRu,
+              nameEn: p.nameEn,
+              thumb: p.images?.[0]?.thumbUrl || i.thumb,
+              priceFrom: p.priceFrom || null,
+              stock: p.stock,
+            };
+          });
+        }),
     }),
     [items, toast]
   );

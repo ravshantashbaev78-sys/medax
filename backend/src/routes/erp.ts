@@ -510,8 +510,9 @@ erpRouter.post("/documents", async (req, res) => {
     let sell = item.sellPrice ?? (prod.priceFrom ? Number(prod.priceFrom) : 0);
     const markup = item.markup ?? (cost && sell ? Math.round(((sell - cost) / cost) * 100) : 0);
 
-    // If INCOME, price basis is cost; if OUTCOME, price basis is sell
-    const unitPrice = body.type === "INCOME" ? (cost || sell) : (sell || cost);
+    // Kirim, ta'minotchiga qaytarish va hisobdan chiqarish tannarxda; sotuv va mijoz qaytimi sotuv narxida
+    const costBasis = body.type === "INCOME" || body.type === "RETURN_SUPPLIER" || body.type === "WRITE_OFF";
+    const unitPrice = costBasis ? (cost || sell) : (sell || cost);
     const lineTotal = unitPrice * item.quantity;
     totalAmount += lineTotal;
 
@@ -526,6 +527,13 @@ erpRouter.post("/documents", async (req, res) => {
       batchNumber: item.batchNumber || prod.batchNumber || undefined,
       expDate: item.expDate || prod.expDate || undefined,
     });
+  }
+
+  // To'lov faqat kirim va sotuv hujjatlarida kassaga yoziladi; boshqalarida saqlansa, hisobot yolg'on bo'ladi
+  const hasPayment = body.type === "INCOME" || body.type === "OUTCOME";
+  if (!hasPayment) body.paidAmount = 0;
+  if (body.paidAmount > totalAmount + 0.01) {
+    throw new HttpError(400, "To'langan summa hujjat summasidan oshmasligi kerak.");
   }
 
   // Execute in Prisma Transaction for absolute consistency
@@ -838,10 +846,27 @@ erpRouter.get("/reports/turnover", async (req, res) => {
     }),
   ]);
 
+  // Saytdagi buyurtmalar ham ombordan ayiriladi (admin tasdiqlaganda), ular ham chiqim sifatida sanaladi
+  const orderItems = await prisma.orderItem.findMany({
+    where: {
+      productId: { not: null },
+      order: { stockDeducted: true, createdAt: { gte: dateFrom, lte: dateTo } },
+    },
+    select: { productId: true, quantity: true, price: true },
+  });
+
   const pStats = new Map<
     number,
     { incomeQty: number; incomeSum: number; outcomeQty: number; outcomeSum: number }
   >();
+
+  for (const it of orderItems) {
+    const pid = it.productId!;
+    if (!pStats.has(pid)) pStats.set(pid, { incomeQty: 0, incomeSum: 0, outcomeQty: 0, outcomeSum: 0 });
+    const st = pStats.get(pid)!;
+    st.outcomeQty += it.quantity;
+    st.outcomeSum += (Number(it.price) || 0) * it.quantity;
+  }
 
   for (const it of docItems) {
     if (!pStats.has(it.productId)) {
@@ -1298,10 +1323,27 @@ erpRouter.get("/export/turnover", async (req, res) => {
     }),
   ]);
 
+  // Saytdagi buyurtmalar ham ombordan ayiriladi (admin tasdiqlaganda), ular ham chiqim sifatida sanaladi
+  const orderItems = await prisma.orderItem.findMany({
+    where: {
+      productId: { not: null },
+      order: { stockDeducted: true, createdAt: { gte: dateFrom, lte: dateTo } },
+    },
+    select: { productId: true, quantity: true, price: true },
+  });
+
   const pStats = new Map<
     number,
     { incomeQty: number; incomeSum: number; outcomeQty: number; outcomeSum: number }
   >();
+
+  for (const it of orderItems) {
+    const pid = it.productId!;
+    if (!pStats.has(pid)) pStats.set(pid, { incomeQty: 0, incomeSum: 0, outcomeQty: 0, outcomeSum: 0 });
+    const st = pStats.get(pid)!;
+    st.outcomeQty += it.quantity;
+    st.outcomeSum += (Number(it.price) || 0) * it.quantity;
+  }
 
   for (const it of docItems) {
     if (!pStats.has(it.productId)) {
