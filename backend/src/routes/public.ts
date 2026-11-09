@@ -91,6 +91,7 @@ const listQuery = z.object({
   flag: z.enum(["hit", "new", "discount"]).optional(),
   minPrice: z.coerce.number().optional(),
   maxPrice: z.coerce.number().optional(),
+  inStock: z.enum(["1", "true"]).optional(),
   sort: z.enum(["new", "name", "price_asc", "price_desc"]).default("new"),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(48).default(24),
@@ -101,7 +102,12 @@ publicRouter.get("/products", async (req, res) => {
   const where: Prisma.ProductWhereInput = { isActive: true };
   if (q.category) where.category = { slug: q.category };
   if (q.categoryId) where.categoryId = q.categoryId;
-  if (q.brand) where.brand = { slug: q.brand };
+  // Bir nechta brend vergul bilan: ?brand=mindray,philips
+  if (q.brand) {
+    const slugs = q.brand.split(",").map((b) => b.trim()).filter(Boolean).slice(0, 30);
+    if (slugs.length) where.brand = { slug: { in: slugs } };
+  }
+  if (q.inStock) where.stock = { gt: 0 };
   if (q.flag === "hit") where.isHit = true;
   if (q.flag === "new") where.isNew = true;
   if (q.flag === "discount") where.oldPrice = { gt: 0 };

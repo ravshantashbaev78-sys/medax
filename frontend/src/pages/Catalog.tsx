@@ -1,44 +1,72 @@
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { api, Brand, Category, Paged, Product } from "../api";
 import { Pager, ProductCard } from "../components/Shell";
-import { MedaxEmblem } from "../components/MedaxLogo";
 import { useI18n } from "../context/I18nContext";
 import { localizeCategory } from "../utils/localize";
 
+/** Narx oraliqlari (so'm): tez tanlash uchun */
+const PRICE_PRESETS: { min: string; max: string; uz: string; ru: string; en: string }[] = [
+  { min: "", max: "1000000", uz: "1 mln gacha", ru: "до 1 млн", en: "under 1M" },
+  { min: "1000000", max: "10000000", uz: "1–10 mln", ru: "1–10 млн", en: "1–10M" },
+  { min: "10000000", max: "", uz: "10 mln dan", ru: "от 10 млн", en: "10M+" },
+];
+
+const fmtMoney = (v: string) => Number(v).toLocaleString("ru-RU").replace(/ |,/g, " ");
+
+function CloseIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" aria-hidden="true">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
+  );
+}
+
+function Section({ title, children }: { title?: string; children: ReactNode }) {
+  return (
+    <section className="ct-sec">
+      {title && <h3 className="ct-sec-title">{title}</h3>}
+      {children}
+    </section>
+  );
+}
+
 export default function Catalog() {
   const { lang, t } = useI18n();
+  const tr = (uz: string, ru: string, en: string) => (lang === "ru" ? ru : lang === "en" ? en : uz);
   const [sp, setSp] = useSearchParams();
   const [cats, setCats] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [data, setData] = useState<Paged<Product> | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [open, setOpen] = useState(false);
-  const [q, setQ] = useState(sp.get("q") || "");
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [brandQuery, setBrandQuery] = useState("");
+  const [showAllBrands, setShowAllBrands] = useState(false);
 
-  // URL Query state
   const category = sp.get("category") || "";
-  const brand = sp.get("brand") || "";
+  const brandParam = sp.get("brand") || "";
+  const selectedBrands = useMemo(() => brandParam.split(",").filter(Boolean), [brandParam]);
   const flag = sp.get("flag") || "";
   const minPrice = sp.get("minPrice") || "";
   const maxPrice = sp.get("maxPrice") || "";
+  const inStock = sp.get("inStock") === "1";
   const sort = sp.get("sort") || "new";
   const page = Number(sp.get("page") || 1);
   const qs = sp.get("q") || "";
 
-  // Local inputs for price range
+  const [q, setQ] = useState(qs);
   const [localMin, setLocalMin] = useState(minPrice);
   const [localMax, setLocalMax] = useState(maxPrice);
-
+  useEffect(() => setQ(qs), [qs]);
   useEffect(() => {
     setLocalMin(minPrice);
     setLocalMax(maxPrice);
   }, [minPrice, maxPrice]);
 
   useEffect(() => {
-    api<Category[]>("/categories").then(setCats).catch(() => {});
-    api<Brand[]>("/brands").then(setBrands).catch(() => {});
+    api<Category[]>("/categories").then((r) => setCats(Array.isArray(r) ? r : [])).catch(() => {});
+    api<Brand[]>("/brands").then((r) => setBrands(Array.isArray(r) ? r : [])).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -47,394 +75,402 @@ export default function Catalog() {
     const params = new URLSearchParams();
     if (qs) params.set("q", qs);
     if (category) params.set("category", category);
-    if (brand) params.set("brand", brand);
+    if (brandParam) params.set("brand", brandParam);
     if (flag) params.set("flag", flag);
     if (minPrice) params.set("minPrice", minPrice);
     if (maxPrice) params.set("maxPrice", maxPrice);
+    if (inStock) params.set("inStock", "1");
     params.set("sort", sort);
     params.set("page", String(page));
-
     api<Paged<Product>>(`/products?${params}`)
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [qs, category, brand, flag, minPrice, maxPrice, sort, page]);
+  }, [qs, category, brandParam, flag, minPrice, maxPrice, inStock, sort, page]);
 
-  useEffect(() => setQ(qs), [qs]);
+  // Eski havola (masalan ?page=3) mavjud sahifalardan katta bo'lsa, oxirgi sahifaga o'tamiz
+  useEffect(() => {
+    if (!loading && data && data.items.length === 0 && data.total > 0 && page > data.pages) {
+      const next = new URLSearchParams(sp);
+      if (data.pages > 1) next.set("page", String(data.pages));
+      else next.delete("page");
+      setSp(next, { replace: true });
+    }
+  }, [loading, data, page]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const set = (patch: Record<string, string>) => {
+  // Telefonda ochiq filtr oynasi orqasidagi sahifa aylanmasin
+  useEffect(() => {
+    if (!sheetOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setSheetOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [sheetOpen]);
+
+  /** Filtr o'zgarsa 1-sahifaga qaytamiz: aks holda 3-sahifada bo'sh natija ko'rinardi */
+  const set = (patch: Record<string, string>, keepPage = false) => {
     const next = new URLSearchParams(sp);
     Object.entries(patch).forEach(([k, v]) => (v ? next.set(k, v) : next.delete(k)));
+    if (!keepPage) next.delete("page");
     setSp(next);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    if (!sheetOpen) window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const submitSearch = (e: FormEvent) => {
-    e.preventDefault();
-    set({ q: q.trim() });
+  const toggleBrand = (slug: string) => {
+    const next = selectedBrands.includes(slug) ? selectedBrands.filter((b) => b !== slug) : [...selectedBrands, slug];
+    set({ brand: next.join(",") });
   };
 
-  const applyPriceFilter = (e?: FormEvent) => {
+  const applyPrice = (e?: FormEvent) => {
     e?.preventDefault();
-    set({ minPrice: localMin.trim(), maxPrice: localMax.trim() });
+    const clean = (v: string) => v.replace(/\D/g, "");
+    set({ minPrice: clean(localMin), maxPrice: clean(localMax) });
   };
 
-  const setPriceRange = (min: string, max: string) => {
-    setLocalMin(min);
-    setLocalMax(max);
-    set({ minPrice: min, maxPrice: max });
-  };
-
-  const resetAllFilters = () => {
+  const resetAll = () => {
     setQ("");
-    setLocalMin("");
-    setLocalMax("");
-    setSp(new URLSearchParams());
+    setBrandQuery("");
+    setSp(new URLSearchParams(sort !== "new" ? { sort } : {}));
   };
 
-  const hasAnyFilter = Boolean(category || brand || flag || minPrice || maxPrice || qs);
+  const totalAll = cats.reduce((s, c) => s + (c.count || 0), 0);
+  const activeCat = cats.find((c) => c.slug === category);
+  // Mahsuloti yo'q brendlar ro'yxatni to'ldirmasin (tanlanganlari bundan mustasno)
+  const brandList = brands
+    .filter((b) => (b.count || 0) > 0 || selectedBrands.includes(b.slug))
+    .filter((b) => !brandQuery || b.name.toLowerCase().includes(brandQuery.toLowerCase()));
+  const visibleBrands = showAllBrands || brandQuery ? brandList : brandList.slice(0, 6);
 
-  const activeCat = Array.isArray(cats) ? cats.find((c) => c.slug === category) : undefined;
-  const activeBrand = Array.isArray(brands) ? brands.find((b) => b.slug === brand) : undefined;
+  const flags = [
+    { v: "discount", label: tr("Chegirma", "Скидки", "Discount") },
+    { v: "new", label: tr("Yangi", "Новинки", "New") },
+    { v: "hit", label: tr("Ommabop", "Хиты", "Popular") },
+  ];
 
-  return (
-    <main className="wrap">
-      {/* Breadcrumbs */}
-      <div className="crumbs">
-        <Link to="/">{lang === "ru" ? "Главная" : lang === "en" ? "Home" : "Bosh sahifa"}</Link> /{" "}
-        <span onClick={resetAllFilters} style={{ cursor: hasAnyFilter ? "pointer" : "default" }}>
-          {t("nav_catalog")}
-        </span>
-        {activeCat && <span> / {localizeCategory(activeCat.name || activeCat.slug, lang)}</span>}
-        {activeBrand && <span> / {activeBrand.name}</span>}
-      </div>
+  const priceLabel =
+    minPrice || maxPrice
+      ? PRICE_PRESETS.find((p) => p.min === minPrice && p.max === maxPrice)?.[lang === "ru" ? "ru" : lang === "en" ? "en" : "uz"] ||
+        `${minPrice ? fmtMoney(minPrice) : "0"} – ${maxPrice ? fmtMoney(maxPrice) : "∞"}`
+      : "";
 
-      <div className="catalog">
-        {/* LEFT FILTERS SIDEBAR */}
-        <aside className={`filters${open ? " open" : ""}`} aria-label={lang === "ru" ? "Фильтры" : lang === "en" ? "Filters" : "Filtrlar"}>
-          <div className="filters-header-row">
-            <h2 className="filters-main-title">{lang === "ru" ? "Фильтры" : lang === "en" ? "Filters" : "Filtrlar"}</h2>
-            {hasAnyFilter && (
-              <button type="button" className="btn-clear-all" onClick={resetAllFilters}>
-                {lang === "ru" ? "Сбросить" : lang === "en" ? "Reset" : "Tozalash"}
+  const chips: { key: string; label: string; clear: () => void }[] = [];
+  if (qs) chips.push({ key: "q", label: `“${qs}”`, clear: () => set({ q: "" }) });
+  if (activeCat) chips.push({ key: "cat", label: localizeCategory(activeCat.name || activeCat.slug, lang), clear: () => set({ category: "" }) });
+  selectedBrands.forEach((slug) => {
+    const b = brands.find((x) => x.slug === slug);
+    chips.push({ key: `b-${slug}`, label: b?.name || slug, clear: () => toggleBrand(slug) });
+  });
+  if (inStock) chips.push({ key: "stock", label: tr("Omborda bor", "В наличии", "In stock"), clear: () => set({ inStock: "" }) });
+  if (flag) chips.push({ key: "flag", label: flags.find((f) => f.v === flag)?.label || flag, clear: () => set({ flag: "" }) });
+  if (priceLabel) chips.push({ key: "price", label: priceLabel, clear: () => set({ minPrice: "", maxPrice: "" }) });
+  const filterCount = chips.filter((c) => c.key !== "q").length;
+
+  const filters = (mobile: boolean) => (
+    <>
+      <Section title={tr("Toifa", "Категория", "Category")}>
+        {mobile ? (
+          <div className="ct-pills">
+            <button type="button" className={`ct-pill${!category ? " on" : ""}`} onClick={() => set({ category: "" })}>
+              {tr("Barchasi", "Все", "All")}
+            </button>
+            {cats.map((c) => (
+              <button key={c.id} type="button" className={`ct-pill${category === c.slug ? " on" : ""}`} onClick={() => set({ category: c.slug })}>
+                {localizeCategory(c.name || c.slug, lang)} · {c.count}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="ct-cats">
+            <button type="button" className={`ct-cat${!category ? " on" : ""}`} onClick={() => set({ category: "" })}>
+              <span>{tr("Barcha toifalar", "Все категории", "All categories")}</span>
+              <span className="ct-count">{totalAll}</span>
+            </button>
+            {cats.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`ct-cat${category === c.slug ? " on" : ""}`}
+                onClick={() => set({ category: c.slug })}
+                aria-pressed={category === c.slug}
+              >
+                <span>{localizeCategory(c.name || c.slug, lang)}</span>
+                <span className="ct-count">{c.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </Section>
+
+      <Section>
+        <label className="ct-switch">
+          <span>{tr("Faqat omborda borlari", "Только в наличии", "In stock only")}</span>
+          <input type="checkbox" checked={inStock} onChange={(e) => set({ inStock: e.target.checked ? "1" : "" })} />
+          <span className="ct-switch-track" aria-hidden="true">
+            <span />
+          </span>
+        </label>
+      </Section>
+
+      <Section title={tr("Narx, so'm", "Цена, сум", "Price, UZS")}>
+        <form className="ct-price" onSubmit={applyPrice}>
+          <label>
+            <span>{tr("dan", "от", "from")}</span>
+            <input
+              inputMode="numeric"
+              value={localMin ? fmtMoney(localMin.replace(/\D/g, "") || "0") : ""}
+              onChange={(e) => setLocalMin(e.target.value.replace(/\D/g, ""))}
+              onBlur={() => applyPrice()}
+              placeholder="0"
+            />
+          </label>
+          <label>
+            <span>{tr("gacha", "до", "to")}</span>
+            <input
+              inputMode="numeric"
+              value={localMax ? fmtMoney(localMax.replace(/\D/g, "") || "0") : ""}
+              onChange={(e) => setLocalMax(e.target.value.replace(/\D/g, ""))}
+              onBlur={() => applyPrice()}
+              placeholder={tr("cheksiz", "без ограничений", "any")}
+            />
+          </label>
+          <button type="submit" className="ct-hidden-submit" tabIndex={-1} aria-hidden="true" />
+        </form>
+        <div className="ct-pills">
+          {PRICE_PRESETS.map((p) => {
+            const on = minPrice === p.min && maxPrice === p.max;
+            return (
+              <button
+                key={p.uz}
+                type="button"
+                className={`ct-pill soft${on ? " on" : ""}`}
+                onClick={() => set(on ? { minPrice: "", maxPrice: "" } : { minPrice: p.min, maxPrice: p.max })}
+                aria-pressed={on}
+              >
+                {p[lang === "ru" ? "ru" : lang === "en" ? "en" : "uz"]}
+              </button>
+            );
+          })}
+        </div>
+      </Section>
+
+      <Section title={tr("Belgilar", "Метки", "Labels")}>
+        <div className="ct-pills">
+          {flags.map((f) => (
+            <button
+              key={f.v}
+              type="button"
+              className={`ct-pill soft${flag === f.v ? " on" : ""}`}
+              onClick={() => set({ flag: flag === f.v ? "" : f.v })}
+              aria-pressed={flag === f.v}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+      </Section>
+
+      {brandList.length > 0 || brandQuery ? (
+        <Section title={tr("Brend", "Бренд", "Brand")}>
+          {brands.filter((b) => (b.count || 0) > 0).length > 6 && (
+            <input
+              className="ct-brand-search"
+              type="search"
+              value={brandQuery}
+              onChange={(e) => setBrandQuery(e.target.value)}
+              placeholder={tr("Brendni qidirish", "Поиск бренда", "Find a brand")}
+              aria-label={tr("Brendni qidirish", "Поиск бренда", "Find a brand")}
+            />
+          )}
+          <div className="ct-checks">
+            {visibleBrands.map((b) => (
+              <label key={b.id} className="ct-check">
+                <input type="checkbox" checked={selectedBrands.includes(b.slug)} onChange={() => toggleBrand(b.slug)} />
+                <span className="ct-box" aria-hidden="true">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.4" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="20 6 9 17 4 12" />
+                  </svg>
+                </span>
+                <span className="ct-check-name">{b.name}</span>
+                <span className="ct-count">{b.count}</span>
+              </label>
+            ))}
+            {!brandQuery && brandList.length > 6 && (
+              <button type="button" className="ct-more" onClick={() => setShowAllBrands((v) => !v)}>
+                {showAllBrands ? tr("Kamroq", "Свернуть", "Show less") : tr(`Yana ${brandList.length - 6} ta`, `Ещё ${brandList.length - 6}`, `${brandList.length - 6} more`)}
               </button>
             )}
+            {brandQuery && !visibleBrands.length && <p className="ct-muted">{tr("Topilmadi", "Не найдено", "Nothing found")}</p>}
           </div>
+        </Section>
+      ) : null}
+    </>
+  );
 
-          {/* 1. Kategoriya filtri */}
-          <div className="filter-group">
-            <h3>{t("filter_categories")}</h3>
-            <ul className="filter-cat-list">
-              <li>
-                <a
-                  href="#"
-                  className={!category ? "on" : ""}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    set({ category: "" });
-                  }}
-                >
-                  <span className="cat-name">{lang === "ru" ? "Все категории" : lang === "en" ? "All categories" : "Barcha toifalar"}</span>
-                  <span className="cat-count-badge">{(Array.isArray(cats) ? cats : []).reduce((s, c) => s + (c.count || 0), 0)}</span>
-                </a>
-              </li>
-              {(Array.isArray(cats) ? cats : []).map((c) => (
-                <li key={c.id}>
-                  <a
-                    href="#"
-                    className={category === c.slug ? "on" : ""}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      set({ category: c.slug });
-                    }}
-                    title={localizeCategory(c.name || c.slug, lang)}
-                  >
-                    <span className="cat-name">{localizeCategory(c.name || c.slug, lang)}</span>
-                    <span className="cat-count-badge">{c.count}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+  const sortSelect = (
+    <select className="ct-sort" value={sort} onChange={(e) => set({ sort: e.target.value }, false)} aria-label={tr("Saralash", "Сортировка", "Sort")}>
+      <option value="new">{tr("Avval yangilari", "Сначала новые", "Newest first")}</option>
+      <option value="price_asc">{tr("Arzonroq", "Сначала дешёвые", "Price: low to high")}</option>
+      <option value="price_desc">{tr("Qimmatroq", "Сначала дорогие", "Price: high to low")}</option>
+      <option value="name">{tr("Nomi bo'yicha", "По названию", "By name")}</option>
+    </select>
+  );
 
-          {/* 2. Maxsus belgilar (Flag: yangi / ommabop) */}
-          <div className="filter-group">
-            <h3>{lang === "ru" ? "Особенности" : lang === "en" ? "Highlights" : "Maxsus belgilar"}</h3>
-            <ul className="filter-radio-list">
-              {[
-                ["", lang === "ru" ? "Все" : lang === "en" ? "All" : "Barchasi"],
-                ["discount", lang === "ru" ? "Скидки и Акции" : lang === "en" ? "Discounts & Offers" : "Chegirmalar va Aksiya %"],
-                ["new", lang === "ru" ? "Новые модели" : lang === "en" ? "New equipment" : "Yangi uskunalar"],
-                ["hit", lang === "ru" ? "Популярные (Хит)" : lang === "en" ? "Popular (Hit)" : "Ommabop modellar (Xit)"],
-              ].map(([val, label]) => {
-                const isSelected = (!val && !flag) || (val === flag);
-                return (
-                  <li key={val}>
-                    <a
-                      href="#"
-                      className={isSelected ? "on" : ""}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        set({ flag: val });
-                      }}
-                    >
-                      <span className="status-label">{label}</span>
-                    </a>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
+  const total = data?.total ?? 0;
 
-          {/* 3. Narx filtri (Price Range) */}
-          <div className="filter-group">
-            <h3>{lang === "ru" ? "Цена (сум)" : lang === "en" ? "Price (UZS)" : "Narx (so'm)"}</h3>
-            <form onSubmit={applyPriceFilter} className="price-filter-box">
-              <div className="price-inputs-row">
-                <input
-                  type="number"
-                  placeholder={lang === "ru" ? "От 0" : lang === "en" ? "From 0" : "0 dan"}
-                  value={localMin}
-                  onChange={(e) => setLocalMin(e.target.value)}
-                  className="price-input"
-                  min={0}
-                />
-                <span className="price-range-sep">—</span>
-                <input
-                  type="number"
-                  placeholder={lang === "ru" ? "До 50 млн" : lang === "en" ? "Up to 50M" : "50 000 000 gacha"}
-                  value={localMax}
-                  onChange={(e) => setLocalMax(e.target.value)}
-                  className="price-input"
-                  min={0}
-                />
-              </div>
+  return (
+    <main className="wrap ct-page">
+      <nav className="ct-crumbs" aria-label={tr("Yo'l", "Навигация", "Breadcrumb")}>
+        <Link to="/">{tr("Bosh sahifa", "Главная", "Home")}</Link>
+        <span aria-hidden="true">/</span>
+        {activeCat ? (
+          <>
+            <button type="button" onClick={() => set({ category: "" })}>
+              {t("nav_catalog")}
+            </button>
+            <span aria-hidden="true">/</span>
+            <span aria-current="page">{localizeCategory(activeCat.name || activeCat.slug, lang)}</span>
+          </>
+        ) : (
+          <span aria-current="page">{t("nav_catalog")}</span>
+        )}
+      </nav>
 
-              {/* Quick range presets */}
-              <div className="price-preset-chips">
-                <button
-                  type="button"
-                  className={`chip ${!minPrice && !maxPrice ? "active" : ""}`}
-                  onClick={() => setPriceRange("", "")}
-                >
-                  {t("filter_all")}
-                </button>
-                <button
-                  type="button"
-                  className={`chip ${maxPrice === "10000000" ? "active" : ""}`}
-                  onClick={() => setPriceRange("0", "10000000")}
-                >
-                  &lt; 10 млн
-                </button>
-                <button
-                  type="button"
-                  className={`chip ${minPrice === "10000000" && maxPrice === "30000000" ? "active" : ""}`}
-                  onClick={() => setPriceRange("10000000", "30000000")}
-                >
-                  10 - 30 млн
-                </button>
-                <button
-                  type="button"
-                  className={`chip ${minPrice === "30000000" ? "active" : ""}`}
-                  onClick={() => setPriceRange("30000000", "99000000")}
-                >
-                  &gt; 30 млн
-                </button>
-              </div>
+      <header className="ct-head">
+        <div>
+          <h1>{activeCat ? localizeCategory(activeCat.name || activeCat.slug, lang) : t("nav_catalog")}</h1>
+          <p className="ct-total">{loading && !data ? "…" : tr(`${total} ta mahsulot`, `${total} товаров`, `${total} products`)}</p>
+        </div>
+        <div className="ct-tools">
+          <form
+            className="ct-search"
+            role="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              set({ q: q.trim() });
+            }}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7" />
+              <path d="M20 20l-3.5-3.5" />
+            </svg>
+            <input
+              type="search"
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder={tr("Nomi, brend yoki artikul", "Название, бренд или артикул", "Name, brand or SKU")}
+              aria-label={t("search_placeholder")}
+            />
+          </form>
+          <div className="ct-desk-sort">{sortSelect}</div>
+        </div>
+        <div className="ct-mob-bar">
+          <button type="button" className="ct-mob-btn" onClick={() => setSheetOpen(true)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 6h16M7 12h10M10 18h4" />
+            </svg>
+            {tr("Filtrlar", "Фильтры", "Filters")}
+            {filterCount > 0 && <span className="ct-badge">{filterCount}</span>}
+          </button>
+          {sortSelect}
+        </div>
+      </header>
 
-              <button type="submit" className="btn btn-apply-price">
-                {lang === "ru" ? "Применить" : lang === "en" ? "Apply" : "Qo'llash"}
+      <div className="ct-layout">
+        <aside className="ct-side" aria-label={tr("Filtrlar", "Фильтры", "Filters")}>
+          {filters(false)}
+          {chips.length > 0 && (
+            <div className="ct-side-foot">
+              <button type="button" className="ct-reset" onClick={resetAll}>
+                {tr("Filtrlarni tozalash", "Сбросить фильтры", "Reset filters")}
               </button>
-            </form>
-          </div>
-
-          {/* 5. Brendlar filtri */}
-          <div className="filter-group">
-            <h3>{t("filter_brands")}</h3>
-            <ul className="filter-brands-list">
-              <li>
-                <a
-                  href="#"
-                  className={!brand ? "on" : ""}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    set({ brand: "" });
-                  }}
-                >
-                  <span>{lang === "ru" ? "Все бренды" : lang === "en" ? "All brands" : "Barcha brendlar"}</span>
-                  <span className="cat-count-badge">{(Array.isArray(brands) ? brands : []).reduce((s, b) => s + (b.count || 0), 0)}</span>
-                </a>
-              </li>
-              {(Array.isArray(brands) ? brands : []).map((b) => (
-                <li key={b.id}>
-                  <a
-                    href="#"
-                    className={brand === b.slug ? "on" : ""}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      set({ brand: b.slug });
-                    }}
-                  >
-                    <span>{b.name}</span>
-                    <span className="cat-count-badge">{b.count}</span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
+            </div>
+          )}
         </aside>
 
-        {/* RIGHT PRODUCTS & TOOLBAR AREA */}
-        <section className="catalog-main-content">
-          {/* Top Search & Sort Toolbar */}
-          <div className="toolbar">
-            <form className="search medax-search" role="search" onSubmit={submitSearch}>
-              <div className="search-logo-indicator" title="Medax">
-                <MedaxEmblem size={24} />
-              </div>
-              <input
-                type="search"
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-                placeholder={t("search_placeholder")}
-                aria-label={t("search_placeholder")}
-              />
-              <button className="btn btn-search" type="submit">
-                {t("btn_search")}
-              </button>
-            </form>
-
-            <button className="btn ghost fbtn" onClick={() => setOpen((v) => !v)}>
-              {lang === "ru" ? "Фильтры" : lang === "en" ? "Filters" : "Filtrlar"} ({hasAnyFilter ? "1+" : "0"})
-            </button>
-
-            <select
-              value={sort}
-              onChange={(e) => set({ sort: e.target.value })}
-              aria-label="Saralash"
-              className="catalog-sort-select"
-            >
-              <option value="new">{lang === "ru" ? "Сначала новые" : lang === "en" ? "Newest first" : "Yangilari avval"}</option>
-              <option value="name">{lang === "ru" ? "По названию" : lang === "en" ? "By name" : "Nomi bo'yicha"}</option>
-              <option value="price_asc">{t("sort_price_asc")}</option>
-              <option value="price_desc">{t("sort_price_desc")}</option>
-            </select>
-          </div>
-
-          {/* Active Filter Pills Bar */}
-          {hasAnyFilter && (
-            <div className="active-filter-pills-bar">
-              <span className="active-filters-label">{lang === "ru" ? "Активные фильтры:" : lang === "en" ? "Active filters:" : "Faol filtrlar:"}</span>
-              {activeCat && (
-                <span className="active-pill" onClick={() => set({ category: "" })}>
-                  {localizeCategory(activeCat.name || activeCat.slug, lang)} <span className="pill-x">✕</span>
+        <section className="ct-main">
+          {chips.length > 0 && (
+            <div className="ct-chips">
+              {chips.map((c) => (
+                <span key={c.key} className="ct-chip">
+                  {c.label}
+                  <button type="button" onClick={c.clear} aria-label={tr(`${c.label} filtrini olib tashlash`, `Убрать ${c.label}`, `Remove ${c.label}`)}>
+                    <CloseIcon />
+                  </button>
                 </span>
-              )}
-              {activeBrand && (
-                <span className="active-pill" onClick={() => set({ brand: "" })}>
-                  Brend: {activeBrand.name} <span className="pill-x">✕</span>
-                </span>
-              )}
-              {flag === "discount" && (
-                <span className="active-pill" onClick={() => set({ flag: "" })}>
-                  {lang === "ru" ? "Скидки" : lang === "en" ? "Discounts" : "Chegirmalar %"} <span className="pill-x">✕</span>
-                </span>
-              )}
-              {flag === "new" && (
-                <span className="active-pill" onClick={() => set({ flag: "" })}>
-                  {lang === "ru" ? "Новые" : lang === "en" ? "New" : "Yangi uskunalar"} <span className="pill-x">✕</span>
-                </span>
-              )}
-              {flag === "hit" && (
-                <span className="active-pill" onClick={() => set({ flag: "" })}>
-                  {lang === "ru" ? "Популярные" : lang === "en" ? "Popular" : "Ommabop (Xit)"} <span className="pill-x">✕</span>
-                </span>
-              )}
-              {(minPrice || maxPrice) && (
-                <span className="active-pill" onClick={() => set({ minPrice: "", maxPrice: "" })}>
-                  Narx: {minPrice ? `${Number(minPrice) / 1_000_000} mln` : "0"} —{" "}
-                  {maxPrice ? `${Number(maxPrice) / 1_000_000} mln` : "max"}{" "}
-                  <span className="pill-x">✕</span>
-                </span>
-              )}
-              {qs && (
-                <span className="active-pill" onClick={() => set({ q: "" })}>
-                  "{qs}" <span className="pill-x">✕</span>
-                </span>
-              )}
-              <button type="button" className="btn-clear-inline" onClick={resetAllFilters}>
-                {lang === "ru" ? "Сбросить всё" : lang === "en" ? "Clear all" : "Barchasini tozalash"}
+              ))}
+              <button type="button" className="ct-clear" onClick={resetAll}>
+                {tr("Barchasini tozalash", "Сбросить всё", "Clear all")}
               </button>
             </div>
           )}
 
           {error && <p className="err">{error}</p>}
 
-          {/* Results count bar */}
-          <div className="catalog-status-bar">
-            <span className="results-badge">
-              <span className="live-radar-dot" />
-              {loading
-                ? (lang === "ru" ? "Каталог обновляется…" : lang === "en" ? "Updating catalog…" : "Medax katalogi yangilanmoqda…")
-                : `${data?.total ?? 0} ${t("items_count")}`}
-            </span>
-          </div>
-
-          {/* Loading or Products Grid */}
-          {loading ? (
-            <div className="med-catalog-loader">
-              <div className="med-loader-emblem">
-                <MedaxEmblem size={48} />
-                <span className="med-loader-radar-ring" />
-              </div>
-              <div className="med-loader-heartbeat">
-                <svg viewBox="0 0 120 40" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M0,20 L30,20 L40,8 L50,32 L60,14 L70,24 L80,20 L120,20" />
-                </svg>
-              </div>
-              <p>{lang === "ru" ? "Загрузка каталога..." : lang === "en" ? "Loading equipment catalog..." : "Medax katalogidan tibbiy uskunalar yuklanmoqda…"}</p>
+          {loading && !data ? (
+            <div className="ct-grid" aria-busy="true">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <div key={i} className="ct-skel">
+                  <span className="ct-skel-img" />
+                  <span className="ct-skel-line w60" />
+                  <span className="ct-skel-line" />
+                  <span className="ct-skel-line w40" />
+                </div>
+              ))}
             </div>
-          ) : data?.items && data.items.length > 0 ? (
-            <div className="grid catalog-products-grid">
+          ) : data && data.items.length > 0 ? (
+            <div className={`ct-grid${loading ? " is-loading" : ""}`}>
               {data.items.map((p) => (
                 <ProductCard key={p.id} p={p} />
               ))}
             </div>
           ) : (
-            /* Modern Medical Empty State */
-            <div className="medax-empty-catalog">
-              <div className="empty-radar-emblem">
-                <div className="empty-pulse-radar" />
-                <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="11" cy="11" r="8" />
-                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                </svg>
-              </div>
-              <h2>{t("not_found_products")}</h2>
-              <p>
-                {lang === "ru"
-                  ? "По вашему запросу медицинское оборудование не найдено. Попробуйте сбросить фильтры."
-                  : lang === "en"
-                  ? "No equipment found matching your criteria. Try resetting filters."
-                  : "Tanlangan filtrlar bo'yicha hech qanday tibbiy uskuna topilmadi. Filtrlarni tozalab ko'ring."}
-              </p>
-              <div className="empty-catalog-actions">
-                <button type="button" className="btn btn-primary-sheen" onClick={resetAllFilters}>
-                  {lang === "ru" ? "Сбросить фильтры" : lang === "en" ? "Reset filters" : "Filtrlarni tozalash"}
+            <div className="ct-empty">
+              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" />
+                <path d="M20 20l-3.5-3.5" />
+              </svg>
+              <h2>{tr("Hech narsa topilmadi", "Ничего не найдено", "Nothing found")}</h2>
+              <p>{tr("Filtrlarni o'zgartiring yoki tozalang.", "Измените или сбросьте фильтры.", "Change or reset the filters.")}</p>
+              {chips.length > 0 && (
+                <button type="button" className="ct-reset primary" onClick={resetAll}>
+                  {tr("Filtrlarni tozalash", "Сбросить фильтры", "Reset filters")}
                 </button>
-                <Link to="/" className="btn ghost">
-                  {lang === "ru" ? "На главную" : lang === "en" ? "Go Home" : "Bosh sahifaga qaytish"}
-                </Link>
-              </div>
+              )}
             </div>
           )}
 
-          {/* Pagination */}
-          {data && !loading && data.pages > 1 && (
-            <Pager page={data.page} pages={data.pages} onPage={(n) => set({ page: String(n) })} />
-          )}
+          {data && data.pages > 1 && <Pager page={data.page} pages={data.pages} onPage={(n) => set({ page: String(n) }, true)} />}
         </section>
       </div>
+
+      {sheetOpen && (
+        <div className="ct-sheet-wrap">
+          <button type="button" className="ct-scrim" aria-label={tr("Yopish", "Закрыть", "Close")} onClick={() => setSheetOpen(false)} />
+          <div className="ct-sheet" role="dialog" aria-modal="true" aria-label={tr("Filtrlar", "Фильтры", "Filters")}>
+            <div className="ct-sheet-head">
+              <h2>{tr("Filtrlar", "Фильтры", "Filters")}</h2>
+              <button type="button" className="ct-sheet-x" onClick={() => setSheetOpen(false)} aria-label={tr("Yopish", "Закрыть", "Close")}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+                  <path d="M18 6 6 18M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="ct-sheet-body">{filters(true)}</div>
+            <div className="ct-sheet-foot">
+              <button type="button" className="ct-reset" onClick={resetAll} disabled={!filterCount}>
+                {tr("Tozalash", "Сбросить", "Reset")}
+              </button>
+              <button type="button" className="ct-apply" onClick={() => setSheetOpen(false)}>
+                {loading ? "…" : tr(`${total} ta mahsulotni ko'rish`, `Показать ${total}`, `Show ${total} products`)}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
