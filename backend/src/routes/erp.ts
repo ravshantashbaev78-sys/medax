@@ -10,10 +10,59 @@ export const erpRouter = Router();
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
 /* -------------------------------------------------------------------------- */
-function generateDocCode(prefix: string): string {
-  const year = new Date().getFullYear();
-  const rand = Math.floor(1000 + Math.random() * 9000);
-  return `${prefix}-${year}-${rand}`;
+type Tx = Prisma.TransactionClient;
+
+/**
+ * Ketma-ket hujjat raqami: PR-2026-0001, PR-2026-0002 ...
+ * Avval tasodifiy 4 xonali son ishlatilgan (yiliga 9000 variant) — ~100 hujjatdan keyin @unique
+ * to'qnashuvi sababli hujjatlar saqlanmay qolardi. Endi mavjud eng katta raqamdan +1 olinadi.
+ */
+async function nextDocNumber(tx: Tx, prefix: string): Promise<string> {
+  const base = `${prefix}-${new Date().getFullYear()}-`;
+  const rows = await tx.erpDocument.findMany({ where: { docNumber: { startsWith: base } }, select: { docNumber: true } });
+  return base + String(maxSuffix(rows.map((r) => r.docNumber), base) + 1).padStart(4, "0");
+}
+
+async function nextCashNumber(tx: Tx): Promise<string> {
+  const base = `KAS-${new Date().getFullYear()}-`;
+  const rows = await tx.cashEntry.findMany({ where: { entryNumber: { startsWith: base } }, select: { entryNumber: true } });
+  return base + String(maxSuffix(rows.map((r) => r.entryNumber), base) + 1).padStart(4, "0");
+}
+
+function maxSuffix(codes: string[], base: string): number {
+  let max = 0;
+  for (const c of codes) {
+    const n = parseInt(c.slice(base.length), 10);
+    if (Number.isFinite(n) && n > max) max = n;
+  }
+  return max;
+}
+
+/** Parallel so'rovlarda raqam to'qnashsa (P2002), tranzaksiyani qayta urinadi */
+async function withUniqueRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+  for (let i = 0; ; i++) {
+    try {
+      return await fn();
+    } catch (err: any) {
+      if (err?.code === "P2002" && i < attempts - 1) continue;
+      throw err;
+    }
+  }
+}
+
+/** Qoldiqni faqat yetarli bo'lsa ayiradi — ombor qoldig'i hech qachon manfiy bo'lmaydi */
+async function decrementStockOrThrow(tx: Tx, productId: number, quantity: number, productName: string) {
+  const r = await tx.product.updateMany({
+    where: { id: productId, stock: { gte: quantity } },
+    data: { stock: { decrement: quantity } },
+  });
+  if (r.count === 0) {
+    const p = await tx.product.findUnique({ where: { id: productId }, select: { stock: true } });
+    throw new HttpError(
+      400,
+      `"${productName}" uchun omborda yetarli qoldiq yo'q (mavjud: ${p?.stock ?? 0}, so'ralgan: ${quantity}).`
+    );
+  }
 }
 
 async function ensureDefaultWarehouse(): Promise<number> {
@@ -197,8 +246,8 @@ erpRouter.post("/inventory/quick-update", async (req, res) => {
       costPrice: z.number().nullish(),
       markupPercent: z.number().nullish(),
       priceFrom: z.number().nullish(),
-      stock: z.number().int().nullish(),
-      minStock: z.number().int().nullish(),
+      stock: z.number().int().min(0, "Qoldiq manfiy bo'lishi mumkin emas").nullish(),
+      minStock: z.number().int().min(0).nullish(),
       batchNumber: z.string().nullish(),
       expDate: z.string().nullish(),
       supplierId: z.number().int().nullish(),
@@ -407,7 +456,7 @@ erpRouter.post("/documents", async (req, res) => {
     RETURN_SUPPLIER: "VP", // Возврат поставщику
     WRITE_OFF: "SP", // Списание
   };
-  const docNumber = generateDocCode(prefixMap[body.type] || "DOC");
+  const docPrefix = prefixMap[body.type] || "DOC";
 
   // Calculate totals and verify products
   const productIds = body.items.map((i) => i.productId);
@@ -456,7 +505,8 @@ erpRouter.post("/documents", async (req, res) => {
   }
 
   // Execute in Prisma Transaction for absolute consistency
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await withUniqueRetry(() => prisma.$transaction(async (tx) => {
+    const docNumber = await nextDocNumber(tx, docPrefix);
     // 1. Create Document
     const doc = await tx.erpDocument.create({
       data: {
@@ -505,13 +555,8 @@ erpRouter.post("/documents", async (req, res) => {
           },
         });
       } else if (body.type === "OUTCOME" || body.type === "WRITE_OFF") {
-        // Decrease stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: { decrement: item.quantity },
-          },
-        });
+        // Decrease stock (faqat qoldiq yetarli bo'lsa)
+        await decrementStockOrThrow(tx, item.productId, item.quantity, item.productName);
       } else if (body.type === "RETURN_CUSTOMER") {
         // Customer returned item -> return to stock
         await tx.product.update({
@@ -521,13 +566,8 @@ erpRouter.post("/documents", async (req, res) => {
           },
         });
       } else if (body.type === "RETURN_SUPPLIER") {
-        // Return to supplier -> decrement stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: { decrement: item.quantity },
-          },
-        });
+        // Return to supplier -> decrement stock (faqat qoldiq yetarli bo'lsa)
+        await decrementStockOrThrow(tx, item.productId, item.quantity, item.productName);
       }
     }
 
@@ -537,7 +577,7 @@ erpRouter.post("/documents", async (req, res) => {
       if (body.paidAmount > 0) {
         await tx.cashEntry.create({
           data: {
-            entryNumber: generateDocCode("KAS"),
+            entryNumber: await nextCashNumber(tx),
             type: "EXPENSE",
             category: "TAMINOTCHI_TOLOV",
             amount: body.paidAmount,
@@ -560,7 +600,7 @@ erpRouter.post("/documents", async (req, res) => {
       if (body.paidAmount > 0) {
         await tx.cashEntry.create({
           data: {
-            entryNumber: generateDocCode("KAS"),
+            entryNumber: await nextCashNumber(tx),
             type: "INCOME",
             category: "MIJOZ_TOLOV",
             amount: body.paidAmount,
@@ -581,7 +621,7 @@ erpRouter.post("/documents", async (req, res) => {
     }
 
     return doc;
-  });
+  }));
 
   res.status(201).json({ ok: true, document: result });
 });
@@ -633,9 +673,8 @@ erpRouter.post("/cash", async (req, res) => {
     })
     .parse(req.body);
 
-  const entryNumber = generateDocCode("KAS");
-
-  const entry = await prisma.$transaction(async (tx) => {
+  const entry = await withUniqueRetry(() => prisma.$transaction(async (tx) => {
+    const entryNumber = await nextCashNumber(tx);
     const created = await tx.cashEntry.create({
       data: {
         entryNumber,
@@ -666,7 +705,7 @@ erpRouter.post("/cash", async (req, res) => {
     }
 
     return created;
-  });
+  }));
 
   res.status(201).json({ ok: true, entry });
 });

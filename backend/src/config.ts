@@ -1,35 +1,32 @@
 import "dotenv/config";
-import crypto from "crypto";
 
 const isProd = process.env.NODE_ENV === "production";
 
-// Xavfsizlik: ishlab chiqarish muhitida barqaror va kuchli sirlar ta'minlanadi
-// Server restart bo'lganda foydalanuvchilar sessiyalari buzilib chiqib ketmasligi uchun doimiy kalit ishlatiladi
-const jwtSecret =
-  process.env.JWT_SECRET && process.env.JWT_SECRET.length >= 32
-    ? process.env.JWT_SECRET
-    : process.env.JWT_SECRET || "medax-production-secure-admin-jwt-key-2026-strict!!";
+// Xavfsizlik: production muhitida JWT kalitlari faqat environment'dan olinadi.
+// Kodda ochiq yozilgan zaxira kalit bo'lsa, istalgan odam admin tokenini soxtalashtira oladi.
+const DEV_JWT_SECRET = "dev-only-admin-jwt-secret-not-for-production-use";
+const DEV_CUSTOMER_JWT_SECRET = "dev-only-customer-jwt-secret-not-for-production-use";
 
-const customerJwtSecret =
-  process.env.CUSTOMER_JWT_SECRET && process.env.CUSTOMER_JWT_SECRET.length >= 32
-    ? process.env.CUSTOMER_JWT_SECRET
-    : process.env.CUSTOMER_JWT_SECRET || "medax-production-secure-customer-jwt-key-2026!!";
+const jwtSecret = process.env.JWT_SECRET || (isProd ? "" : DEV_JWT_SECRET);
+const customerJwtSecret = process.env.CUSTOMER_JWT_SECRET || (isProd ? "" : DEV_CUSTOMER_JWT_SECRET);
 
 export function validateStartupConfig() {
   if (isProd) {
-    if (!process.env.JWT_SECRET) {
+    const problems: string[] = [];
+    if (!jwtSecret || jwtSecret.length < 32) problems.push("JWT_SECRET (kamida 32 belgi)");
+    if (!customerJwtSecret || customerJwtSecret.length < 32) problems.push("CUSTOMER_JWT_SECRET (kamida 32 belgi)");
+    if (jwtSecret && jwtSecret === customerJwtSecret) problems.push("JWT_SECRET va CUSTOMER_JWT_SECRET bir xil bo'lmasligi kerak");
+    if (problems.length) {
       console.error(
-        "XAVFSIZLIK XATOSI: Production muhitida JWT_SECRET environment o'zgaruvchisi o'rnatilmagan! Doimiy maxfiy kalit o'rnating."
+        "XAVFSIZLIK XATOSI: quyidagi environment o'zgaruvchilari noto'g'ri yoki o'rnatilmagan: " +
+          problems.join(", ") +
+          ". Yaratish: openssl rand -hex 32. Server ishga tushirilmaydi."
       );
-    }
-    if (!process.env.CUSTOMER_JWT_SECRET) {
-      console.error(
-        "XAVFSIZLIK XATOSI: Production muhitida CUSTOMER_JWT_SECRET environment o'zgaruvchisi o'rnatilmagan! Doimiy maxfiy kalit o'rnating."
-      );
+      process.exit(1);
     }
     if (config.smsProvider === "console") {
       console.warn(
-        "⚠️ OGOHLANTIRISH: SMS_PROVIDER=console holatida. SMS xabarlar faqat server konsoliga chiqadi. Haqiqiy SMS yuborish uchun Render Environment sozlamalarida SMS_PROVIDER=eskiz, ESKIZ_EMAIL va ESKIZ_PASSWORD ni kiriting."
+        "⚠️ OGOHLANTIRISH: SMS_PROVIDER=console holatida. SMS xabarlar faqat server konsoliga chiqadi. Haqiqiy SMS yuborish uchun SMS_PROVIDER=eskiz, ESKIZ_EMAIL va ESKIZ_PASSWORD ni kiriting."
       );
     }
   }

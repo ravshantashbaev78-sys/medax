@@ -3,6 +3,24 @@ import { Platform } from "react-native";
 
 export const API_BASE = "https://medax.uz/api";
 export const TOKEN_KEY = "@medax_customer_token";
+export const CUSTOMER_CACHE_KEY = "@medax_customer_profile";
+
+/** Server JSON o'rniga HTML (masalan 502 xato sahifasi) qaytarsa ham ilova yiqilmaydi */
+async function readJson(res: Response): Promise<any> {
+  try {
+    return await readJson(res);
+  } catch {
+    return { error: res.ok ? "Serverdan noto'g'ri javob keldi" : `Server vaqtincha ishlamayapti (${res.status}). Birozdan so'ng urinib ko'ring.` };
+  }
+}
+
+function networkError(err: any): string {
+  const msg = String(err?.message || "");
+  if (/network request failed|failed to fetch|network/i.test(msg)) {
+    return "Internet aloqasi yo'q. Tarmoqni tekshirib, qayta urinib ko'ring.";
+  }
+  return msg || "Tarmoq xatosi";
+}
 
 export interface Category {
   id: number;
@@ -38,16 +56,52 @@ export interface Customer {
   phone?: string | null;
   organization?: string | null;
   avatar?: string | null;
+  hasPassword?: boolean;
 }
 
 export async function fetchCategories(): Promise<Category[]> {
   try {
     const res = await fetch(`${API_BASE}/categories`);
-    const data = await res.json();
+    const data = await readJson(res);
     return Array.isArray(data) ? data : data.categories || [];
   } catch (err) {
     console.error("fetchCategories error:", err);
     return [];
+  }
+}
+
+export interface ProductPage {
+  items: Product[];
+  page: number;
+  pages: number;
+  total: number;
+  ok: boolean;
+}
+
+/** Katalog uchun sahifalab yuklash (server bir so'rovda ko'pi bilan 48 ta mahsulot beradi) */
+export async function fetchProductsPage(
+  params: { categoryId?: number; search?: string; page?: number; limit?: number } = {}
+): Promise<ProductPage> {
+  const page = params.page || 1;
+  try {
+    const query = new URLSearchParams();
+    if (params.categoryId) query.append("categoryId", String(params.categoryId));
+    if (params.search) query.append("q", params.search);
+    query.append("page", String(page));
+    query.append("limit", String(params.limit || 24));
+    const res = await fetch(`${API_BASE}/products?${query.toString()}`);
+    if (!res.ok) return { items: [], page, pages: page, total: 0, ok: false };
+    const data = await readJson(res);
+    return {
+      items: Array.isArray(data.items) ? data.items : [],
+      page: data.page || page,
+      pages: data.pages || 1,
+      total: data.total || 0,
+      ok: true,
+    };
+  } catch (err) {
+    console.warn("fetchProductsPage error:", err);
+    return { items: [], page, pages: page, total: 0, ok: false };
   }
 }
 
@@ -63,7 +117,7 @@ export async function fetchProducts(params: { categoryId?: number; category?: st
     }
 
     const res = await fetch(`${API_BASE}/products?${query.toString()}`);
-    const data = await res.json();
+    const data = await readJson(res);
     return Array.isArray(data) ? data : (data.items || data.products || []);
   } catch (err) {
     console.error("fetchProducts error:", err);
@@ -89,7 +143,7 @@ export async function fetchProductDetail(slug: string): Promise<Product | null> 
   try {
     const res = await fetch(`${API_BASE}/products/${slug}`);
     if (!res.ok) return null;
-    return await res.json();
+    return await readJson(res);
   } catch (err) {
     console.error("fetchProductDetail error:", err);
     return null;
@@ -104,11 +158,11 @@ export async function sendCustomerOtp(phone: string): Promise<{ ok: boolean; res
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone: cleanPhone }),
     });
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) return { ok: false, error: data.error || "SMS yuborishda xatolik" };
     return { ok: true, resendIn: data.resendIn || 60 };
   } catch (err: any) {
-    return { ok: false, error: err.message || "Tarmoq xatosi" };
+    return { ok: false, error: networkError(err) };
   }
 }
 
@@ -125,11 +179,11 @@ export async function verifyCustomerOtp(phone: string, code: string, name?: stri
         password: password?.trim() || undefined,
       }),
     });
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) return { ok: false, error: data.error || "Tasdiqlash kodi noto'g'ri" };
     return data;
   } catch (err: any) {
-    return { ok: false, error: err.message || "Tarmoq xatosi" };
+    return { ok: false, error: networkError(err) };
   }
 }
 
@@ -141,11 +195,11 @@ export async function loginCustomerWithPassword(phone: string, password: string)
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone: cleanPhone, password }),
     });
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) return { ok: false, error: data.error || "Login yoki parol noto'g'ri" };
     return data;
   } catch (err: any) {
-    return { ok: false, error: err.message || "Tarmoq xatosi" };
+    return { ok: false, error: networkError(err) };
   }
 }
 
@@ -157,11 +211,11 @@ export async function sendForgotPasswordOtp(phone: string): Promise<{ ok: boolea
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone: cleanPhone }),
     });
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) return { ok: false, error: data.error || "SMS yuborishda xatolik" };
     return data;
   } catch (err: any) {
-    return { ok: false, error: err.message || "Tarmoq xatosi" };
+    return { ok: false, error: networkError(err) };
   }
 }
 
@@ -177,29 +231,59 @@ export async function resetCustomerPassword(
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone: cleanPhone, code, newPassword }),
     });
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) return { ok: false, error: data.error || "Parolni yangilashda xatolik" };
     return data;
   } catch (err: any) {
-    return { ok: false, error: err.message || "Tarmoq xatosi" };
+    return { ok: false, error: networkError(err) };
+  }
+}
+
+export type ProfileResult =
+  | { status: "ok"; customer: Customer }
+  | { status: "unauthorized" }
+  | { status: "offline" };
+
+/**
+ * Profilni tekshiradi. Faqat server tokenni rad etsa (401/404) "unauthorized" qaytaradi.
+ * Internet yo'q yoki server vaqtincha ishlamasa — "offline" (mijoz tizimdan chiqarib yuborilmaydi!).
+ */
+export async function fetchCustomerProfileStatus(): Promise<ProfileResult> {
+  const token = await AsyncStorage.getItem(TOKEN_KEY);
+  if (!token) return { status: "unauthorized" };
+  try {
+    const res = await fetch(`${API_BASE}/customer/auth/me`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.status === 401 || res.status === 404) return { status: "unauthorized" };
+    if (!res.ok) return { status: "offline" };
+    const data = await readJson(res);
+    if (!data.customer) return { status: "offline" };
+    return { status: "ok", customer: data.customer };
+  } catch {
+    return { status: "offline" };
   }
 }
 
 export async function fetchCustomerProfile(): Promise<Customer | null> {
+  const r = await fetchCustomerProfileStatus();
+  return r.status === "ok" ? r.customer : null;
+}
+
+export async function deleteCustomerAccount(password?: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
-    if (!token) return null;
-    const res = await fetch(`${API_BASE}/customer/auth/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+    if (!token) return { ok: false, error: "Tizimga kirilmagan" };
+    const res = await fetch(`${API_BASE}/customer/auth/account`, {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(password ? { password } : {}),
     });
-    if (!res.ok) {
-      await AsyncStorage.removeItem(TOKEN_KEY);
-      return null;
-    }
-    const data = await res.json();
-    return data.customer || null;
-  } catch {
-    return null;
+    const data = await readJson(res);
+    if (!res.ok) return { ok: false, error: data.error || "Hisobni o'chirishda xatolik" };
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: networkError(err) };
   }
 }
 
@@ -231,7 +315,7 @@ export async function uploadCustomerAvatar(
       },
       body: formData,
     });
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) {
       return { ok: false, error: data.error || `Server xatosi (${res.status})` };
     }
@@ -249,7 +333,7 @@ export async function fetchCustomerOrders(): Promise<any[]> {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return [];
-    const data = await res.json();
+    const data = await readJson(res);
     return data.orders || [];
   } catch {
     return [];
@@ -268,14 +352,15 @@ export async function setCustomerPassword(newPassword: string): Promise<{ ok: bo
       },
       body: JSON.stringify({ newPassword }),
     });
-    const data = await res.json();
+    const data = await readJson(res);
+    if (!res.ok) return { ok: false, error: data.error || "Parolni saqlashda xatolik" };
     return data;
   } catch (err: any) {
     return { ok: false, error: err.message || "Parolni saqlashda xatolik" };
   }
 }
 
-export async function updateCustomerProfile(payload: { name?: string; organization?: string; avatar?: string }): Promise<{ ok: boolean; customer?: Customer; error?: string }> {
+export async function updateCustomerProfile(payload: { name?: string; organization?: string; avatar?: null }): Promise<{ ok: boolean; customer?: Customer; error?: string }> {
   try {
     const token = await AsyncStorage.getItem(TOKEN_KEY);
     if (!token) return { ok: false, error: "Tizimga kirilmagan" };
@@ -288,10 +373,11 @@ export async function updateCustomerProfile(payload: { name?: string; organizati
       },
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await readJson(res);
+    if (!res.ok) return { ok: false, error: data.error || "Profilni yangilashda xatolik" };
     return data;
   } catch (err: any) {
-    return { ok: false, error: err.message || "Profilni yangilashda xatolik" };
+    return { ok: false, error: networkError(err) };
   }
 }
 
@@ -303,13 +389,13 @@ export async function sendOrderOtp(phone: string): Promise<{ ok: boolean; resend
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ phone: cleanPhone }),
     });
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) {
       return { ok: false, error: data.error || "SMS tasdiqlash kodini yuborishda xatolik" };
     }
     return { ok: true, resendIn: data.resendIn || 60 };
   } catch (err: any) {
-    return { ok: false, error: err.message || "Tarmoqda xatolik yuz berdi" };
+    return { ok: false, error: networkError(err) };
   }
 }
 
@@ -349,13 +435,13 @@ export async function submitOrder(orderData: {
       headers,
       body: JSON.stringify(payload),
     });
-    const data = await res.json();
+    const data = await readJson(res);
     if (!res.ok) {
       return { ok: false, error: data.error || data.message || "Buyurtma berishda xatolik" };
     }
     return data;
   } catch (err: any) {
-    return { ok: false, error: err.message || "Tarmoqda xatolik yuz berdi" };
+    return { ok: false, error: networkError(err) };
   }
 }
 
@@ -401,7 +487,7 @@ export async function fetchNotifications(): Promise<{ notifications: any[]; unre
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) return { notifications: [], unreadCount: 0 };
-    return await res.json();
+    return await readJson(res);
   } catch {
     return { notifications: [], unreadCount: 0 };
   }

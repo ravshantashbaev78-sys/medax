@@ -6,11 +6,42 @@ import { HttpError } from "../errors";
 
 export const publicRouter = Router();
 
+// Xavfsizlik: ommaviy API faqat shu maydonlarni qaytaradi.
+// costPrice, markupPercent, supplierId, warehouseId, batchNumber va boshqa ichki (ERP) maydonlar
+// hech qachon tashqariga chiqmasligi kerak — shuning uchun `include` emas, aniq `select` ishlatiladi.
+const publicProductFields = {
+  id: true,
+  slug: true,
+  sku: true,
+  name: true,
+  nameRu: true,
+  nameEn: true,
+  description: true,
+  descriptionRu: true,
+  descriptionEn: true,
+  specs: true,
+  country: true,
+  priceFrom: true,
+  oldPrice: true,
+  discountPercent: true,
+  unit: true,
+  packageQty: true,
+  stock: true,
+  isHit: true,
+  isNew: true,
+  isActive: true,
+  categoryId: true,
+  brandId: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.ProductSelect;
+
 const listInclude = {
+  ...publicProductFields,
   brand: { select: { name: true, slug: true } },
   category: { select: { name: true, slug: true } },
   images: { orderBy: { sortOrder: "asc" as const }, take: 1, select: { thumbUrl: true, url: true } },
-};
+} satisfies Prisma.ProductSelect;
 
 publicRouter.get("/categories", async (_req, res) => {
   const rows = await prisma.category.findMany({
@@ -35,9 +66,9 @@ publicRouter.get("/home", async (_req, res) => {
       orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
       include: { _count: { select: { products: { where } } } },
     }),
-    prisma.product.findMany({ where: { ...where, isHit: true }, orderBy: { updatedAt: "desc" }, take: 8, include: listInclude }),
-    prisma.product.findMany({ where: { ...where, isNew: true }, orderBy: { updatedAt: "desc" }, take: 8, include: listInclude }),
-    prisma.product.findMany({ where, orderBy: { createdAt: "desc" }, take: 8, include: listInclude }),
+    prisma.product.findMany({ where: { ...where, isHit: true }, orderBy: { updatedAt: "desc" }, take: 8, select: listInclude }),
+    prisma.product.findMany({ where: { ...where, isNew: true }, orderBy: { updatedAt: "desc" }, take: 8, select: listInclude }),
+    prisma.product.findMany({ where, orderBy: { createdAt: "desc" }, take: 8, select: listInclude }),
     prisma.product.count({ where }),
     prisma.brand.findMany({ orderBy: { name: "asc" }, take: 12 }),
   ]);
@@ -99,7 +130,7 @@ publicRouter.get("/products", async (req, res) => {
 
   const [total, items] = await Promise.all([
     prisma.product.count({ where }),
-    prisma.product.findMany({ where, orderBy, skip: (q.page - 1) * q.limit, take: q.limit, include: listInclude }),
+    prisma.product.findMany({ where, orderBy, skip: (q.page - 1) * q.limit, take: q.limit, select: listInclude }),
   ]);
   res.json({ items, total, page: q.page, pages: Math.max(1, Math.ceil(total / q.limit)) });
 });
@@ -107,7 +138,8 @@ publicRouter.get("/products", async (req, res) => {
 publicRouter.get("/products/:slug", async (req, res) => {
   const p = await prisma.product.findFirst({
     where: { slug: String(req.params.slug), isActive: true },
-    include: {
+    select: {
+      ...publicProductFields,
       brand: true,
       category: true,
       images: { orderBy: { sortOrder: "asc" } },
@@ -119,7 +151,7 @@ publicRouter.get("/products/:slug", async (req, res) => {
     where: { isActive: true, categoryId: p.categoryId, id: { not: p.id } },
     take: 4,
     orderBy: { createdAt: "desc" },
-    include: listInclude,
+    select: listInclude,
   });
   res.json({ ...p, related });
 });

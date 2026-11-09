@@ -31,43 +31,60 @@ declare module "express-serve-static-core" {
   }
 }
 
-export function requireCustomerAuth(req: Request, _res: Response, next: NextFunction) {
+function extractCustomerToken(req: Request): string {
   const h =
     req.headers.authorization ||
     (req.headers["x-authorization"] as string) ||
     (req.headers["x-customer-token"] as string) ||
     (req.headers["x-access-token"] as string) ||
-    (req.query.token as string) ||
     "";
-  const token = h.startsWith("Bearer ") ? h.slice(7).trim() : h.trim();
-  if (!token) return next(new HttpError(401, "Iltimos, tizimga kiring"));
+  return h.startsWith("Bearer ") ? h.slice(7).trim() : h.trim();
+}
 
+/**
+ * Tokenni tekshiradi va mijoz bazada hali ham mavjudligini tasdiqlaydi.
+ * Hisob o'chirilgan yoki telefon olib tashlangan bo'lsa — token yaroqsiz.
+ * Telefon va ism tokendan emas, bazadan olinadi (eskirgan ma'lumot ishlatilmaydi).
+ */
+async function resolveCustomer(token: string): Promise<CustomerAuthPayload | null> {
+  let decoded: CustomerAuthPayload;
   try {
-    const decoded = jwt.verify(token, config.customerJwtSecret) as CustomerAuthPayload;
-    if (decoded.type !== "CUSTOMER") throw new Error("Invalid token type");
-    req.customer = decoded;
-    next();
+    decoded = jwt.verify(token, config.customerJwtSecret) as CustomerAuthPayload;
   } catch {
-    next(new HttpError(401, "Sessiya eskirgan. Qayta kiring"));
+    return null;
+  }
+  if (!decoded || decoded.type !== "CUSTOMER" || !decoded.id) return null;
+  const row = await prisma.customer.findUnique({
+    where: { id: decoded.id },
+    select: { id: true, phone: true, name: true },
+  });
+  if (!row || !row.phone) return null;
+  return { id: row.id, type: "CUSTOMER", phone: row.phone, name: row.name };
+}
+
+export async function requireCustomerAuth(req: Request, _res: Response, next: NextFunction) {
+  const token = extractCustomerToken(req);
+  if (!token) return next(new HttpError(401, "Iltimos, tizimga kiring"));
+  try {
+    const c = await resolveCustomer(token);
+    if (!c) return next(new HttpError(401, "Sessiya eskirgan. Qayta kiring"));
+    req.customer = c;
+    next();
+  } catch (err) {
+    next(err);
   }
 }
 
-export function optionalCustomerAuth(req: Request, _res: Response, next: NextFunction) {
-  const h =
-    req.headers.authorization ||
-    (req.headers["x-authorization"] as string) ||
-    (req.headers["x-customer-token"] as string) ||
-    (req.headers["x-access-token"] as string) ||
-    (req.query.token as string) ||
-    "";
-  const token = h.startsWith("Bearer ") ? h.slice(7).trim() : h.trim();
-  if (token) {
-    try {
-      const decoded = jwt.verify(token, config.customerJwtSecret) as CustomerAuthPayload;
-      if (decoded.type === "CUSTOMER") req.customer = decoded;
-    } catch {}
+export async function optionalCustomerAuth(req: Request, _res: Response, next: NextFunction) {
+  const token = extractCustomerToken(req);
+  if (!token) return next();
+  try {
+    const c = await resolveCustomer(token);
+    if (c) req.customer = c;
+    next();
+  } catch (err) {
+    next(err);
   }
-  next();
 }
 
 export const customerRouter = Router();
@@ -476,16 +493,25 @@ customerRouter.put("/auth/profile", requireCustomerAuth, async (req, res) => {
     .object({
       name: z.string().trim().min(2, "Ismni kiriting").max(80),
       organization: z.string().trim().max(120).optional(),
-      avatar: z.string().max(2000000).optional(),
+      // Xavfsizlik: avatar faqat /auth/avatar orqali yuklanadi. Bu yerda faqat o'chirish (null/"") mumkin,
+      // aks holda mijoz istalgan /uploads/... yo'lini yozib, keyin uni serverdan o'chirtira oladi.
+      avatar: z.union([z.literal(""), z.null()]).optional(),
     })
     .parse(req.body);
+
+  if (avatar !== undefined) {
+    const prev = await prisma.customer.findUnique({ where: { id: req.customer!.id }, select: { avatar: true } });
+    if (prev?.avatar && prev.avatar.startsWith("/uploads/avatars/")) {
+      await removeFile(prev.avatar).catch(() => {});
+    }
+  }
 
   const updated = await prisma.customer.update({
     where: { id: req.customer!.id },
     data: {
       name,
       organization: organization || "",
-      ...(avatar !== undefined ? { avatar: avatar || null } : {}),
+      ...(avatar !== undefined ? { avatar: null } : {}),
     },
     select: { id: true, name: true, phone: true, organization: true, avatar: true, passwordHash: true },
   });
@@ -506,7 +532,7 @@ customerRouter.post("/auth/avatar", requireCustomerAuth, avatarLimiter, avatarUp
   const avatarUrl = await saveAvatar(req.file.buffer);
 
   // Oldingi rasmni diskdan o'chirib, disk to'lib ketishini oldini olamiz
-  if (existing?.avatar) {
+  if (existing?.avatar && existing.avatar.startsWith("/uploads/avatars/")) {
     await removeFile(existing.avatar).catch(() => {});
   }
 
@@ -545,6 +571,54 @@ customerRouter.put("/auth/password", requireCustomerAuth, async (req, res) => {
   });
 
   res.json({ ok: true, message: "Parol muvaffaqiyatli saqlandi ✓" });
+});
+
+// 6b. Hisobni butunlay o'chirish (Google Play / App Store talabi: ilova ichidan hisobni o'chirish)
+customerRouter.delete("/auth/account", requireCustomerAuth, authLimiter, async (req, res) => {
+  const { password } = z.object({ password: z.string().max(100).optional() }).parse(req.body || {});
+
+  const customer = await prisma.customer.findUnique({
+    where: { id: req.customer!.id },
+    include: { _count: { select: { erpDocuments: true, cashEntries: true } } },
+  });
+  if (!customer) throw new HttpError(404, "Mijoz topilmadi");
+
+  // Parol o'rnatilgan bo'lsa, o'chirishdan oldin tasdiqlash shart (o'g'irlangan telefon/token himoyasi)
+  if (customer.passwordHash) {
+    if (!password) throw new HttpError(400, "Hisobni o'chirish uchun parolingizni kiriting.");
+    const ok = await bcrypt.compare(password, customer.passwordHash);
+    if (!ok) throw new HttpError(400, "Parol noto'g'ri.");
+  }
+
+  if (customer.avatar && customer.avatar.startsWith("/uploads/avatars/")) {
+    await removeFile(customer.avatar).catch(() => {});
+  }
+
+  const hasAccounting =
+    customer._count.erpDocuments > 0 || customer._count.cashEntries > 0 || Number(customer.balance) !== 0;
+
+  if (hasAccounting) {
+    // Buxgalteriya hujjatlari qonun bo'yicha saqlanadi: kirish ma'lumotlari va shaxsiy kontaktlar o'chiriladi
+    await prisma.$transaction([
+      prisma.notification.deleteMany({ where: { customerId: customer.id } }),
+      prisma.customer.update({
+        where: { id: customer.id },
+        data: {
+          phone: null,
+          passwordHash: null,
+          avatar: null,
+          pushToken: null,
+          hasApp: false,
+          resetPasswordOtpSentAt: null,
+        },
+      }),
+    ]);
+  } else {
+    // Buyurtmalar tarixida customerId avtomatik NULL bo'ladi (onDelete: SetNull), bildirishnomalar o'chadi (Cascade)
+    await prisma.customer.delete({ where: { id: customer.id } });
+  }
+
+  res.json({ ok: true, message: "Hisobingiz o'chirildi." });
 });
 
 // 5. Mijozning buyurtmalar tarixi (Faqat o'zining tasdiqlangan ID va telefon raqami bo'yicha)

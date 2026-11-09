@@ -60,6 +60,9 @@ export async function savePdf(buf: Buffer): Promise<string> {
 export async function removeFile(url: string) {
   if (!url.startsWith("/uploads/")) return;
   const rel = url.replace("/uploads/", "");
-  if (rel.includes("..")) return;
-  await fs.rm(path.join(config.uploadDir, rel), { force: true });
+  if (rel.includes("..") || rel.includes("\\") || rel.includes("\0")) return;
+  const root = path.resolve(config.uploadDir);
+  const target = path.resolve(root, rel);
+  if (!target.startsWith(root + path.sep)) return;
+  await fs.rm(target, { force: true });
 }

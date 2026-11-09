@@ -514,89 +514,74 @@ adminRouter.patch("/orders/:id", async (req, res) => {
   const prevOrder = await prisma.order.findUnique({ where: { id: id(req.params.id) } });
   if (!prevOrder) throw new HttpError(404, "Buyurtma topilmadi");
 
-  const order = await prisma.order.update({
-    where: { id: prevOrder.id },
-    data: {
-      ...d,
-      ...(d.isPaid !== undefined && d.isPaid && !prevOrder.isPaid ? { paidAt: new Date() } : {}),
-    },
-    include: { items: true },
+  const needsDeduct =
+    (d.status === "CONFIRMED" || d.status === "READY" || d.status === "DONE") && !prevOrder.stockDeducted;
+  const needsRestore = (d.status === "CANCELED" || d.status === "FAKE") && prevOrder.stockDeducted;
+
+  // Holat o'zgarishi va ombor harakati BITTA tranzaksiyada: qoldiq yetmasa, holat ham o'zgarmaydi.
+  const order = await prisma.$transaction(async (tx) => {
+    const updated = await tx.order.update({
+      where: { id: prevOrder.id },
+      data: {
+        ...d,
+        ...(d.isPaid !== undefined && d.isPaid && !prevOrder.isPaid ? { paidAt: new Date() } : {}),
+      },
+      include: { items: true },
+    });
+
+    // 1. Tasdiqlash/tayyorlash/topshirishda qoldiq atomar ayiriladi (race condition bo'lmaydi)
+    // stockDeducted bayrog'ini atomar "egallaymiz": parallel ikki so'rov qoldiqni ikki marta ayirmaydi
+    const claimDeduct = needsDeduct
+      ? (await tx.order.updateMany({ where: { id: updated.id, stockDeducted: false }, data: { stockDeducted: true } })).count > 0
+      : false;
+    const claimRestore = needsRestore
+      ? (await tx.order.updateMany({ where: { id: updated.id, stockDeducted: true }, data: { stockDeducted: false } })).count > 0
+      : false;
+    if (claimDeduct) updated.stockDeducted = true;
+    if (claimRestore) updated.stockDeducted = false;
+
+    if (claimDeduct) {
+      for (const item of updated.items) {
+        if (!item.productId) continue;
+        const updateResult = await tx.product.updateMany({
+          where: { id: item.productId, stock: { gte: item.quantity } },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (updateResult.count === 0) {
+          const prod = await tx.product.findUnique({ where: { id: item.productId } });
+          throw new HttpError(
+            400,
+            `"${prod?.name || "Mahsulot"}" uchun omborda yetarli qoldiq yo'q (mavjud: ${prod?.stock ?? 0} dona, buyurtmada: ${item.quantity} dona). Avval ombor qoldig'ini to'ldiring.`
+          );
+        }
+        // Qoldiq 0 ga tushgan bo'lsa, mahsulotni avtomatik nofaol qilish
+        await tx.product.updateMany({ where: { id: item.productId, stock: 0 }, data: { isActive: false } });
+      }
+    }
+
+    // 2. Bekor qilinsa (CANCELED yoki FAKE), avval yechilgan qoldiq omborga qaytariladi
+    if (claimRestore) {
+      for (const item of updated.items) {
+        if (!item.productId) continue;
+        const prod = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!prod) continue;
+        const wasZero = prod.stock === 0;
+        await tx.product.update({
+          where: { id: item.productId },
+          data: {
+            stock: { increment: item.quantity },
+            // Faqat qoldiq 0 bo'lgani sababli yashirilgan bo'lsa qayta yoqiladi
+            ...(wasZero && !prod.isActive ? { isActive: true } : {}),
+          },
+        });
+      }
+    }
+
+    return updated;
   });
 
   let blocked = false;
   if (d.status === "FAKE") blocked = await applyFakeStrike(order.phone);
-
-  // 1. Ombordagi qoldiqni boshqarish (Tranzaksiyada atomar tekshiruv va decrement):
-  // Admin buyurtmani tasdiqlaganda (CONFIRMED), tayyorlaganda (READY) yoki topshirganda (DONE)
-  // avval ombordagi qoldiq yetarliligi tekshiriladi va atomar tarzda ayiriladi.
-  if (
-    (d.status === "CONFIRMED" || d.status === "READY" || d.status === "DONE") &&
-    !prevOrder.stockDeducted
-  ) {
-    await prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        if (item.productId) {
-          // Atomar tarzda faqat qoldiq yetarli bo'lgandagina ayiramiz (race condition bo'lmaydi)
-          const updateResult = await tx.product.updateMany({
-            where: {
-              id: item.productId,
-              stock: { gte: item.quantity },
-            },
-            data: {
-              stock: { decrement: item.quantity },
-            },
-          });
-
-          if (updateResult.count === 0) {
-            const prod = await tx.product.findUnique({ where: { id: item.productId } });
-            throw new HttpError(
-              400,
-              `"${prod?.name || "Mahsulot"}" uchun omborda yetarli qoldiq yo'q (mavjud: ${prod?.stock ?? 0} dona, buyurtmada: ${item.quantity} dona). Avval ombor qoldig'ini to'ldiring.`
-            );
-          }
-
-          // Qoldiq 0 ga tushgan bo'lsa, mahsulotni avtomatik nofaol qilish
-          const updatedProd = await tx.product.findUnique({
-            where: { id: item.productId },
-            select: { stock: true },
-          });
-          if (updatedProd && updatedProd.stock === 0) {
-            await tx.product.update({
-              where: { id: item.productId },
-              data: { isActive: false },
-            });
-          }
-        }
-      }
-
-      await tx.order.update({ where: { id: order.id }, data: { stockDeducted: true } });
-      order.stockDeducted = true;
-    });
-  }
-
-  // 2. Agar buyurtma bekor qilinsa (CANCELED yoki FAKE), avval yechilgan qoldiq omborga qaytariladi:
-  if ((d.status === "CANCELED" || d.status === "FAKE") && prevOrder.stockDeducted) {
-    await prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        if (item.productId) {
-          const prod = await tx.product.findUnique({ where: { id: item.productId } });
-          if (prod) {
-            const wasZero = prod.stock === 0;
-            await tx.product.update({
-              where: { id: item.productId },
-              data: {
-                stock: { increment: item.quantity },
-                // Faqat qoldiq 0 bo'lgani sababli yashirilgan bo'lsa qayta yoqiladi
-                ...(wasZero && !prod.isActive ? { isActive: true } : {}),
-              },
-            });
-          }
-        }
-      }
-      await tx.order.update({ where: { id: order.id }, data: { stockDeducted: false } });
-      order.stockDeducted = false;
-    });
-  }
 
   // 3. Bildirishnomalar va SMS (CONFIRMED != READY, takrorlanmas SMS):
   if (d.status === "CONFIRMED" && prevOrder.status !== "CONFIRMED") {

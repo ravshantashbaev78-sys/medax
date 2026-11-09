@@ -31,7 +31,6 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     (req.headers["x-authorization"] as string) ||
     (req.headers["x-admin-token"] as string) ||
     (req.headers["x-access-token"] as string) ||
-    (req.query.token as string) ||
     "";
   const token = h.startsWith("Bearer ") ? h.slice(7).trim() : h.trim();
   if (!token) return next(new HttpError(401, "Tizimga kiring"));

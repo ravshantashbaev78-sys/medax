@@ -31,7 +31,6 @@ export function CartScreen({ navigation }: any) {
 
   const [customerName, setCustomerName] = useState(customer?.name || "");
   const [phone, setPhone] = useState(customer?.phone || "+998 ");
-  const [address, setAddress] = useState("");
   const [comment, setComment] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("Do'konda to'lash (Olib ketishda)");
   const [loading, setLoading] = useState(false);
@@ -43,6 +42,25 @@ export function CartScreen({ navigation }: any) {
     orderCode: "",
   });
 
+  // Savatcha ekrani ochiq turganda mijoz tizimga kirsa/chiqsa, forma yangilanadi
+  useEffect(() => {
+    if (customer) {
+      setCustomerName((prev) => prev.trim() || customer.name || "");
+      if (customer.phone) setPhone(customer.phone);
+      setOtpSent(false);
+      setOtpCode("");
+    }
+  }, [customer?.id]);
+
+  const handlePhoneChange = (value: string) => {
+    setPhone(value);
+    // Raqam o'zgarsa, eski raqamga yuborilgan SMS kod endi yaroqsiz
+    if (otpSent) {
+      setOtpSent(false);
+      setOtpCode("");
+    }
+  };
+
   useEffect(() => {
     let t: any;
     if (resendTimer > 0) {
@@ -51,7 +69,6 @@ export function CartScreen({ navigation }: any) {
     return () => clearTimeout(t);
   }, [resendTimer]);
 
-  const hasUnpriced = items.some((i) => !i.product.priceFrom || Number(i.product.priceFrom) <= 0);
 
   const handleCheckout = async () => {
     if (!customerName.trim()) {
@@ -61,10 +78,6 @@ export function CartScreen({ navigation }: any) {
     const cleanPhone = phone.replace(/\D/g, "");
     if (cleanPhone.length < 9) {
       Alert.alert("Diqqat", "Iltimos, to'g'ri telefon raqamini kiriting (+998 __ ___ __ __).");
-      return;
-    }
-    if (!address.trim()) {
-      Alert.alert("Diqqat", "Iltimos, yetkazib berish yoki olib ketish manzilini kiriting.");
       return;
     }
 
@@ -90,7 +103,7 @@ export function CartScreen({ navigation }: any) {
       return;
     }
 
-    const selectedMethod = hasUnpriced ? "cash" : paymentMethod;
+    const selectedMethod = paymentMethod;
 
     setLoading(true);
     const orderItems = items.map((i) => ({
@@ -121,12 +134,18 @@ export function CartScreen({ navigation }: any) {
     } else {
       if (token && res.error && (res.error.includes("SMS tasdiqlash kodini") || res.error.includes("401"))) {
         await logout();
-        setOtpSent(true);
-        Alert.alert(
-          "Sessiya yangilandi",
-          "Avvalgi profilingiz sessiyasi eskirgan. Telefoningizga tasdiqlash kodi yuborildi, kodni kiritib buyurtmani tasdiqlang."
-        );
-        await sendOrderOtp(phone.trim());
+        const otpRes = await sendOrderOtp(phone.trim());
+        if (otpRes.ok) {
+          setOtpSent(true);
+          setOtpCode("");
+          setResendTimer(otpRes.resendIn || 60);
+          Alert.alert(
+            "Sessiya yangilandi",
+            "Avvalgi profilingiz sessiyasi eskirgan. Telefoningizga tasdiqlash kodi yuborildi, kodni kiritib buyurtmani tasdiqlang."
+          );
+        } else {
+          Alert.alert("Xatolik", otpRes.error || "SMS tasdiqlash kodini yuborishda xatolik yuz berdi.");
+        }
         return;
       }
       Alert.alert("Xatolik", res.error || "Buyurtma yuborishda xatolik yuz berdi");
@@ -162,7 +181,15 @@ export function CartScreen({ navigation }: any) {
           <CartIcon size={22} color={colors.primary} />
           <Text style={[styles.headerTitle, { color: colors.text }]}>{t("nav_cart")} ({totalItems})</Text>
         </View>
-        <TouchableOpacity onPress={clearCart} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+        <TouchableOpacity
+          onPress={() =>
+            Alert.alert(t("cart_clear"), "Savatchadagi barcha mahsulotlar o'chirilsinmi?", [
+              { text: "Bekor qilish", style: "cancel" },
+              { text: t("cart_clear"), style: "destructive", onPress: clearCart },
+            ])
+          }
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
           <Text style={styles.clearAll}>{t("cart_clear")}</Text>
         </TouchableOpacity>
       </View>
@@ -267,10 +294,16 @@ export function CartScreen({ navigation }: any) {
               style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
               placeholder="+998 90 123 45 67"
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={handlePhoneChange}
               keyboardType="phone-pad"
+              editable={!token}
               placeholderTextColor={colors.textMuted}
             />
+            {token ? (
+              <Text style={{ fontSize: 11.5, color: colors.textMuted, marginTop: -6, marginBottom: 10 }}>
+                Buyurtma akkauntingizdagi tasdiqlangan raqamga rasmiylashtiriladi.
+              </Text>
+            ) : null}
 
             <Text style={[styles.label, { color: colors.textMuted }]}>{t("contact_store") || "Olib ketish manzili"}</Text>
             <View style={[styles.storeAddressCard, theme === "dark" && { backgroundColor: "#064e3b25", borderColor: "#05966950" }]}>
@@ -343,8 +376,10 @@ export function CartScreen({ navigation }: any) {
                   style={[styles.otpInput, { backgroundColor: colors.inputBg, borderColor: colors.primary, color: colors.text }]}
                   placeholder="------"
                   value={otpCode}
-                  onChangeText={setOtpCode}
+                  onChangeText={(v) => setOtpCode(v.replace(/\D/g, ""))}
                   keyboardType="number-pad"
+                  textContentType="oneTimeCode"
+                  autoComplete="sms-otp"
                   maxLength={6}
                   placeholderTextColor={colors.textMuted}
                 />

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Product } from "../api";
 
@@ -20,57 +20,81 @@ interface CartContextType {
 const CartContext = createContext<CartContextType | null>(null);
 
 const CART_KEY = "@medax_cart_items";
+// Server bitta mahsulotdan ko'pi bilan 100 dona va bitta buyurtmada 20 xil mahsulot qabul qiladi
+const MAX_QTY_PER_ITEM = 100;
+
+/** Miqdorni ombor qoldig'i va server limiti bilan cheklaydi */
+function clampQty(product: Product, qty: number): number {
+  let max = MAX_QTY_PER_ITEM;
+  if (typeof product.stock === "number" && product.stock >= 0) max = Math.min(max, product.stock);
+  return Math.max(0, Math.min(max, Math.floor(qty)));
+}
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const loaded = useRef(false);
 
   useEffect(() => {
-    AsyncStorage.getItem(CART_KEY).then((data) => {
-      if (data) {
+    AsyncStorage.getItem(CART_KEY)
+      .then((data) => {
+        if (!data) return;
         try {
-          setItems(JSON.parse(data));
-        } catch {}
-      }
-    });
+          const saved = JSON.parse(data) as CartItem[];
+          if (!Array.isArray(saved)) return;
+          // Yuklanish paytida qo'shilgan mahsulotlar yo'qolmasligi uchun birlashtiramiz
+          setItems((current) => {
+            const ids = new Set(current.map((i) => i.product.id));
+            return [...saved.filter((i) => i?.product?.id && !ids.has(i.product.id)), ...current];
+          });
+        } catch {
+          // buzilgan kesh — e'tiborsiz qoldiramiz
+        }
+      })
+      .finally(() => {
+        loaded.current = true;
+      });
   }, []);
 
-  const saveCart = (newItems: CartItem[]) => {
-    setItems(newItems);
-    AsyncStorage.setItem(CART_KEY, JSON.stringify(newItems));
-  };
+  // Har bir o'zgarishni saqlaymiz (yuklanish tugagandan keyin)
+  useEffect(() => {
+    if (!loaded.current) return;
+    AsyncStorage.setItem(CART_KEY, JSON.stringify(items)).catch(() => {});
+  }, [items]);
 
   const addToCart = (product: Product, quantity = 1) => {
-    const existingIndex = items.findIndex((i) => i.product.id === product.id);
-    if (existingIndex > -1) {
-      const updated = [...items];
-      updated[existingIndex].quantity += quantity;
-      saveCart(updated);
-    } else {
-      saveCart([...items, { product, quantity }]);
-    }
+    setItems((prev) => {
+      const idx = prev.findIndex((i) => i.product.id === product.id);
+      if (idx > -1) {
+        const qty = clampQty(product, prev[idx].quantity + quantity);
+        return prev.map((it, i) => (i === idx ? { product, quantity: Math.max(1, qty) } : it));
+      }
+      const qty = clampQty(product, quantity);
+      if (qty <= 0) return prev;
+      return [...prev, { product, quantity: qty }];
+    });
   };
 
   const removeFromCart = (productId: number) => {
-    saveCart(items.filter((i) => i.product.id !== productId));
+    setItems((prev) => prev.filter((i) => i.product.id !== productId));
   };
 
   const updateQuantity = (productId: number, quantity: number) => {
-    if (quantity <= 0) {
-      removeFromCart(productId);
-      return;
-    }
-    const updated = items.map((i) => (i.product.id === productId ? { ...i, quantity } : i));
-    saveCart(updated);
+    setItems((prev) => {
+      if (quantity <= 0) return prev.filter((i) => i.product.id !== productId);
+      return prev.map((i) =>
+        i.product.id === productId ? { ...i, quantity: Math.max(1, clampQty(i.product, quantity)) } : i
+      );
+    });
   };
 
   const clearCart = () => {
-    saveCart([]);
+    setItems([]);
   };
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalPrice = items.reduce((sum, i) => {
     const price = typeof i.product.priceFrom === "number" ? i.product.priceFrom : parseFloat(String(i.product.priceFrom || 0));
-    return sum + price * i.quantity;
+    return sum + (Number.isFinite(price) ? price : 0) * i.quantity;
   }, 0);
 
   return (

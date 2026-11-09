@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -9,9 +9,10 @@ import {
   Image,
   ActivityIndicator,
   Dimensions,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Category, fetchCategories, fetchProducts, Product, getImageUrl, formatPrice } from "../api";
+import { Category, fetchCategories, fetchProductsPage, Product, getImageUrl, formatPrice } from "../api";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
 import { useI18n, localizeCategoryName, localizeProductName } from "../context/I18nContext";
@@ -30,11 +31,14 @@ export function CatalogScreen({ navigation, route }: any) {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [addedId, setAddedId] = useState<number | null>(null);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const requestId = useRef(0);
   const { addToCart } = useCart();
-
-  useEffect(() => {
-    fetchCategories().then(setCategories);
-  }, []);
 
   useEffect(() => {
     if (route?.params?.categoryId !== undefined) {
@@ -42,13 +46,47 @@ export function CatalogScreen({ navigation, route }: any) {
     }
   }, [route?.params?.categoryId]);
 
+  // Har bir harf uchun so'rov yubormaslik uchun qidiruvni 350ms kechiktiramiz
   useEffect(() => {
-    setLoading(true);
-    fetchProducts({ categoryId: selectedCat, search }).then((data) => {
-      setProducts(data);
-      setLoading(false);
-    });
-  }, [selectedCat, search]);
+    const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const loadFirstPage = async (isRefresh = false) => {
+    const myId = ++requestId.current;
+    if (isRefresh || categories.length === 0) fetchCategories().then((c) => c.length && setCategories(c));
+    if (isRefresh) setRefreshing(true);
+    else setLoading(true);
+    const res = await fetchProductsPage({ categoryId: selectedCat, search: debouncedSearch, page: 1 });
+    // Eskirgan javob (foydalanuvchi allaqachon boshqa narsa qidiryapti) — e'tiborsiz qoldiramiz
+    if (myId !== requestId.current) return;
+    setProducts(res.items);
+    setPage(1);
+    setPages(res.pages);
+    setLoadError(!res.ok);
+    setLoading(false);
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
+    loadFirstPage();
+  }, [selectedCat, debouncedSearch]);
+
+  const loadMore = async () => {
+    if (loading || loadingMore || page >= pages) return;
+    const myId = requestId.current;
+    setLoadingMore(true);
+    const res = await fetchProductsPage({ categoryId: selectedCat, search: debouncedSearch, page: page + 1 });
+    if (myId === requestId.current && res.ok) {
+      setProducts((prev) => {
+        const ids = new Set(prev.map((p) => p.id));
+        return [...prev, ...res.items.filter((p) => !ids.has(p.id))];
+      });
+      setPage(res.page);
+      setPages(res.pages);
+    }
+    setLoadingMore(false);
+  };
 
   const handleAddToCart = (product: Product) => {
     addToCart(product, 1);
@@ -114,6 +152,18 @@ export function CatalogScreen({ navigation, route }: any) {
       {/* Product List */}
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
+      ) : products.length === 0 && loadError ? (
+        <View style={styles.emptyWrap}>
+          <Text style={{ fontSize: 40, marginBottom: 12 }}>📡</Text>
+          <Text style={[styles.emptyTitle, { color: colors.text }]}>Internet aloqasi yo'q</Text>
+          <Text style={[styles.emptySub, { color: colors.textMuted }]}>Tarmoqni tekshirib, qayta urinib ko'ring.</Text>
+          <TouchableOpacity
+            onPress={() => loadFirstPage()}
+            style={{ marginTop: 16, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12, backgroundColor: "#0284c7" }}
+          >
+            <Text style={{ color: "#ffffff", fontWeight: "800" }}>Qayta urinish</Text>
+          </TouchableOpacity>
+        </View>
       ) : products.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Text style={{ fontSize: 40, marginBottom: 12 }}>🔎</Text>
@@ -128,6 +178,15 @@ export function CatalogScreen({ navigation, route }: any) {
           contentContainerStyle={styles.listContent}
           columnWrapperStyle={styles.columnWrapper}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          onEndReached={loadMore}
+          onEndReachedThreshold={0.5}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={() => loadFirstPage(true)} colors={[colors.primary]} tintColor={colors.primary} />
+          }
+          ListFooterComponent={
+            loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 18 }} /> : null
+          }
           renderItem={({ item }) => {
             const imgUrl = getImageUrl(item.images?.[0]?.url);
             const isAdded = addedId === item.id;

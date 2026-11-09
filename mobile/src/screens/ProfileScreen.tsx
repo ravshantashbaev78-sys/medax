@@ -14,6 +14,7 @@ import {
   Platform,
   KeyboardAvoidingView,
   Keyboard,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as ImagePicker from "expo-image-picker";
@@ -31,6 +32,7 @@ import {
   fetchNotifications,
   markNotificationsRead,
   fetchCustomerOrders,
+  deleteCustomerAccount,
 } from "../api";
 import {
   ShieldIcon,
@@ -51,7 +53,7 @@ import { SuccessModal } from "../components/SuccessModal";
 
 export function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { customer, logout, loginWithToken, refreshProfile } = useAuth();
+  const { customer, logout, clearSession, loginWithToken, refreshProfile } = useAuth();
   const { theme, colors, setTheme } = useTheme();
   const { lang, setLang, t } = useI18n();
 
@@ -79,6 +81,9 @@ export function ProfileScreen() {
 
   const [loading, setLoading] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleting, setDeleting] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [keyboardHeight, setKeyboardHeight] = useState(0);
 
@@ -274,7 +279,13 @@ export function ProfileScreen() {
         setNewPassword("");
         setConfirmPassword("");
       } else {
-        Alert.alert(t("error"), res.error || "Xatolik yuz berdi");
+        const msg = res.error || "Xatolik yuz berdi";
+        // Kod noto'g'ri/eskirgan bo'lsa — kod kiritish bosqichiga qaytaramiz
+        if (/kod/i.test(msg)) {
+          setAuthMode("otp");
+          setOtpCode("");
+        }
+        Alert.alert(t("error"), msg);
       }
     } catch {
       Alert.alert(t("error"), "Tarmoqda xatolik yuz berdi");
@@ -374,12 +385,8 @@ export function ProfileScreen() {
 
   const pickAndUploadAvatar = async () => {
     try {
-      // Android 13+ da tizimli Photo Picker ruxsat talab qilmaydi, eski versiyalarda ruxsat so'raladi
-      const perm = await ImagePicker.getMediaLibraryPermissionsAsync();
-      if (!perm.granted && perm.canAskAgain) {
-        await ImagePicker.requestMediaLibraryPermissionsAsync();
-      }
-
+      // Tizimli Photo Picker ishlatiladi — galereyaga ruxsat (READ_MEDIA_IMAGES) talab qilinmaydi.
+      // Google Play siyosati bir martalik rasm tanlash uchun bu ruxsatni so'rashni taqiqlaydi.
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,
@@ -405,13 +412,46 @@ export function ProfileScreen() {
     }
   };
 
-  const handleLogout = async () => {
+  const resetAuthForm = () => {
     setPhone("+998 ");
     setName("");
     setOtpCode("");
     setPassword("");
-    setAuthMode("phone");
-    await logout();
+    setAuthTab("login");
+    setAuthMode("password");
+  };
+
+  const handleLogout = () => {
+    Alert.alert(t("profile_logout"), "Hisobingizdan chiqmoqchimisiz?", [
+      { text: "Bekor qilish", style: "cancel" },
+      {
+        text: t("profile_logout"),
+        style: "destructive",
+        onPress: async () => {
+          resetAuthForm();
+          await logout();
+        },
+      },
+    ]);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (customer?.hasPassword && !deletePassword) {
+      Alert.alert(t("error"), "Hisobni o'chirish uchun parolingizni kiriting.");
+      return;
+    }
+    setDeleting(true);
+    const res = await deleteCustomerAccount(deletePassword || undefined);
+    setDeleting(false);
+    if (!res.ok) {
+      Alert.alert(t("error"), res.error || "Hisobni o'chirishda xatolik");
+      return;
+    }
+    setDeleteModalVisible(false);
+    setDeletePassword("");
+    resetAuthForm();
+    await clearSession();
+    Alert.alert("Hisob o'chirildi", "Hisobingiz va shaxsiy ma'lumotlaringiz o'chirildi.");
   };
 
   const displayName = customer?.name && customer.name !== "*" ? customer.name : "Mijoz";
@@ -585,7 +625,7 @@ export function ProfileScreen() {
                           })}
                         </Text>
                         <Text style={[styles.orderTotal, { color: colors.primary }]}>
-                          {Number(order.totalPrice || 0).toLocaleString()} so'm
+                          {Number(order.totalAmount || 0) > 0 ? `${Number(order.totalAmount).toLocaleString()} so'm` : "Kelishuv asosida"}
                         </Text>
                       </View>
                     </View>
@@ -638,7 +678,7 @@ export function ProfileScreen() {
                     </View>
                     <Text style={[styles.notifItemBody, { color: colors.textMuted }]}>{n.body}</Text>
                     <Text style={[styles.notifItemTime, { color: colors.textMuted }]}>
-                      {new Date(n.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(n.createdAt).toLocaleString([], { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                     </Text>
                   </View>
                 ))}
@@ -648,6 +688,19 @@ export function ProfileScreen() {
 
           <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
             <Text style={styles.logoutBtnText}>{t("profile_logout")}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={{ marginTop: 14, paddingVertical: 8, alignItems: "center" }}
+            onPress={() => {
+              setDeletePassword("");
+              setDeleteModalVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ color: colors.textMuted, fontSize: 12.5, fontWeight: "600", textDecorationLine: "underline" }}>
+              Hisobni o'chirish
+            </Text>
           </TouchableOpacity>
         </View>
       ) : (
@@ -1352,6 +1405,50 @@ export function ProfileScreen() {
         </TouchableOpacity>
       </View>
     </ScrollView>
+
+    {/* Hisobni o'chirish oynasi (Google Play talabi) */}
+    <Modal
+      visible={deleteModalVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => !deleting && setDeleteModalVisible(false)}
+    >
+      <View style={{ flex: 1, backgroundColor: "rgba(15,23,42,0.55)", justifyContent: "center", padding: 24 }}>
+        <View style={{ backgroundColor: colors.card, borderRadius: 20, padding: 22, borderWidth: 1, borderColor: colors.border }}>
+          <Text style={{ fontSize: 18, fontWeight: "800", color: "#dc2626", marginBottom: 8 }}>Hisobni o'chirish</Text>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: colors.textMuted, marginBottom: 14 }}>
+            Hisobingiz, profil rasmingiz, parolingiz va bildirishnomalaringiz butunlay o'chiriladi. Bu amalni ortga qaytarib bo'lmaydi.
+            Rasmiylashtirilgan buyurtmalar bo'yicha hujjatlar qonunchilik talabiga ko'ra do'konda saqlanib qoladi.
+          </Text>
+          {customer?.hasPassword ? (
+            <TextInput
+              style={[styles.inputField, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text, marginBottom: 14 }]}
+              value={deletePassword}
+              onChangeText={setDeletePassword}
+              secureTextEntry
+              placeholder="Tasdiqlash uchun parolingiz"
+              placeholderTextColor={colors.textMuted}
+            />
+          ) : null}
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <TouchableOpacity
+              style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", backgroundColor: colors.inputBg }}
+              onPress={() => setDeleteModalVisible(false)}
+              disabled={deleting}
+            >
+              <Text style={{ fontWeight: "700", color: colors.text }}>Bekor qilish</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 1, paddingVertical: 12, borderRadius: 12, alignItems: "center", backgroundColor: "#dc2626", opacity: deleting ? 0.7 : 1 }}
+              onPress={handleDeleteAccount}
+              disabled={deleting}
+            >
+              {deleting ? <ActivityIndicator color="#ffffff" /> : <Text style={{ fontWeight: "800", color: "#ffffff" }}>O'chirish</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
 
     {/* Chiroyli muvaffaqiyat modal oynasi */}
     <SuccessModal
