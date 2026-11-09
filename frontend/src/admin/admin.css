@@ -1,0 +1,915 @@
+/* ==========================================================================
+   Medax Admin — yagona dizayn tizimi
+   Faqat .adm ichida ishlaydi: ommaviy saytga ta'sir qilmaydi.
+   Yorug' va qorong'i mavzu uchun alohida tokenlar; mavjud komponentlar
+   ishlatadigan umumiy o'zgaruvchilar (--card, --line, --ink ...) shu
+   tokenlarga yo'naltiriladi, shuning uchun barcha sahifalar birdaniga yangilanadi.
+   ========================================================================== */
+
+.adm.theme-light {
+  --a-bg: #f6f7f9;
+  --a-surface: #ffffff;
+  --a-surface-2: #f9fafb;
+  --a-hover: #f3f4f6;
+  --a-border: #e5e7eb;
+  --a-border-strong: #d1d5db;
+  --a-text: #111827;
+  --a-text-2: #4b5563;
+  --a-text-3: #6b7280;
+  --a-primary: #0a72bf;
+  --a-primary-hover: #085c9c;
+  --a-primary-text: #0a66ad;
+  --a-primary-soft: #eaf3fb;
+  --a-success: #15803d;
+  --a-success-soft: #dcfce7;
+  --a-warn: #a16207;
+  --a-warn-soft: #fef3c7;
+  --a-danger: #b91c1c;
+  --a-danger-soft: #fee2e2;
+  --a-info: #1d4ed8;
+  --a-info-soft: #dbeafe;
+  --a-nav-active: #eaf3fb;
+  --a-shadow: 0 1px 2px rgba(17, 24, 39, 0.05);
+  --a-overlay: rgba(17, 24, 39, 0.45);
+}
+
+.adm.theme-dark {
+  --a-bg: #0b0f14;
+  --a-surface: #11161d;
+  --a-surface-2: #151b23;
+  --a-hover: #1a222c;
+  --a-border: #1f2731;
+  --a-border-strong: #2b3542;
+  --a-text: #e6eaf0;
+  --a-text-2: #a9b4c2;
+  --a-text-3: #8592a3;
+  --a-primary: #0a72bf;
+  --a-primary-hover: #0b80d6;
+  --a-primary-text: #5aaeea;
+  --a-primary-soft: #0f2536;
+  --a-success: #4ade80;
+  --a-success-soft: #0f2a1a;
+  --a-warn: #fbbf24;
+  --a-warn-soft: #2a2010;
+  --a-danger: #f87171;
+  --a-danger-soft: #2a1414;
+  --a-info: #93c5fd;
+  --a-info-soft: #13233b;
+  --a-nav-active: #16212c;
+  --a-shadow: none;
+  --a-overlay: rgba(0, 0, 0, 0.6);
+}
+
+/* Umumiy o'zgaruvchilarni admin palitrasiga yo'naltirish */
+.adm {
+  --paper: var(--a-bg);
+  --bg: var(--a-bg);
+  --card: var(--a-surface);
+  --surface: var(--a-surface);
+  --surface-card: var(--a-surface-2);
+  --surface-muted: var(--a-surface-2);
+  --panel: var(--a-surface);
+  --hover: var(--a-hover);
+  --line: var(--a-border);
+  --ink: var(--a-text);
+  --ink2: var(--a-text-2);
+  --ink-muted: var(--a-text-3);
+  --sea: var(--a-primary-soft);
+  --teal: var(--a-primary);
+  --brand: var(--a-primary);
+  --red: var(--a-danger);
+  --danger: var(--a-danger);
+  --danger-bg: var(--a-danger-soft);
+  --moss: var(--a-primary);
+  --moss-ink: #ffffff;
+  --head: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  grid-template-columns: 232px minmax(0, 1fr);
+  background: var(--a-bg);
+  color: var(--a-text);
+  font-family: var(--body);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  font-feature-settings: "cv11", "ss01";
+}
+.adm h1,
+.adm h2,
+.adm h3,
+.adm h4 {
+  font-family: var(--head);
+  letter-spacing: -0.015em;
+  color: var(--a-text);
+}
+.adm .muted,
+.adm .note {
+  color: var(--a-text-3);
+}
+
+/* ------------------------------ Sidebar ------------------------------ */
+.adm .adm-side {
+  background: var(--a-surface);
+  border-right: 1px solid var(--a-border);
+  padding: 14px 10px;
+  gap: 2px;
+}
+.adm .adm-side-brand {
+  padding: 4px 8px 14px;
+  margin-bottom: 4px;
+  border-bottom: 0;
+}
+.adm .adm-version-tag {
+  display: none;
+}
+.adm .adm-nav-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.adm .adm-nav-group {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--a-text-3);
+  padding: 16px 10px 6px;
+  letter-spacing: 0.02em;
+}
+.adm .adm-nav-group:first-child {
+  padding-top: 4px;
+}
+.adm .adm-nav-item {
+  height: 36px;
+  padding: 0 10px;
+  border-radius: 8px;
+  gap: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--a-text-2);
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+  line-height: 1.2;
+}
+.adm .adm-nav-item svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  color: var(--a-text-3);
+  stroke-width: 1.9;
+}
+.adm .adm-nav-item span:not(.adm-badge-count) {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.adm .adm-nav-item:hover {
+  background: var(--a-hover);
+  color: var(--a-text);
+  transform: none;
+}
+.adm .adm-nav-item.on {
+  background: var(--a-nav-active);
+  color: var(--a-primary-text);
+  font-weight: 600;
+  box-shadow: none;
+}
+.adm .adm-nav-item.on svg {
+  color: var(--a-primary-text);
+  stroke: currentColor;
+}
+.adm .adm-nav-item svg {
+  stroke: currentColor;
+}
+.adm .adm-badge-count {
+  margin-left: auto;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 10px;
+  background: var(--a-primary);
+  color: #fff;
+  font-size: 11.5px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: none;
+  animation: none;
+}
+.adm .adm-side-footer {
+  border-top: 1px solid var(--a-border);
+  padding-top: 8px;
+  gap: 1px;
+}
+.adm .adm-side-link {
+  height: 34px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--a-text-2);
+}
+.adm .adm-side-link:hover {
+  background: var(--a-hover);
+  color: var(--a-text);
+}
+.adm .adm-side-link.btn-logout:hover {
+  background: var(--a-danger-soft);
+  color: var(--a-danger);
+}
+
+/* ------------------------------ Topbar ------------------------------- */
+.adm .adm-topbar {
+  height: 56px;
+  padding: 0 28px;
+  background: var(--a-surface);
+  border-bottom: 1px solid var(--a-border);
+}
+.adm .adm-page-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--a-text);
+}
+.adm .adm-topbar-right {
+  gap: 10px;
+}
+.adm .adm-lang-picker {
+  background: var(--a-surface-2);
+  border: 1px solid var(--a-border);
+  border-radius: 8px;
+  padding: 2px;
+  gap: 2px;
+}
+.adm .adm-lang-picker .lang-btn {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--a-text-3);
+  background: transparent;
+  box-shadow: none;
+}
+.adm .adm-lang-picker .lang-btn.active {
+  background: var(--a-surface);
+  color: var(--a-text);
+  box-shadow: 0 0 0 1px var(--a-border);
+}
+.adm .adm-user-profile-chip {
+  background: transparent;
+  border: 1px solid var(--a-border);
+  border-radius: 10px;
+  padding: 4px 10px 4px 4px;
+  box-shadow: none;
+}
+.adm .adm-user-profile-chip:hover {
+  background: var(--a-hover);
+}
+.adm .user-avatar-dot {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  background: var(--a-primary-soft);
+  color: var(--a-primary-text);
+  font-weight: 600;
+}
+.adm .user-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--a-text);
+}
+.adm .user-role-badge {
+  font-size: 11.5px;
+  color: var(--a-text-3);
+  background: none;
+  padding: 0;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+/* ------------------------------ Content ------------------------------ */
+.adm .adm-content-body {
+  padding: 24px 32px 64px;
+  background: var(--a-bg);
+}
+.adm .adm-content-body > * {
+  max-width: 1440px;
+}
+.adm .adm-content-body > h1,
+.adm .adm-content-body h1 {
+  font-size: 22px;
+  font-weight: 650;
+  line-height: 1.25;
+  margin: 0 0 18px;
+}
+.adm .adm-content-body h2 {
+  font-size: 18px;
+  font-weight: 600;
+}
+.adm .adm-content-body h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* ------------------------------ Buttons ------------------------------ */
+.adm .btn,
+.adm .adm-btn-primary,
+.adm .btn-erp-primary {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: var(--a-primary);
+  color: #fff;
+  font: 500 14px var(--body);
+  gap: 7px;
+  box-shadow: none;
+  transform: none;
+  filter: none;
+  white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.adm .btn:hover,
+.adm .adm-btn-primary:hover,
+.adm .btn-erp-primary:hover {
+  background: var(--a-primary-hover);
+  transform: none;
+  box-shadow: none;
+  filter: none;
+}
+.adm .btn::after {
+  display: none;
+}
+.adm .btn.ghost,
+.adm .btn-erp-secondary {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 8px;
+  background: var(--a-surface);
+  color: var(--a-text);
+  border: 1px solid var(--a-border-strong);
+  font: 500 14px var(--body);
+  box-shadow: var(--a-shadow);
+  transform: none;
+}
+.adm .btn.ghost:hover,
+.adm .btn-erp-secondary:hover {
+  background: var(--a-hover);
+  border-color: var(--a-border-strong);
+  transform: none;
+}
+.adm .btn.sm {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+  border-radius: 7px;
+}
+.adm .btn.danger {
+  background: var(--a-danger-soft);
+  color: var(--a-danger);
+  border-color: transparent;
+}
+.adm .btn.danger:hover {
+  background: var(--a-danger);
+  color: #fff;
+}
+.adm .btn:disabled {
+  opacity: 0.5;
+}
+.adm .btn-link {
+  color: var(--a-primary-text);
+  font-weight: 500;
+}
+
+/* ------------------------------ Forms -------------------------------- */
+.adm .field {
+  gap: 6px;
+  margin-bottom: 14px;
+}
+.adm .field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--a-text-2);
+}
+.adm input[type="text"],
+.adm input[type="search"],
+.adm input[type="email"],
+.adm input[type="password"],
+.adm input[type="tel"],
+.adm input[type="number"],
+.adm input[type="date"],
+.adm select,
+.adm textarea {
+  font: 400 14px var(--body);
+  color: var(--a-text);
+  background: var(--a-surface);
+  border: 1px solid var(--a-border-strong);
+  border-radius: 8px;
+  padding: 0 12px;
+  min-height: 38px;
+  box-shadow: none;
+}
+.adm textarea {
+  padding: 10px 12px;
+  min-height: 96px;
+}
+.adm input::placeholder,
+.adm textarea::placeholder {
+  color: var(--a-text-3);
+  opacity: 1;
+}
+.adm input:focus,
+.adm select:focus,
+.adm textarea:focus {
+  outline: none;
+  border-color: var(--a-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--a-primary) 22%, transparent);
+}
+.adm input[type="checkbox"] {
+  accent-color: var(--a-primary);
+  width: 16px;
+  height: 16px;
+}
+.adm .err {
+  background: var(--a-danger-soft);
+  color: var(--a-danger);
+  border: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 13.5px;
+}
+.adm .ok {
+  color: var(--a-success);
+}
+
+/* ------------------------------ Tabs / filters ----------------------- */
+.adm .tab {
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid var(--a-border);
+  background: var(--a-surface);
+  color: var(--a-text-2);
+  font: 500 13px var(--body);
+  box-shadow: none;
+}
+.adm .tab:hover {
+  background: var(--a-hover);
+  color: var(--a-text);
+  border-color: var(--a-border-strong);
+}
+.adm .tab[aria-selected="true"] {
+  background: var(--a-text);
+  color: var(--a-surface);
+  border-color: var(--a-text);
+  box-shadow: none;
+}
+
+/* ERP ichki tablari: tagiga chiziq */
+.adm .erp-nav-tabs {
+  gap: 2px;
+  border-bottom: 1px solid var(--a-border);
+  background: none;
+  padding: 0;
+  border-radius: 0;
+}
+.adm .erp-tab-btn {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: none;
+  color: var(--a-text-3);
+  font: 500 13.5px var(--body);
+  box-shadow: none;
+}
+.adm .erp-tab-btn:hover {
+  color: var(--a-text);
+  background: none;
+}
+.adm .erp-tab-btn.active {
+  color: var(--a-text);
+  border-bottom-color: var(--a-primary);
+  background: none;
+  box-shadow: none;
+}
+.adm .erp-tab-badge {
+  background: var(--a-warn-soft);
+  color: var(--a-warn);
+}
+
+/* ------------------------------ Cards -------------------------------- */
+.adm .adm-panel-card,
+.adm .erp-card-table,
+.adm .erp-reports-box,
+.adm .box {
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  box-shadow: var(--a-shadow);
+}
+.adm .adm-panel-card {
+  padding: 0;
+  overflow: hidden;
+}
+.adm .adm-panel-head {
+  padding: 14px 16px;
+  margin: 0;
+  border-bottom: 1px solid var(--a-border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.adm .adm-panel-head h3 {
+  margin: 0;
+}
+.adm .adm-link-more {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--a-primary-text);
+}
+
+/* KPI kartalari (bosh sahifa va ERP) */
+.adm .adm-kpi-card,
+.adm .erp-kpi-card {
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  box-shadow: var(--a-shadow);
+  transform: none;
+}
+.adm .adm-kpi-card:hover {
+  border-color: var(--a-border-strong);
+  transform: none;
+  box-shadow: var(--a-shadow);
+}
+.adm .erp-kpi-label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--a-text-3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+.adm .erp-kpi-value {
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+.adm .erp-kpi-sub {
+  font-size: 12.5px;
+  color: var(--a-text-3);
+}
+
+/* ERP modul kartalari */
+.adm .erp-module-box {
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  box-shadow: var(--a-shadow);
+  transform: none;
+}
+.adm .erp-module-box:hover {
+  border-color: var(--a-primary);
+  transform: none;
+  box-shadow: var(--a-shadow);
+}
+.adm .erp-mod-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--a-primary-soft) !important;
+  color: var(--a-primary-text) !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0;
+}
+.adm .erp-mod-text strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+.adm .erp-mod-text small,
+.adm .erp-mod-text p {
+  color: var(--a-text-3);
+}
+.adm .erp-alert-icon {
+  color: var(--a-warn);
+  display: inline-flex;
+}
+
+/* ------------------------------ Tables ------------------------------- */
+.adm .tbl-wrap {
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  box-shadow: var(--a-shadow);
+}
+.adm .tbl th,
+.adm .erp-table th {
+  font: 500 12.5px var(--body);
+  color: var(--a-text-3);
+  background: var(--a-surface-2);
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--a-border);
+  text-transform: none;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+.adm .tbl td,
+.adm .erp-table td {
+  font-size: 13.5px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--a-border);
+  color: var(--a-text);
+  white-space: nowrap;
+  max-width: 340px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-variant-numeric: tabular-nums;
+}
+.adm .tbl tr:hover td,
+.adm .erp-table tbody tr:hover td {
+  background: var(--a-hover);
+}
+.adm .tbl tr:last-child td {
+  border-bottom: 0;
+}
+.adm .tbl td img {
+  border-radius: 8px;
+}
+
+/* Holat belgilari */
+.adm .st {
+  display: inline-flex;
+  align-items: center;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.adm .st.NEW { background: var(--a-warn-soft); color: var(--a-warn); }
+.adm .st.CONFIRMED { background: var(--a-info-soft); color: var(--a-info); }
+.adm .st.READY { background: var(--a-success-soft); color: var(--a-success); }
+.adm .st.DONE { background: var(--a-hover); color: var(--a-text-2); }
+.adm .st.CANCELED { background: var(--a-danger-soft); color: var(--a-danger); }
+.adm .st.FAKE { background: var(--a-danger-soft); color: var(--a-danger); }
+
+/* ------------------------------ Modals ------------------------------- */
+.adm .erp-modal-overlay,
+.adm .modal-overlay {
+  background: var(--a-overlay);
+  backdrop-filter: none;
+}
+.adm .modal {
+  background: var(--a-overlay);
+  border: 0;
+  box-shadow: none;
+}
+.adm .modal > .box {
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+}
+.adm .modal > .box h2 {
+  font-size: 20px !important;
+  font-weight: 650;
+}
+.adm .erp-modal-window {
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.25);
+}
+.adm .erp-modal-header {
+  border-bottom: 1px solid var(--a-border);
+}
+.adm .erp-modal-footer {
+  border-top: 1px solid var(--a-border);
+  background: var(--a-surface-2);
+}
+
+/* ------------------------------ Dashboard ---------------------------- */
+.adm .dash-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.adm .dash-head h1 {
+  margin: 0;
+}
+.adm .dash-date {
+  font-size: 13.5px;
+  color: var(--a-text-3);
+  margin-top: 4px;
+}
+.adm .dash-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.adm .dash-kpi {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  box-shadow: var(--a-shadow);
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+a.dash-kpi:hover {
+  border-color: var(--a-border-strong);
+}
+.adm .dash-kpi-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--a-text-2);
+}
+.adm .dash-kpi-label svg {
+  color: var(--a-text-3);
+}
+.adm .dash-kpi-value {
+  font-size: 28px;
+  font-weight: 650;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.adm .dash-kpi-foot {
+  font-size: 12.5px;
+  color: var(--a-text-3);
+}
+.adm .dash-kpi.attention .dash-kpi-value {
+  color: var(--a-warn);
+}
+.adm .dash-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  background: var(--a-surface);
+  border: 1px solid var(--a-border);
+  border-radius: 12px;
+  margin-bottom: 20px;
+  box-shadow: var(--a-shadow);
+}
+.adm .dash-strip > * {
+  padding: 12px 16px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+  font-size: 13px;
+  color: var(--a-text-2);
+  border-left: 1px solid var(--a-border);
+}
+.adm .dash-strip > *:first-child {
+  border-left: 0;
+}
+.adm .dash-strip b {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--a-text);
+  font-variant-numeric: tabular-nums;
+}
+.adm a.dash-strip-item:hover {
+  background: var(--a-hover);
+}
+.adm .dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.adm .dash-list {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+.adm .dash-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 13.5px;
+}
+.adm .dash-list li + li {
+  border-top: 1px solid var(--a-border);
+}
+.adm .dash-list .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.adm .dash-stock {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.adm .dash-stock.zero {
+  color: var(--a-danger);
+}
+.adm .dash-stock.low {
+  color: var(--a-warn);
+}
+.adm .dash-empty {
+  padding: 28px 16px;
+  text-align: center;
+  color: var(--a-text-3);
+  font-size: 13.5px;
+}
+.adm .order-code-link {
+  font-weight: 600;
+  color: var(--a-primary-text);
+  text-decoration: none;
+}
+
+/* Kichik ekranlar */
+@media (max-width: 1100px) {
+  .adm .dash-kpis,
+  .adm .dash-strip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .adm .dash-strip > *:nth-child(3) {
+    border-left: 0;
+  }
+  .adm .dash-strip > *:nth-child(n + 3) {
+    border-top: 1px solid var(--a-border);
+  }
+  .adm .dash-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Ingichka scrollbar */
+.adm ::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.adm ::-webkit-scrollbar-thumb {
+  background: var(--a-border-strong);
+  border-radius: 10px;
+  border: 3px solid var(--a-bg);
+}
+.adm ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Chop etish: admin bezaklari aralashmasin */
+@media print {
+  .adm .adm-side,
+  .adm .adm-topbar {
+    display: none !important;
+  }
+}
+
+/* ERP sarlavhasi */
+.adm .erp-badge-pill {
+  display: none;
+}
+.adm .erp-main-title {
+  font-size: 22px !important;
+  font-weight: 650 !important;
+  letter-spacing: -0.015em;
+}
+.adm .erp-section-head h3 {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.adm .erp-btn-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  border: 1px solid var(--a-border);
+  background: var(--a-surface);
+  color: var(--a-text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.adm .erp-btn-icon:hover {
+  background: var(--a-hover);
+  color: var(--a-text);
+}

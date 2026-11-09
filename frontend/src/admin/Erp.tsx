@@ -8,7 +8,7 @@ import { numberToWordsUz, numberToWordsRu } from "./numberToWords";
 /* -------------------------------------------------------------------------- */
 function formatMoney(n: number | string | null | undefined): string {
   if (n === null || n === undefined || isNaN(Number(n))) return "0";
-  return Number(n).toLocaleString("uz-UZ");
+  return Number(n).toLocaleString("ru-RU").replace(/,/g, " ");
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -504,7 +504,7 @@ export default function Erp() {
       <div className="erp-top-header">
         <div className="erp-header-left">
           <div className="erp-badge-pill">1C: Enterprise & ERP</div>
-          <h1 className="erp-main-title">Ombor, Savdo va Buxgalteriya hisobi</h1>
+          <h1 className="erp-main-title">Ombor va buxgalteriya</h1>
           <p className="erp-subtitle">Tovarlar kirim-chiqimi, partiyalar, yaroqlilik muddati, kassa va o'zaro hisob-kitoblar</p>
         </div>
         <div className="erp-header-actions">
@@ -520,7 +520,7 @@ export default function Erp() {
               <line x1="12" y1="5" x2="12" y2="19" />
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            <span>+ Tovar Kirim qilish (Приход)</span>
+            <span>Tovar kirimi</span>
           </button>
           <button
             type="button"
@@ -533,7 +533,7 @@ export default function Erp() {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
-            <span>- Tovar Chiqim / Sotuv (Расход)</span>
+            <span>Tovar chiqimi / sotuv</span>
           </button>
         </div>
       </div>
@@ -551,7 +551,7 @@ export default function Erp() {
             <rect x="14" y="14" width="7" height="7" rx="1.5" />
             <rect x="3" y="14" width="7" height="7" rx="1.5" />
           </svg>
-          <span>Monitor (Рабочий стол)</span>
+          <span>Umumiy holat</span>
         </button>
 
         <button
@@ -564,7 +564,7 @@ export default function Erp() {
             <polyline points="3.27 6.96 12 12.01 20.73 6.96" />
             <line x1="12" y1="22.08" x2="12" y2="12" />
           </svg>
-          <span>Tovarlar & Qoldiqlar (Товары)</span>
+          <span>Tovarlar va qoldiqlar</span>
           {alerts.lowStock.length > 0 && (
             <span className="erp-tab-badge amber">{alerts.lowStock.length}</span>
           )}
@@ -581,7 +581,7 @@ export default function Erp() {
             <line x1="16" y1="13" x2="8" y2="13" />
             <line x1="16" y1="17" x2="8" y2="17" />
           </svg>
-          <span>Hujjatlar (Документы)</span>
+          <span>Hujjatlar</span>
         </button>
 
         <button
@@ -594,7 +594,7 @@ export default function Erp() {
             <circle cx="12" cy="12" r="2" />
             <path d="M6 12h.01M18 12h.01" />
           </svg>
-          <span>Kassa & Moliya (Касса)</span>
+          <span>Kassa</span>
         </button>
 
         <button
@@ -608,7 +608,7 @@ export default function Erp() {
             <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
-          <span>Kontragentlar (Поставщики / Клиенты)</span>
+          <span>Kontragentlar</span>
         </button>
 
         <button
@@ -621,7 +621,7 @@ export default function Erp() {
             <line x1="12" y1="20" x2="12" y2="4" />
             <line x1="6" y1="20" x2="6" y2="14" />
           </svg>
-          <span>Hisobotlar & Sverka (Отчеты)</span>
+          <span>Hisobotlar</span>
         </button>
       </div>
 
@@ -634,7 +634,7 @@ export default function Erp() {
           <div className="erp-alert-row">
             {alerts.lowStock.length > 0 && (
               <div className="erp-alert-card warning" onClick={() => setShowLowStockModal(true)}>
-                <div className="erp-alert-icon">⚠️</div>
+                <div className="erp-alert-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></svg></div>
                 <div className="erp-alert-info">
                   <strong>{alerts.lowStock.length} ta tovar tugab qolmoqda</strong>
                   <p>Minimal qoldiq me'yoridan kam qolgan tovarlarni ko'rish va buyurtma berish</p>
@@ -682,7 +682,7 @@ export default function Erp() {
             </div>
 
             <div className="erp-kpi-card debt">
-              <span className="erp-kpi-label">Mijozlar qarzdorligi (Дебиторка)</span>
+              <span className="erp-kpi-label">Mijozlar qarzdorligi</span>
               <div className="erp-kpi-value">{formatMoney(overview?.customerDebt)} <small>so'm</small></div>
               <div className="erp-kpi-sub">
                 Ta'minotchilardan qarzimiz: <strong>{formatMoney(overview?.supplierDebt)} so'm</strong>
@@ -692,7 +692,7 @@ export default function Erp() {
 
           {/* Quick Shortcuts & 1C Navigation Modules */}
           <div className="erp-section-head">
-            <h3>Tezkor Amallar va Boshqaruv modullari</h3>
+            <h3>Amallar</h3>
           </div>
           <div className="erp-modules-grid">
             <div
@@ -702,9 +702,9 @@ export default function Erp() {
                 setShowCreateDocModal(true);
               }}
             >
-              <div className="erp-mod-icon incoming">📥</div>
+              <div className="erp-mod-icon incoming"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="M7 10l5 5 5-5" /><path d="M4 17v3h16v-3" /></svg></div>
               <div className="erp-mod-text">
-                <strong>Приход товар (Kirim)</strong>
+                <strong>Tovar kirimi</strong>
                 <span>Yetkazib beruvchidan tovar qabul qilish va omborga kiritish</span>
               </div>
             </div>
@@ -716,9 +716,9 @@ export default function Erp() {
                 setShowCreateDocModal(true);
               }}
             >
-              <div className="erp-mod-icon outgoing">📤</div>
+              <div className="erp-mod-icon outgoing"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 15V3" /><path d="M7 8l5-5 5 5" /><path d="M4 17v3h16v-3" /></svg></div>
               <div className="erp-mod-text">
-                <strong>Расход товар (Chiqim / Sotuv)</strong>
+                <strong>Tovar chiqimi / sotuv</strong>
                 <span>Klinika va dorixonalarga tovar sotish yoki chiqarish</span>
               </div>
             </div>
@@ -730,9 +730,9 @@ export default function Erp() {
                 setShowCashModal(true);
               }}
             >
-              <div className="erp-mod-icon cash-in">💵</div>
+              <div className="erp-mod-icon cash-in"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2" /><circle cx="12" cy="12" r="2.5" /><path d="M6 12h.01M18 12h.01" /></svg></div>
               <div className="erp-mod-text">
-                <strong>Кассовый ордер (Kirim)</strong>
+                <strong>Kassa kirim orderi</strong>
                 <span>Mijozlardan qarz yoki sotuv tushumini qabul qilish</span>
               </div>
             </div>
@@ -744,25 +744,25 @@ export default function Erp() {
                 setShowCashModal(true);
               }}
             >
-              <div className="erp-mod-icon cash-out">💸</div>
+              <div className="erp-mod-icon cash-out"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2" /><path d="M9 12h6" /></svg></div>
               <div className="erp-mod-text">
-                <strong>Кассовый ордер (Chiqim)</strong>
+                <strong>Kassa chiqim orderi</strong>
                 <span>Ta'minotchi to'lovi, ijara yoki transport xarajatlari</span>
               </div>
             </div>
 
             <div className="erp-module-box" onClick={() => setActiveTab("reports")}>
-              <div className="erp-mod-icon report">📑</div>
+              <div className="erp-mod-icon report"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><path d="M14 3v6h6M8 13h8M8 17h5" /></svg></div>
               <div className="erp-mod-text">
-                <strong>Акт сверки (Sverka)</strong>
+                <strong>Solishtirma dalolatnoma</strong>
                 <span>Mijoz yoki yetkazib beruvchi bilan solishtirma dalolatnoma</span>
               </div>
             </div>
 
             <div className="erp-module-box" onClick={() => setActiveTab("inventory")}>
-              <div className="erp-mod-icon stock">📊</div>
+              <div className="erp-mod-icon stock"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></svg></div>
               <div className="erp-mod-text">
-                <strong>Товарный остаток (Qoldiqlar)</strong>
+                <strong>Tovar qoldiqlari</strong>
                 <span>1C uslubidagi to'liq narx va muddatlar jadvali</span>
               </div>
             </div>
@@ -770,9 +770,9 @@ export default function Erp() {
 
           {/* Recent Operations Table */}
           <div className="erp-section-head space-between" style={{ marginTop: 32 }}>
-            <h3>Oxirgi bajarilgan operatsiyalar (Hujjatlar)</h3>
+            <h3>So'nggi hujjatlar</h3>
             <button type="button" className="btn-link" onClick={() => setActiveTab("documents")}>
-              Barchasini ko'rish →
+              Barchasi
             </button>
           </div>
           <div className="erp-card-table">
@@ -795,7 +795,7 @@ export default function Erp() {
                       <td><strong>#{d.docNumber}</strong></td>
                       <td>
                         <span className={`erp-doc-pill ${d.type}`}>
-                          {d.type === "INCOME" ? "Приход (Kirim)" : d.type === "OUTCOME" ? "Расход (Sotuv)" : d.type}
+                          {d.type === "INCOME" ? "Kirim" : d.type === "OUTCOME" ? "Sotuv" : d.type === "WRITE_OFF" ? "Hisobdan chiqarish" : d.type === "RETURN_CUSTOMER" ? "Mijozdan qaytim" : d.type === "RETURN_SUPPLIER" ? "Ta'minotchiga qaytim" : d.type === "TRANSFER" ? "Ko'chirish" : d.type}
                         </span>
                       </td>
                       <td>{formatDate(d.date)}</td>
@@ -869,7 +869,7 @@ export default function Erp() {
                   setShowCreateDocModal(true);
                 }}
               >
-                + Kirim (Приход)
+                Kirim
               </button>
               <button
                 type="button"
@@ -877,14 +877,14 @@ export default function Erp() {
                 disabled={exportingExcel}
                 onClick={() => handleExport("/admin/erp/export/inventory", `medax-ombor-qoldiqlari-${new Date().toISOString().slice(0, 10)}.xlsx`)}
               >
-                📥 {exportingExcel ? "Yuklanmoqda..." : "Excel (.xlsx)"}
+                {exportingExcel ? "Yuklanmoqda..." : "Excel (.xlsx)"}
               </button>
               <button
                 type="button"
                 className="btn btn-erp-secondary"
                 onClick={() => window.print()}
               >
-                🖨️ Chop etish
+                Chop etish
               </button>
             </div>
           </div>
@@ -948,9 +948,10 @@ export default function Erp() {
                             type="button"
                             className="erp-btn-icon"
                             title="Tezkor tahrirlash"
+                            aria-label="Tezkor tahrirlash"
                             onClick={() => setEditingProduct(p)}
                           >
-                            ✏️
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
                           </button>
                           <button
                             type="button"
@@ -958,8 +959,9 @@ export default function Erp() {
                             title="Tsennik & Shtrix-kod chop etish"
                             onClick={() => setPriceTagProduct(p)}
                             style={{ marginLeft: 4 }}
+                            aria-label="Narx yorlig'ini chop etish"
                           >
-                            🏷️
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L2 12V2h10l8.6 8.6a2 2 0 0 1 0 2.8z" /><circle cx="7" cy="7" r="1.5" /></svg>
                           </button>
                         </td>
                       </tr>
@@ -995,28 +997,28 @@ export default function Erp() {
                 className={`erp-chip success ${docTypeFilter === "INCOME" ? "active" : ""}`}
                 onClick={() => setDocTypeFilter("INCOME")}
               >
-                📥 Kirim (Приход)
+                Kirim
               </button>
               <button
                 type="button"
                 className={`erp-chip ${docTypeFilter === "OUTCOME" ? "active" : ""}`}
                 onClick={() => setDocTypeFilter("OUTCOME")}
               >
-                📤 Chiqim / Sotuv (Расход)
+                Chiqim / sotuv
               </button>
               <button
                 type="button"
                 className={`erp-chip warning ${docTypeFilter === "TRANSFER" ? "active" : ""}`}
                 onClick={() => setDocTypeFilter("TRANSFER")}
               >
-                🔄 Ko'chirish (Перемещение)
+                Ko'chirish
               </button>
               <button
                 type="button"
                 className={`erp-chip danger ${docTypeFilter === "WRITE_OFF" ? "active" : ""}`}
                 onClick={() => setDocTypeFilter("WRITE_OFF")}
               >
-                🗑️ Списание
+                Hisobdan chiqarish
               </button>
             </div>
 
@@ -1028,7 +1030,7 @@ export default function Erp() {
                 setShowCreateDocModal(true);
               }}
             >
-              + Yangi Hujjat Rasmiylashtirish
+              Yangi hujjat
             </button>
           </div>
 
@@ -1059,11 +1061,11 @@ export default function Erp() {
                       <td>
                         <span className={`erp-doc-pill ${d.type}`}>
                           {d.type === "INCOME"
-                            ? "Приход (Kirim)"
+                            ? "Kirim"
                             : d.type === "OUTCOME"
-                            ? "Расход (Sotuv)"
+                            ? "Sotuv"
                             : d.type === "TRANSFER"
-                            ? "Перемещение"
+                            ? "Ko'chirish"
                             : d.type}
                         </span>
                       </td>
@@ -1094,7 +1096,7 @@ export default function Erp() {
                               setDocPrintFormat("nakladnaya");
                             }}
                           >
-                            🖨️ Nakladnaya
+                            Nakladnoy
                           </button>
                         </div>
                       </td>
@@ -1141,7 +1143,7 @@ export default function Erp() {
                   setShowCashModal(true);
                 }}
               >
-                + Kirim Kassa Orderi (ПКО)
+                Kassa kirim orderi
               </button>
               <button
                 type="button"
@@ -1151,7 +1153,7 @@ export default function Erp() {
                   setShowCashModal(true);
                 }}
               >
-                - Chiqim Kassa Orderi (РКО)
+                Kassa chiqim orderi
               </button>
               <button
                 type="button"
@@ -1159,7 +1161,7 @@ export default function Erp() {
                 disabled={exportingExcel}
                 onClick={() => handleExport("/admin/erp/export/cash", `medax-kassa-kitobi-${new Date().toISOString().slice(0, 10)}.xlsx`)}
               >
-                📥 {exportingExcel ? "Yuklanmoqda..." : "Kassa kitobi Excel (.xlsx)"}
+                {exportingExcel ? "Yuklanmoqda..." : "Kassa kitobi Excel (.xlsx)"}
               </button>
             </div>
           </div>
@@ -1190,7 +1192,7 @@ export default function Erp() {
                       <td><strong>#{c.entryNumber}</strong></td>
                       <td>
                         <span className={`erp-doc-pill ${c.type}`}>
-                          {c.type === "INCOME" ? "+ Kirim (ПКО)" : "- Chiqim (РКО)"}
+                          {c.type === "INCOME" ? "Kirim" : "Chiqim"}
                         </span>
                       </td>
                       <td>{formatDate(c.date)}</td>
@@ -1215,7 +1217,7 @@ export default function Erp() {
                           title="Kassa orderi kvitansiyasini chop etish"
                           onClick={() => setSelectedCashReceipt(c)}
                         >
-                          🖨️ Kvitansiya
+                          Kvitansiya
                         </button>
                       </td>
                     </tr>
@@ -1238,7 +1240,7 @@ export default function Erp() {
         <div className="erp-view-content">
           <div className="erp-section-head space-between">
             <div>
-              <h3>Yetkazib beruvchilar (Поставщики)</h3>
+              <h3>Yetkazib beruvchilar</h3>
               <p className="erp-sub">Tibbiy apparatlar va reaktivlar yetkazib beruvchi ta'minotchilar ro'yxati va qarzlar</p>
             </div>
             <button
@@ -1246,7 +1248,7 @@ export default function Erp() {
               className="btn btn-erp-primary"
               onClick={() => setShowSupplierModal(true)}
             >
-              + Yangi Yetkazib beruvchi
+              Yangi yetkazib beruvchi
             </button>
           </div>
 
@@ -1257,7 +1259,7 @@ export default function Erp() {
                   <th>Nomi / Firma</th>
                   <th>Kompaniya</th>
                   <th>Telefon</th>
-                  <th>STIR (ИНН)</th>
+                  <th>STIR</th>
                   <th>Yetkazilgan tovarlar</th>
                   <th>Bizning qarzimiz (Kreditorka)</th>
                   <th>Amallar</th>
@@ -1307,7 +1309,7 @@ export default function Erp() {
 
           {/* Customers & Clinics Balances */}
           <div className="erp-section-head">
-            <h3>Mijozlar & Klinikalar qarzdorligi (Дебиторка)</h3>
+            <h3>Mijozlar va klinikalar qarzdorligi</h3>
             <p className="erp-sub">Xarid qilgan klinikalar, dorixonalar va ularning qarz-haqlari</p>
           </div>
           <div className="erp-card-table">
@@ -1367,7 +1369,7 @@ export default function Erp() {
           {/* Sub-tabs for Reports */}
           <div className="erp-reports-box">
             <div className="erp-report-header">
-              <h3>📑 Акт сверки взаиморасчетов (Solishtirma dalolatnoma)</h3>
+              <h3>Solishtirma dalolatnoma (akt sverki)</h3>
               <p>Mijoz yoki yetkazib beruvchi bilan barcha tovar yetkazib berish va to'lovlar tarixini solishtirish</p>
             </div>
 
@@ -1382,8 +1384,8 @@ export default function Erp() {
                     setSverkaData(null);
                   }}
                 >
-                  <option value="supplier">Yetkazib beruvchi (Поставщик)</option>
-                  <option value="customer">Mijoz / Klinika (Клиент)</option>
+                  <option value="supplier">Yetkazib beruvchi</option>
+                  <option value="customer">Mijoz / klinika</option>
                 </select>
               </div>
 
@@ -1410,7 +1412,7 @@ export default function Erp() {
                 onClick={loadSverka}
                 disabled={!sverkaEntityId || loadingSverka}
               >
-                {loadingSverka ? "Shakllantirilmoqda…" : "Shakllantirish (Сформировать)"}
+                {loadingSverka ? "Shakllantirilmoqda…" : "Shakllantirish"}
               </button>
 
               {sverkaData && (
@@ -1421,14 +1423,14 @@ export default function Erp() {
                     disabled={exportingExcel}
                     onClick={() => handleExport(`/admin/erp/export/act-sverka?type=${sverkaEntityType}&id=${sverkaEntityId}`, `medax-akt-sverka-${new Date().toISOString().slice(0, 10)}.xlsx`)}
                   >
-                    📥 Sverka Excel (.xlsx)
+                    Excel (.xlsx)
                   </button>
                   <button
                     type="button"
                     className="btn btn-erp-secondary"
                     onClick={() => window.print()}
                   >
-                    🖨️ A4 Shaklda Chop etish
+                    A4 chop etish
                   </button>
                 </>
               )}
@@ -1494,7 +1496,7 @@ export default function Erp() {
           <div className="erp-reports-box" style={{ marginTop: 32 }}>
             <div className="erp-report-header space-between">
               <div>
-                <h3>📊 Товарная оборотка (Tovar oborotkasi)</h3>
+                <h3>Tovar aylanmasi (oborotka)</h3>
                 <p>Tanlangan davr bo'yicha tovarlar harakati: Boshlang'ich qoldiq, Kirim, Chiqim va Yakuniy qoldiq</p>
               </div>
               <div style={{ display: "flex", gap: 10 }}>
@@ -1504,7 +1506,7 @@ export default function Erp() {
                   disabled={exportingExcel}
                   onClick={() => handleExport("/admin/erp/export/turnover", `medax-tovar-oborotkasi-${new Date().toISOString().slice(0, 10)}.xlsx`)}
                 >
-                  📥 {exportingExcel ? "Yuklanmoqda..." : "Oborotka Excel (.xlsx)"}
+                  {exportingExcel ? "Yuklanmoqda..." : "Oborotka Excel (.xlsx)"}
                 </button>
                 <button type="button" className="btn btn-erp-secondary" onClick={loadTurnover}>
                   Yangilash
@@ -1560,7 +1562,7 @@ export default function Erp() {
           <div className="erp-reports-box" style={{ marginTop: 32 }}>
             <div className="erp-report-header space-between">
               <div>
-                <h3>🏷️ Mijozlar va Klinikalar uchun Rasmiy Prays-list</h3>
+                <h3>Prays-list</h3>
                 <p>Barcha faol tibbiy asboblar va reaktivlarning rasmiy narxlari, artikul va mavjudlik holatini Excel formatida shakllantirish</p>
               </div>
               <button
@@ -1569,7 +1571,7 @@ export default function Erp() {
                 disabled={exportingExcel}
                 onClick={() => handleExport("/admin/erp/export/price-list", `medax-prays-list-${new Date().toISOString().slice(0, 10)}.xlsx`)}
               >
-                📥 {exportingExcel ? "Yuklanmoqda..." : "Prays-list Excel (.xlsx) yuklab olish"}
+                {exportingExcel ? "Yuklanmoqda..." : "Prays-list Excel (.xlsx) yuklab olish"}
               </button>
             </div>
           </div>
@@ -1585,10 +1587,10 @@ export default function Erp() {
             <div className="erp-modal-header">
               <h3>
                 {docForm.type === "INCOME"
-                  ? "📥 Yangi Tovar Kirimi (Приход)"
+                  ? "Yangi tovar kirimi"
                   : docForm.type === "OUTCOME"
-                  ? "📤 Yangi Tovar Chiqimi / Sotuv (Расход)"
-                  : "📑 Yangi Hujjat"}
+                  ? "Yangi tovar chiqimi / sotuv"
+                  : "Yangi hujjat"}
               </h3>
               <button type="button" className="erp-close-btn" onClick={() => setShowCreateDocModal(false)}>×</button>
             </div>
@@ -1602,18 +1604,18 @@ export default function Erp() {
                       value={docForm.type}
                       onChange={(e) => setDocForm({ ...docForm, type: e.target.value as any })}
                     >
-                      <option value="INCOME">Kirim (Приход товара)</option>
-                      <option value="OUTCOME">Chiqim / Sotuv (Расход товара)</option>
+                      <option value="INCOME">Kirim</option>
+                      <option value="OUTCOME">Chiqim / sotuv</option>
                       <option value="TRANSFER">Omborlararo ko'chirish</option>
-                      <option value="RETURN_CUSTOMER">Mijozdan qaytish (Возврат)</option>
+                      <option value="RETURN_CUSTOMER">Mijozdan qaytim</option>
                       <option value="RETURN_SUPPLIER">Ta'minotchiga qaytarish</option>
-                      <option value="WRITE_OFF">Списание (Hisobdan chiqarish)</option>
+                      <option value="WRITE_OFF">Hisobdan chiqarish</option>
                     </select>
                   </div>
 
                   {docForm.type === "INCOME" || docForm.type === "RETURN_SUPPLIER" ? (
                     <div className="field">
-                      <label>Yetkazib beruvchi (Поставщик):</label>
+                      <label>Yetkazib beruvchi:</label>
                       <select
                         value={docForm.supplierId}
                         onChange={(e) => setDocForm({ ...docForm, supplierId: Number(e.target.value) || "" })}
@@ -1832,7 +1834,7 @@ export default function Erp() {
                   Bekor qilish
                 </button>
                 <button type="submit" className="btn btn-erp-primary" disabled={docForm.items.length === 0}>
-                  ✓ Hujjatni saqlash va tasdiqlash
+                  Hujjatni saqlash
                 </button>
               </div>
             </form>
@@ -1918,7 +1920,7 @@ export default function Erp() {
                     />
                   </div>
                   <div className="field">
-                    <label>Yaroqlilik muddati (Срок):</label>
+                    <label>Yaroqlilik muddati:</label>
                     <input
                       type="text"
                       placeholder="e.g. 2026-12 yoki 12.2026"
@@ -1948,7 +1950,7 @@ export default function Erp() {
         <div className="erp-modal-overlay" onClick={() => setShowCashModal(false)}>
           <div className="erp-modal-window" onClick={(e) => e.stopPropagation()}>
             <div className="erp-modal-header">
-              <h3>{cashModalType === "INCOME" ? "💵 Kirim Kassa Orderi (ПКО)" : "💸 Chiqim Kassa Orderi (РКО)"}</h3>
+              <h3>{cashModalType === "INCOME" ? "Kassa kirim orderi" : "Kassa chiqim orderi"}</h3>
               <button type="button" className="erp-close-btn" onClick={() => setShowCashModal(false)}>×</button>
             </div>
             <form onSubmit={handleSaveCash}>
@@ -2069,7 +2071,7 @@ export default function Erp() {
                   <label>Yetkazib beruvchi ismi yoki vakili *:</label>
                   <input
                     type="text"
-                    placeholder="Masalan: Юсуфхон ака"
+                    placeholder="Masalan: Yusufxon aka"
                     value={newSupplier.name}
                     onChange={(e) => setNewSupplier({ ...newSupplier, name: e.target.value })}
                     required
@@ -2094,7 +2096,7 @@ export default function Erp() {
                   />
                 </div>
                 <div className="field">
-                  <label>STIR (ИНН):</label>
+                  <label>STIR:</label>
                   <input
                     type="text"
                     placeholder="9 xonali STIR raqami"
@@ -2140,14 +2142,14 @@ export default function Erp() {
                     className={`erp-chip ${docPrintFormat === "standard" ? "active" : ""}`}
                     onClick={() => setDocPrintFormat("standard")}
                   >
-                    📋 Oddiy ko'rinish
+                    Oddiy ko'rinish
                   </button>
                   <button
                     type="button"
                     className={`erp-chip success ${docPrintFormat === "nakladnaya" ? "active" : ""}`}
                     onClick={() => setDocPrintFormat("nakladnaya")}
                   >
-                    📄 Rasmiy Nakladnaya (A4)
+                    Nakladnoy (A4)
                   </button>
                 </div>
               </div>
@@ -2336,7 +2338,7 @@ export default function Erp() {
                   setTimeout(() => window.print(), 80);
                 }}
               >
-                🖨️ Nakladnoyni Chop etish (A4)
+                Nakladnoyni chop etish (A4)
               </button>
             </div>
           </div>
@@ -2423,7 +2425,7 @@ export default function Erp() {
                 Yopish
               </button>
               <button type="button" className="btn btn-erp-primary" onClick={() => window.print()}>
-                🖨️ Kvitansiyani Chop etish
+                Kvitansiyani Chop etish
               </button>
             </div>
           </div>
@@ -2437,7 +2439,7 @@ export default function Erp() {
         <div className="erp-modal-overlay" onClick={() => setPriceTagProduct(null)}>
           <div className="erp-modal-window" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
             <div className="erp-modal-header">
-              <h3>🏷️ Narx yorlig'i (Tsennik)</h3>
+              <h3>Narx yorlig'i</h3>
               <button type="button" className="erp-close-btn" onClick={() => setPriceTagProduct(null)}>×</button>
             </div>
             <div className="erp-modal-body" style={{ textAlign: "center" }}>
@@ -2517,7 +2519,7 @@ export default function Erp() {
                 Yopish
               </button>
               <button type="button" className="btn btn-erp-primary" onClick={() => window.print()}>
-                🖨️ Tsennikni Chop etish
+                Narx yorlig'ini chop etish
               </button>
             </div>
           </div>
@@ -2531,7 +2533,7 @@ export default function Erp() {
         <div className="erp-modal-overlay" onClick={() => setShowLowStockModal(false)}>
           <div className="erp-modal-window large" onClick={(e) => e.stopPropagation()}>
             <div className="erp-modal-header">
-              <h3>⚠️ Kam qolgan tovarlar ro'yxati (Минимал количество)</h3>
+              <h3>Kam qolgan tovarlar</h3>
               <button type="button" className="erp-close-btn" onClick={() => setShowLowStockModal(false)}>×</button>
             </div>
             <div className="erp-modal-body">
@@ -2574,7 +2576,7 @@ export default function Erp() {
         <div className="erp-modal-overlay" onClick={() => setShowExpiringModal(false)}>
           <div className="erp-modal-window large" onClick={(e) => e.stopPropagation()}>
             <div className="erp-modal-header">
-              <h3>⏳ Yaroqlilik muddati yaqin tovarlar (Срок товары)</h3>
+              <h3>Yaroqlilik muddati yaqin tovarlar</h3>
               <button type="button" className="erp-close-btn" onClick={() => setShowExpiringModal(false)}>×</button>
             </div>
             <div className="erp-modal-body">

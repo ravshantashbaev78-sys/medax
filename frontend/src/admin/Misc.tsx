@@ -151,7 +151,7 @@ export function Users() {
             {rows.map((u) => (
               <tr key={u.id}>
                 <td style={{ fontWeight: 600 }}>
-                  {u.name} {u.role === "OWNER" && "👑"}
+                  {u.name}
                 </td>
                 <td>{u.email}</td>
                 <td>

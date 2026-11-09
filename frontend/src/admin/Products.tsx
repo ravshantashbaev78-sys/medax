@@ -1190,8 +1190,7 @@ export function ProductForm() {
             }}
           >
             <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <span>🏢</span>
-              <span>1C Ombor & Buxgalteriya parametrlari (Tannarx, Natsenka, Partiya)</span>
+              <span>Ombor va buxgalteriya: tannarx, ustama, partiya</span>
             </span>
             <span style={{ fontSize: 13, color: "var(--ink2)" }}>
               {showErpDetails ? "▲ Yashirish" : "▼ Ko'rsatish"}

@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState, useRef } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { api, ApiError, getToken, setToken } from "../api";
 import { MedaxLogo } from "../components/MedaxLogo";
 import { AdminI18nProvider, useAdminI18n } from "./i18n";
 import { useTheme } from "../context/ThemeContext";
 import { LanguageSwitcher } from "../components/LanguageSwitcher";
 import { ThemeToggle } from "../components/ThemeToggle";
+import "./admin.css";
 
 export interface Me {
   id: number;
@@ -47,8 +48,29 @@ function playNotificationChime() {
   } catch {}
 }
 
+const NAV_GROUPS: Record<string, Record<string, string>> = {
+  sales: { uz: "Savdo", ru: "Продажи", en: "Sales" },
+  catalog: { uz: "Katalog", ru: "Каталог", en: "Catalog" },
+  stock: { uz: "Ombor", ru: "Склад", en: "Inventory" },
+  system: { uz: "Tizim", ru: "Система", en: "System" },
+};
+
+// Sarlavhada joriy bo'lim nomi (i18n kalitlari)
+const PAGE_TITLE_KEYS: [string, string][] = [
+  ["/admin/orders", "orders"],
+  ["/admin/customers", "customers_list"],
+  ["/admin/messages", "contact_inquiries"],
+  ["/admin/products", "products"],
+  ["/admin/taxonomy", "taxonomy"],
+  ["/admin/import", "import_excel"],
+  ["/admin/erp", "erp_title"],
+  ["/admin/blocklist", "blocklist"],
+  ["/admin/users", "users"],
+];
+
 function AdminLayoutInner() {
   const nav = useNavigate();
+  const location = useLocation();
   const { lang, setLang, t } = useAdminI18n();
   const { theme, toggleTheme } = useTheme();
   const [me, setMe] = useState<Me | null>(null);
@@ -126,6 +148,7 @@ function AdminLayoutInner() {
             <span>{t("dashboard")}</span>
           </NavLink>
 
+          <div className="adm-nav-group">{NAV_GROUPS.sales[lang] || NAV_GROUPS.sales.uz}</div>
           <NavLink to="/admin/orders" className={link}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z" />
@@ -135,7 +158,24 @@ function AdminLayoutInner() {
             <span>{t("orders")}</span>
             {newCount > 0 && <span className="adm-badge-count">{newCount}</span>}
           </NavLink>
+          <NavLink to="/admin/customers" className={link}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <span>{t("customers_list")}</span>
+          </NavLink>
+          <NavLink to="/admin/messages" className={link}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>{t("contact_inquiries")}</span>
+            {unreadMsg > 0 && <span className="adm-badge-count">{unreadMsg}</span>}
+          </NavLink>
 
+          <div className="adm-nav-group">{NAV_GROUPS.catalog[lang] || NAV_GROUPS.catalog.uz}</div>
           <NavLink to="/admin/products" className={link}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
@@ -144,7 +184,22 @@ function AdminLayoutInner() {
             </svg>
             <span>{t("products")}</span>
           </NavLink>
+          <NavLink to="/admin/taxonomy" className={link}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+            <span>{t("taxonomy")}</span>
+          </NavLink>
+          <NavLink to="/admin/import" className={link}>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            <span>{t("import_excel")}</span>
+          </NavLink>
 
+          <div className="adm-nav-group">{NAV_GROUPS.stock[lang] || NAV_GROUPS.stock.uz}</div>
           <NavLink to="/admin/erp" className={link}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <rect x="2" y="3" width="20" height="14" rx="2" />
@@ -156,40 +211,7 @@ function AdminLayoutInner() {
             <span>{t("erp_title")}</span>
           </NavLink>
 
-          <NavLink to="/admin/taxonomy" className={link}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-            </svg>
-            <span>{t("taxonomy")}</span>
-          </NavLink>
-
-          <NavLink to="/admin/customers" className={link}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-            <span>{t("customers_list")}</span>
-          </NavLink>
-
-          <NavLink to="/admin/messages" className={link}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            <span>{t("contact_inquiries")}</span>
-            {unreadMsg > 0 && <span className="adm-badge-count">{unreadMsg}</span>}
-          </NavLink>
-
-          <NavLink to="/admin/import" className={link}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            <span>{t("import_excel")}</span>
-          </NavLink>
-
+          <div className="adm-nav-group">{NAV_GROUPS.system[lang] || NAV_GROUPS.system.uz}</div>
           <NavLink to="/admin/blocklist" className={link}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <circle cx="12" cy="12" r="10" />
@@ -197,7 +219,6 @@ function AdminLayoutInner() {
             </svg>
             <span>{t("blocklist")}</span>
           </NavLink>
-
           {(me.role === "ADMIN" || me.role === "OWNER") && (
             <NavLink to="/admin/users" className={link}>
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -256,7 +277,9 @@ function AdminLayoutInner() {
       <div className="adm-main-wrap">
         <header className="adm-topbar">
           <div className="adm-topbar-left">
-            <span className="adm-page-title">{t("admin_panel")}</span>
+            <span className="adm-page-title">
+              {t((PAGE_TITLE_KEYS.find(([p]) => location.pathname.startsWith(p))?.[1] || "dashboard") as any)}
+            </span>
           </div>
 
           <div className="adm-topbar-right">
@@ -269,7 +292,7 @@ function AdminLayoutInner() {
                   className={`lang-btn ${lang === l ? "active" : ""}`}
                   onClick={() => setLang(l)}
                 >
-                  {l === "uz" ? "🇺🇿 UZ" : l === "ru" ? "🇷🇺 RU" : "🇬🇧 EN"}
+                  {l.toUpperCase()}
                 </button>
               ))}
             </div>
@@ -529,56 +552,63 @@ interface RecentOrder {
   phone: string;
   status: string;
   createdAt: string;
+  totalAmount?: string | number | null;
   items: { quantity: number; productName: string }[];
 }
 
+interface LowStockItem {
+  id: number;
+  name: string;
+  stock: number;
+  minStock: number;
+}
+
+const DASH_TEXT: Record<string, Record<string, string>> = {
+  newOrders: { uz: "Yangi buyurtmalar", ru: "Новые заказы", en: "New orders" },
+  newOrdersFoot: { uz: "Tasdiqlashni kutmoqda", ru: "Ожидают подтверждения", en: "Awaiting confirmation" },
+  inWork: { uz: "Jarayonda", ru: "В работе", en: "In progress" },
+  inWorkFoot: { uz: "Tasdiqlangan va tayyor", ru: "Подтверждены и готовы", en: "Confirmed and ready" },
+  last30: { uz: "30 kunda buyurtmalar", ru: "Заказы за 30 дней", en: "Orders, 30 days" },
+  fake: { uz: "soxta", ru: "фейк", en: "fake" },
+  products: { uz: "Mahsulotlar", ru: "Товары", en: "Products" },
+  productsFoot: { uz: "Katalogda jami", ru: "Всего в каталоге", en: "Total in catalog" },
+  customers: { uz: "Mijozlar", ru: "Клиенты", en: "Customers" },
+  inquiries: { uz: "O'qilmagan murojaatlar", ru: "Непрочитанные обращения", en: "Unread inquiries" },
+  blocked: { uz: "Bloklangan", ru: "Заблокировано", en: "Blocked" },
+  done: { uz: "Topshirilgan", ru: "Выдано", en: "Completed" },
+  lowStock: { uz: "Kam qolgan tovarlar", ru: "Заканчиваются", en: "Low stock" },
+  lowStockEmpty: { uz: "Barcha tovarlar yetarli", ru: "Остатков достаточно", en: "Stock levels are fine" },
+  warehouse: { uz: "Omborga o'tish", ru: "Перейти на склад", en: "Open inventory" },
+  pcs: { uz: "dona", ru: "шт.", en: "pcs" },
+  amount: { uz: "Summa", ru: "Сумма", en: "Amount" },
+  negotiable: { uz: "Kelishiladi", ru: "Договорная", en: "On request" },
+};
+
+function fmtMoney(v: RecentOrder["totalAmount"], neg: string) {
+  const n = Number(v);
+  if (!v || !Number.isFinite(n) || n <= 0) return neg;
+  return n.toLocaleString("ru-RU").replace(/,/g, " ") + " so'm";
+}
+
 export function Dashboard() {
-  const { t } = useAdminI18n();
+  const { t, lang } = useAdminI18n();
+  const d = (k: string) => DASH_TEXT[k]?.[lang] || DASH_TEXT[k]?.uz || k;
   const [s, setS] = useState<any>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+  const [lowStock, setLowStock] = useState<LowStockItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [healthStatus, setHealthStatus] = useState<{
-    server: boolean;
-    database: boolean;
-    lastCheck: string;
-  }>({
-    server: true,
-    database: true,
-    lastCheck: "",
-  });
 
   useEffect(() => {
-    const fetchHealth = () => {
-      fetch("/api/health")
-        .then((r) => r.json())
-        .then((data) => {
-          setHealthStatus({
-            server: data?.server === "online",
-            database: data?.database === "connected",
-            lastCheck: new Date().toLocaleTimeString(),
-          });
-        })
-        .catch(() => {
-          setHealthStatus({
-            server: false,
-            database: false,
-            lastCheck: new Date().toLocaleTimeString(),
-          });
-        });
-    };
-    fetchHealth();
-    const hTimer = setInterval(fetchHealth, 30000);
-
     Promise.all([
       api("/admin/stats", { admin: true }).catch(() => null),
       api<{ items: RecentOrder[] }>("/admin/orders?page=1", { admin: true }).catch(() => ({ items: [] })),
-    ]).then(([stats, ordersRes]) => {
+      api<{ lowStock: LowStockItem[] }>("/admin/erp/alerts", { admin: true }).catch(() => ({ lowStock: [] })),
+    ]).then(([stats, ordersRes, alerts]) => {
       if (stats) setS(stats);
-      if (ordersRes?.items) setRecentOrders(ordersRes.items.slice(0, 5));
+      setRecentOrders(ordersRes?.items?.slice(0, 7) || []);
+      setLowStock((alerts?.lowStock || []).filter((p) => p.stock <= (p.minStock || 5)).slice(0, 8));
       setLoading(false);
     });
-
-    return () => clearInterval(hTimer);
   }, []);
 
   if (loading || !s) {
@@ -590,343 +620,139 @@ export function Dashboard() {
     );
   }
 
-  const rate = s.last30 ? Math.round((s.fake30 / s.last30) * 100) : 0;
+  const statusLabel = (st: string) =>
+    ({ NEW: t("st_new"), CONFIRMED: t("st_confirmed"), READY: t("st_ready"), DONE: t("st_done"), CANCELED: t("st_canceled"), FAKE: t("st_fake") } as Record<string, string>)[st] || st;
 
-  const statusLabel = (st: string) => {
-    switch (st) {
-      case "NEW": return t("st_new");
-      case "CONFIRMED": return t("st_confirmed");
-      case "DONE": return t("st_done");
-      case "CANCELED": return t("st_canceled");
-      case "FAKE": return t("st_fake");
-      default: return st;
-    }
-  };
+  const o = s.orders || {};
+  const today = new Date().toLocaleDateString(lang === "en" ? "en-GB" : "ru-RU", { day: "2-digit", month: "2-digit", year: "numeric" });
 
   return (
     <div className="adm-dashboard-view">
-      <div className="adm-dashboard-head">
+      <div className="dash-head">
         <div>
           <h1>{t("dashboard")}</h1>
-          <p className="adm-dashboard-sub">{t("security_notice")}</p>
+          <div className="dash-date">{today}</div>
         </div>
-
-        <div className="adm-dashboard-actions">
-          <Link to="/admin/products/new" className="adm-btn-primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19" />
-              <line x1="5" y1="12" x2="19" y2="12" />
-            </svg>
-            <span>{t("action_add_product")}</span>
-          </Link>
-        </div>
-      </div>
-
-      {/* Modern KPI Cards Grid */}
-      <div className="adm-kpi-grid">
-        <Link to="/admin/orders?status=NEW" className="adm-kpi-card card-amber">
-          <div className="kpi-icon-box">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-              <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-            </svg>
-          </div>
-          <div className="kpi-meta">
-            <span className="kpi-value">{s.orders.NEW || 0}</span>
-            <strong className="kpi-title">{t("stat_new_orders")}</strong>
-            <span className="kpi-sub">{t("stat_new_orders_sub")}</span>
-          </div>
-        </Link>
-
-        <Link to="/admin/orders?status=CONFIRMED" className="adm-kpi-card card-blue">
-          <div className="kpi-icon-box">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-          </div>
-          <div className="kpi-meta">
-            <span className="kpi-value">{s.orders.CONFIRMED || 0}</span>
-            <strong className="kpi-title">{t("stat_confirmed")}</strong>
-            <span className="kpi-sub">{t("stat_confirmed_sub")}</span>
-          </div>
-        </Link>
-
-        <Link to="/admin/orders?status=DONE" className="adm-kpi-card card-green">
-          <div className="kpi-icon-box">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          </div>
-          <div className="kpi-meta">
-            <span className="kpi-value">{s.orders.DONE || 0}</span>
-            <strong className="kpi-title">{t("stat_completed")}</strong>
-            <span className="kpi-sub">{t("stat_completed_sub")}</span>
-          </div>
-        </Link>
-
-        <Link to="/admin/products" className="adm-kpi-card card-purple">
-          <div className="kpi-icon-box">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="2" y="7" width="20" height="14" rx="2" ry="2" />
-              <path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16" />
-            </svg>
-          </div>
-          <div className="kpi-meta">
-            <span className="kpi-value">{s.products || 0}</span>
-            <strong className="kpi-title">{t("stat_products")}</strong>
-            <span className="kpi-sub">{t("stat_products_sub")}</span>
-          </div>
-        </Link>
-
-        <div className="adm-kpi-card card-rose">
-          <div className="kpi-icon-box">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
-              <line x1="12" y1="9" x2="12" y2="13" />
-              <line x1="12" y1="17" x2="12.01" y2="17" />
-            </svg>
-          </div>
-          <div className="kpi-meta">
-            <span className="kpi-value">{rate}%</span>
-            <strong className="kpi-title">{t("stat_fake_rate")}</strong>
-            <span className="kpi-sub">
-              {t("stat_fake_sub")} ({s.fake30 || 0} / {s.last30 || 0})
-            </span>
-          </div>
-        </div>
-
-        <Link to="/admin/blocklist" className="adm-kpi-card card-slate">
-          <div className="kpi-icon-box">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-          </div>
-          <div className="kpi-meta">
-            <span className="kpi-value">{s.blocked || 0}</span>
-            <strong className="kpi-title">{t("stat_blocked")}</strong>
-            <span className="kpi-sub">{t("stat_blocked_sub")}</span>
-          </div>
-        </Link>
-
-        <Link to="/admin/customers" className="adm-kpi-card card-teal">
-          <div className="kpi-icon-box">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </div>
-          <div className="kpi-meta">
-            <span className="kpi-value">{s.customers || 0}</span>
-            <strong className="kpi-title">{t("stat_customers")}</strong>
-            <span className="kpi-sub">{t("stat_customers_sub")}</span>
-          </div>
-        </Link>
-
-        <Link to="/admin/messages" className="adm-kpi-card card-blue">
-          <div className="kpi-icon-box">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-          </div>
-          <div className="kpi-meta">
-            <span className="kpi-value">{s.unreadContacts || 0}</span>
-            <strong className="kpi-title">{t("stat_inquiries")}</strong>
-            <span className="kpi-sub">{t("stat_inquiries_sub")}</span>
-          </div>
+        <Link to="/admin/products/new" className="btn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+          {t("add_product")}
         </Link>
       </div>
 
-      {/* Quick Actions & System Health Section */}
-      <div className="adm-two-col-grid">
-        {/* Quick Actions Panel */}
-        <div className="adm-panel-card">
-          <div className="adm-panel-head">
-            <h3>{t("quick_actions")}</h3>
-          </div>
-          <div className="adm-quick-actions-list">
-            <Link to="/admin/products/new" className="quick-action-btn">
-              <span className="qa-icon">➕</span>
-              <div className="qa-text">
-                <strong>{t("action_add_product")}</strong>
-                <small>{t("action_add_product_sub")}</small>
-              </div>
-            </Link>
+      <div className="dash-kpis">
+        <Link to="/admin/orders?status=NEW" className={`dash-kpi ${o.NEW ? "attention" : ""}`}>
+          <span className="dash-kpi-label">{d("newOrders")}</span>
+          <span className="dash-kpi-value">{o.NEW || 0}</span>
+          <span className="dash-kpi-foot">{d("newOrdersFoot")}</span>
+        </Link>
+        <Link to="/admin/orders?status=CONFIRMED" className="dash-kpi">
+          <span className="dash-kpi-label">{d("inWork")}</span>
+          <span className="dash-kpi-value">{(o.CONFIRMED || 0) + (o.READY || 0)}</span>
+          <span className="dash-kpi-foot">{d("inWorkFoot")}</span>
+        </Link>
+        <Link to="/admin/orders" className="dash-kpi">
+          <span className="dash-kpi-label">{d("last30")}</span>
+          <span className="dash-kpi-value">{s.last30 || 0}</span>
+          <span className="dash-kpi-foot">
+            {s.fake30 || 0} {d("fake")}
+          </span>
+        </Link>
+        <Link to="/admin/products" className="dash-kpi">
+          <span className="dash-kpi-label">{d("products")}</span>
+          <span className="dash-kpi-value">{s.products || 0}</span>
+          <span className="dash-kpi-foot">{d("productsFoot")}</span>
+        </Link>
+      </div>
 
-            <Link to="/admin/taxonomy" className="quick-action-btn">
-              <span className="qa-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
-              </span>
-              <div className="qa-text">
-                <strong>{t("action_add_category")}</strong>
-                <small>{t("action_add_category_sub")}</small>
-              </div>
-            </Link>
+      <div className="dash-strip">
+        <Link to="/admin/customers" className="dash-strip-item">
+          {d("customers")} <b>{s.customers || 0}</b>
+        </Link>
+        <Link to="/admin/messages" className="dash-strip-item">
+          {d("inquiries")} <b>{s.unreadContacts || 0}</b>
+        </Link>
+        <Link to="/admin/orders?status=DONE" className="dash-strip-item">
+          {d("done")} <b>{o.DONE || 0}</b>
+        </Link>
+        <Link to="/admin/blocklist" className="dash-strip-item">
+          {d("blocked")} <b>{s.blocked || 0}</b>
+        </Link>
+      </div>
 
-            <Link to="/admin/orders" className="quick-action-btn">
-              <span className="qa-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-                  <polyline points="14 2 14 8 20 8" />
-                  <line x1="16" y1="13" x2="8" y2="13" />
-                  <line x1="16" y1="17" x2="8" y2="17" />
-                  <polyline points="10 9 9 9 8 9" />
-                </svg>
-              </span>
-              <div className="qa-text">
-                <strong>{t("action_view_orders")}</strong>
-                <small>{t("action_view_orders_sub")}</small>
-              </div>
-            </Link>
-
-            <Link to="/admin/import" className="quick-action-btn">
-              <span className="qa-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </span>
-              <div className="qa-text">
-                <strong>{t("action_excel_import")}</strong>
-                <small>{t("action_excel_import_sub")}</small>
-              </div>
-            </Link>
-
-            <Link to="/admin/customers" className="quick-action-btn">
-              <span className="qa-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </span>
-              <div className="qa-text">
-                <strong>{t("customers_list")}</strong>
-                <small>{t("stat_customers_sub")}</small>
-              </div>
-            </Link>
-          </div>
-        </div>
-
-        {/* System Status Panel (Real-time live health check) */}
+      <div className="dash-grid">
         <div className="adm-panel-card">
           <div className="adm-panel-head space-between">
-            <h3>{t("system_health")}</h3>
-            {healthStatus.lastCheck && (
-              <small style={{ fontSize: 11, color: "var(--ink2)" }}>{healthStatus.lastCheck}</small>
-            )}
+            <h3>{t("recent_orders")}</h3>
+            <Link to="/admin/orders" className="adm-link-more">
+              {t("all")}
+            </Link>
           </div>
-          <div className="adm-health-list">
-            <div className="health-row">
-              <div className="health-info">
-                <span className={`health-indicator-dot ${healthStatus.server ? "online" : "offline"}`} />
-                <div>
-                  <strong>{t("sys_server")}</strong>
-                  <small>Node.js & Express REST API</small>
-                </div>
-              </div>
-              <span
-                className="health-status-badge"
-                style={!healthStatus.server ? { background: "rgba(239,68,68,0.15)", color: "#ef4444" } : undefined}
-              >
-                {healthStatus.server ? t("sys_online") : "Offline"}
-              </span>
-            </div>
-
-            <div className="health-row">
-              <div className="health-info">
-                <span className={`health-indicator-dot ${healthStatus.database ? "online" : "offline"}`} />
-                <div>
-                  <strong>{t("sys_database")}</strong>
-                  <small>Prisma ORM & PostgreSQL</small>
-                </div>
-              </div>
-              <span
-                className="health-status-badge"
-                style={!healthStatus.database ? { background: "rgba(239,68,68,0.15)", color: "#ef4444" } : undefined}
-              >
-                {healthStatus.database ? t("sys_online") : "Offline"}
-              </span>
-            </div>
-
-            <div className="health-row">
-              <div className="health-info">
-                <span className="health-indicator-dot online" />
-                <div>
-                  <strong>{t("sys_security")}</strong>
-                  <small>{t("sys_security_sub")}</small>
-                </div>
-              </div>
-              <span className="health-status-badge">{t("sys_active")}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Recent Orders Overview Table */}
-      <div className="adm-panel-card" style={{ marginTop: 24 }}>
-        <div className="adm-panel-head space-between">
-          <h3>{t("recent_orders")}</h3>
-          <Link to="/admin/orders" className="adm-link-more">
-            {t("all")} →
-          </Link>
-        </div>
-
-        {recentOrders.length === 0 ? (
-          <p className="muted" style={{ padding: 20 }}>
-            {t("no_orders_yet")}
-          </p>
-        ) : (
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <thead>
-                <tr>
-                  <th>{t("order_code")}</th>
-                  <th>{t("customer")}</th>
-                  <th>{t("phone")}</th>
-                  <th>{t("products_col")}</th>
-                  <th>{t("status")}</th>
-                  <th>{t("date")}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentOrders.map((o) => (
-                  <tr key={o.id}>
-                    <td>
-                      <Link to={`/admin/orders?q=${o.code}`} className="order-code-link">
-                        #{o.code}
-                      </Link>
-                    </td>
-                    <td>
-                      <strong>{o.customerName}</strong>
-                    </td>
-                    <td>{o.phone}</td>
-                    <td>
-                      {o.items?.length > 0
-                        ? `${o.items[0].productName} ${o.items.length > 1 ? `(+${o.items.length - 1})` : ""}`
-                        : "1 ta"}
-                    </td>
-                    <td>
-                      <span className={`st ${o.status}`}>{statusLabel(o.status)}</span>
-                    </td>
-                    <td>{new Date(o.createdAt).toLocaleDateString("ru-RU")}</td>
+          {recentOrders.length === 0 ? (
+            <div className="dash-empty">{t("no_orders_yet")}</div>
+          ) : (
+            <div style={{ overflowX: "auto" }}>
+              <table className="tbl" style={{ minWidth: 560 }}>
+                <thead>
+                  <tr>
+                    <th>{t("order_code")}</th>
+                    <th>{t("customer")}</th>
+                    <th>{t("products_col")}</th>
+                    <th style={{ textAlign: "right" }}>{d("amount")}</th>
+                    <th>{t("status")}</th>
+                    <th>{t("date")}</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {recentOrders.map((r) => (
+                    <tr key={r.id}>
+                      <td>
+                        <Link to={`/admin/orders?q=${r.code}`} className="order-code-link">
+                          {r.code}
+                        </Link>
+                      </td>
+                      <td>{r.customerName}</td>
+                      <td style={{ maxWidth: 220 }}>
+                        {r.items?.length ? `${r.items[0].productName}${r.items.length > 1 ? ` +${r.items.length - 1}` : ""}` : "—"}
+                      </td>
+                      <td style={{ textAlign: "right" }}>{fmtMoney(r.totalAmount, d("negotiable"))}</td>
+                      <td>
+                        <span className={`st ${r.status}`}>{statusLabel(r.status)}</span>
+                      </td>
+                      <td>{new Date(r.createdAt).toLocaleDateString("ru-RU")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="adm-panel-card">
+          <div className="adm-panel-head space-between">
+            <h3>{d("lowStock")}</h3>
+            <Link to="/admin/erp" className="adm-link-more">
+              {d("warehouse")}
+            </Link>
           </div>
-        )}
+          {lowStock.length === 0 ? (
+            <div className="dash-empty">{d("lowStockEmpty")}</div>
+          ) : (
+            <ul className="dash-list">
+              {lowStock.map((p) => (
+                <li key={p.id}>
+                  <Link to={`/admin/products/${p.id}`} className="name" style={{ color: "inherit", textDecoration: "none" }}>
+                    {p.name}
+                  </Link>
+                  <span className={`dash-stock ${p.stock <= 0 ? "zero" : "low"}`}>
+                    {p.stock} {d("pcs")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -148,7 +148,6 @@ export default function Orders() {
           style={{ display: "flex", alignItems: "center", gap: 6, height: 38 }}
           title="Buyurtmalar ro'yxatini Excel (.csv) formatida yuklab olish"
         >
-          <span>📥</span>
           <span>{lang === "ru" ? "Экспорт в Excel" : "Excel (CSV)"}</span>
         </button>
         <form className="search" onSubmit={(e: FormEvent) => { e.preventDefault(); setPage(1); setQuery(q.trim()); }}>
@@ -179,7 +178,7 @@ export default function Orders() {
                 <td>{o.phone}</td>
                 <td>{o.items.length} {lang === "ru" ? "поз." : lang === "en" ? "items" : "ta"} ({o.items.reduce((s, i) => s + i.quantity, 0)} {t("unit_pcs")})</td>
                 <td style={{ fontWeight: 600 }}>
-                  {o.totalAmount && Number(o.totalAmount) > 0 ? Number(o.totalAmount).toLocaleString() + " so'm" : <span className="muted">{t("agreement_price")}</span>}
+                  {o.totalAmount && Number(o.totalAmount) > 0 ? Number(o.totalAmount).toLocaleString("ru-RU").replace(/,/g, " ") + " so'm" : <span className="muted">{t("agreement_price")}</span>}
                 </td>
                 <td>
                   {o.isPaid ? (
@@ -321,7 +320,6 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
         )}
 
         <h4 style={{ margin: "18px 0 8px", fontSize: 15, color: "var(--ink)", display: "flex", alignItems: "center", gap: 6 }}>
-          <span>📦</span>
           <span>{t("order_items_title")}</span>
         </h4>
         <div style={{ display: "grid", gap: 8, margin: "8px 0 16px" }}>
@@ -386,7 +384,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 4, fontSize: 13, color: "var(--ink-muted, #64748b)", flexWrap: "wrap" }}>
                     {price ? (
-                      <span>{price.toLocaleString()} so'm × <b>{i.quantity} {t("unit_pcs")}</b></span>
+                      <span>{price.toLocaleString("ru-RU").replace(/,/g, " ")} so'm × <b>{i.quantity} {t("unit_pcs")}</b></span>
                     ) : (
                       <span>{t("agreed_price")} × <b>{i.quantity} {t("unit_pcs")}</b></span>
                     )}
@@ -404,7 +402,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                 </div>
                 <div style={{ textAlign: "right", flexShrink: 0 }}>
                   <strong style={{ fontSize: 15, color: "var(--ink)" }}>
-                    {itemTotal ? itemTotal.toLocaleString() + " so'm" : t("agreement_price")}
+                    {itemTotal ? itemTotal.toLocaleString("ru-RU").replace(/,/g, " ") + " so'm" : t("agreement_price")}
                   </strong>
                 </div>
               </div>
@@ -417,7 +415,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
           <div>
             <strong style={{ display: "block", fontSize: 13, color: "var(--ink-muted, #64748b)" }}>{t("order_sum_label")}</strong>
             <span style={{ fontSize: 19, fontWeight: 800, color: "var(--ink, #0f172a)" }}>
-              {order.totalAmount && Number(order.totalAmount) > 0 ? Number(order.totalAmount).toLocaleString() + " so'm" : t("agreement_price")}
+              {order.totalAmount && Number(order.totalAmount) > 0 ? Number(order.totalAmount).toLocaleString("ru-RU").replace(/,/g, " ") + " so'm" : t("agreement_price")}
             </span>
           </div>
           <div>
