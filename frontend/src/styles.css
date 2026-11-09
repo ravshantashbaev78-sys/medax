@@ -5,6 +5,15 @@
   --ink2: #4b6070;
   --paper: #ffffff;
   --card: #ffffff;
+  --surface-card: #f8fafc; /* ichki bloklar foni (admin forma, savat, kirish oynasi) */
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+  --panel: #ffffff;
+  --hover: #f1f5f9;
+  --ink-muted: #64748b;
+  --red: #dc2626;
+  --brand: #0284c7;
+  --mint-solid: #10b981;
   --bg: #ffffff;
   --line: #dce5ea;
   --sea: #e1eef8;
@@ -30,6 +39,15 @@
   --ink2: #94a3b8;
   --paper: #0b131b;
   --card: #13222e;
+  --surface-card: #172a38; /* qorong'i mavzuda ichki bloklar: matn o'qiladi */
+  --surface: #13222e;
+  --surface-muted: #172a38;
+  --panel: #13222e;
+  --hover: #1b3142;
+  --ink-muted: #94a3b8;
+  --red: #f87171;
+  --brand: #38bdf8;
+  --mint-solid: #34d399;
   --bg: #0b131b;
   --line: #1e3447;
   --sea: #162c3d;

@@ -59,15 +59,20 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
         "X-Customer-Token": token,
       },
     })
-      .then((res) => {
+      .then(async (res) => {
+        // Faqat server tokenni rad etsa chiqaramiz. Tarmoq uzilishi yoki 5xx/429 — sessiya saqlanadi.
+        if (res.status === 401 || res.status === 404) {
+          saveToken(null);
+          setCustomer(null);
+          return;
+        }
         const isJson = res.headers.get("content-type")?.includes("application/json");
-        if (!res.ok || !isJson) throw new Error("Unauthorized");
-        return res.json();
+        if (!res.ok || !isJson) return;
+        const data = await res.json();
+        if (data?.customer) setCustomer(data.customer);
       })
-      .then((data) => setCustomer(data.customer))
       .catch(() => {
-        saveToken(null);
-        setCustomer(null);
+        /* tarmoq xatosi: tokenni o'chirmaymiz */
       })
       .finally(() => setLoading(false));
   }, [token]);
@@ -82,6 +87,12 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
           "X-Customer-Token": token,
         },
       });
+      if (res.status === 401 || res.status === 404) {
+        // Masalan, parol boshqa qurilmada almashtirilgan — sessiya yopilgan
+        saveToken(null);
+        setCustomer(null);
+        return;
+      }
       if (res.ok) {
         const data = await res.json();
         if (data.customer) setCustomer(data.customer);

@@ -59,22 +59,7 @@ export default function ProductPage() {
             {img ? (
               <img src={img.url} alt={p.name} />
             ) : (
-              <img
-                src={
-                  p.category?.slug === "reanimatsiya-va-anesteziologiya"
-                    ? "/uploads/products/medical-icu.jpg"
-                    : p.category?.slug === "ultratovush-diagnostikasi"
-                    ? "/uploads/products/medical-diag.jpg"
-                    : p.category?.slug === "jarrohlik"
-                    ? "/uploads/products/medical-surgery.jpg"
-                    : p.category?.slug === "tibbiy-mebel"
-                    ? "/uploads/products/medical-bed.jpg"
-                    : p.category?.slug === "operatsion-raqamli-integratsiya"
-                    ? "/uploads/products/medical-recorder.jpg"
-                    : "/uploads/products/medical-diag.jpg"
-                }
-                alt={p.name}
-              />
+              <DeviceIcon category={p.category?.slug} name={p.name} />
             )}
           </div>
           {p.images.length > 1 && (

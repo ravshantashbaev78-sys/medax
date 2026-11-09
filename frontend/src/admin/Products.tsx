@@ -1039,6 +1039,11 @@ export function ProductForm() {
                 value={f.stock}
                 onChange={(e) => set("stock", e.target.value)}
               />
+              {(f.stock === "" || Number(f.stock) <= 0) && (
+                <small style={{ display: "block", marginTop: 6, color: "var(--red)", fontWeight: 600 }}>
+                  Qoldiq 0 bo'lsa, mahsulot saytda ko'rinmaydi. Sotuvga chiqarish uchun mavjud sonini kiriting.
+                </small>
+              )}
             </div>
 
             {/* O'lchov birligi */}

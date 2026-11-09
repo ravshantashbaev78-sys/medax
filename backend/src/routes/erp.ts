@@ -50,6 +50,19 @@ async function withUniqueRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T
   }
 }
 
+/**
+ * Qoldiq 0 dan oshganda avtomatik yashirilgan mahsulotni qayta ko'rsatadi.
+ * Buyurtmalardagi qoida bilan bir xil: faqat qoldiq 0 bo'lgani uchun yashirilganlar qayta yoqiladi.
+ */
+async function incrementStock(tx: Tx, productId: number, quantity: number, extra: Prisma.ProductUncheckedUpdateInput = {}) {
+  const before = await tx.product.findUnique({ where: { id: productId }, select: { stock: true, isActive: true } });
+  const reactivate = before && before.stock <= 0 && !before.isActive;
+  await tx.product.update({
+    where: { id: productId },
+    data: { ...extra, stock: { increment: quantity }, ...(reactivate ? { isActive: true } : {}) },
+  });
+}
+
 /** Qoldiqni faqat yetarli bo'lsa ayiradi — ombor qoldig'i hech qachon manfiy bo'lmaydi */
 async function decrementStockOrThrow(tx: Tx, productId: number, quantity: number, productName: string) {
   const r = await tx.product.updateMany({
@@ -63,6 +76,8 @@ async function decrementStockOrThrow(tx: Tx, productId: number, quantity: number
       `"${productName}" uchun omborda yetarli qoldiq yo'q (mavjud: ${p?.stock ?? 0}, so'ralgan: ${quantity}).`
     );
   }
+  // Qoldiq tugasa, mahsulot saytda yashiriladi (buyurtmalardagi kabi) — mijoz tugagan tovarga buyurtma bermaydi
+  await tx.product.updateMany({ where: { id: productId, stock: 0 }, data: { isActive: false } });
 }
 
 async function ensureDefaultWarehouse(): Promise<number> {
@@ -262,9 +277,18 @@ erpRouter.post("/inventory/quick-update", async (req, res) => {
     body.markupPercent = Math.round(((sellPrice - body.costPrice) / body.costPrice) * 100);
   }
 
+  // Qoldiq qo'lda o'zgartirilsa: 0 -> yashirish, 0 dan oshsa (avtomatik yashirilgan bo'lsa) -> qayta ko'rsatish
+  let activeChange: { isActive: boolean } | {} = {};
+  if (body.stock !== undefined && body.stock !== null) {
+    const before = await prisma.product.findUnique({ where: { id: body.id }, select: { stock: true, isActive: true } });
+    if (body.stock === 0) activeChange = { isActive: false };
+    else if (before && before.stock <= 0 && !before.isActive) activeChange = { isActive: true };
+  }
+
   const updated = await prisma.product.update({
     where: { id: body.id },
     data: {
+      ...activeChange,
       costPrice: body.costPrice !== undefined ? body.costPrice : undefined,
       markupPercent: body.markupPercent !== undefined ? body.markupPercent : undefined,
       priceFrom: sellPrice !== undefined ? sellPrice : undefined,
@@ -541,10 +565,7 @@ erpRouter.post("/documents", async (req, res) => {
     for (const item of itemsData) {
       if (body.type === "INCOME") {
         // Increase stock, update prices and batch info
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: { increment: item.quantity },
+        await incrementStock(tx, item.productId, item.quantity, {
             costPrice: item.costPrice ? item.costPrice : undefined,
             markupPercent: item.markup ? item.markup : undefined,
             priceFrom: item.sellPrice ? item.sellPrice : undefined,
@@ -552,19 +573,13 @@ erpRouter.post("/documents", async (req, res) => {
             expDate: item.expDate || undefined,
             supplierId: body.supplierId || undefined,
             warehouseId: whId,
-          },
         });
       } else if (body.type === "OUTCOME" || body.type === "WRITE_OFF") {
         // Decrease stock (faqat qoldiq yetarli bo'lsa)
         await decrementStockOrThrow(tx, item.productId, item.quantity, item.productName);
       } else if (body.type === "RETURN_CUSTOMER") {
         // Customer returned item -> return to stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: {
-            stock: { increment: item.quantity },
-          },
-        });
+        await incrementStock(tx, item.productId, item.quantity);
       } else if (body.type === "RETURN_SUPPLIER") {
         // Return to supplier -> decrement stock (faqat qoldiq yetarli bo'lsa)
         await decrementStockOrThrow(tx, item.productId, item.quantity, item.productName);

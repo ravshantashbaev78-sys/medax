@@ -581,18 +581,21 @@ export function ProductCard({ p }: { p: Product }) {
           {p.isNew && <span className="tag new">{t("badge_new")}</span>}
         </div>
 
-        {(() => {
-          const catImgMap: Record<string, string> = {
-            "reanimatsiya-va-anesteziologiya": "/uploads/products/medical-icu.jpg",
-            "ultratovush-diagnostikasi": "/uploads/products/medical-diag.jpg",
-            "jarrohlik": "/uploads/products/medical-surgery.jpg",
-            "tibbiy-mebel": "/uploads/products/medical-bed.jpg",
-            "operatsion-raqamli-integratsiya": "/uploads/products/medical-recorder.jpg",
-            "reabilitatsiya-va-invalit-aravachalari": "/uploads/products/wheelchair.jpg",
-          };
-          const imgSrc = img?.thumbUrl || img?.url || catImgMap[p.category?.slug || ""] || "/uploads/products/medical-diag.jpg";
-          return <img src={imgSrc} alt={localizedName} loading="lazy" width={480} height={360} onError={(e) => { (e.currentTarget as HTMLImageElement).src = "/uploads/products/medical-diag.jpg"; }} />;
-        })()}
+        {/* Rasm bo'lmasa — boshqa mahsulot surati emas, kategoriya belgisi ko'rsatiladi */}
+        {img?.thumbUrl || img?.url ? (
+          <img
+            src={img.thumbUrl || img.url}
+            alt={localizedName}
+            loading="lazy"
+            width={480}
+            height={360}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
+            }}
+          />
+        ) : (
+          <DeviceIcon category={p.category?.slug} name={p.name} />
+        )}
       </Link>
 
       <div className="b">
