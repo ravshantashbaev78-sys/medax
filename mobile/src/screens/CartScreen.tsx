@@ -8,41 +8,64 @@ import {
   Image,
   TextInput,
   Alert,
-  ActivityIndicator,
-  Linking,
   KeyboardAvoidingView,
   Platform,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCart } from "../context/CartContext";
 import { useAuth } from "../context/AuthContext";
-import { submitOrder, sendOrderOtp, getImageUrl, formatPrice } from "../api";
+import { submitOrder, sendOrderOtp, getImageUrl } from "../api";
 import { useTheme } from "../context/ThemeContext";
 import { useI18n, localizeProductName } from "../context/I18nContext";
-import { CartIcon, CloseIcon, ShieldIcon, BoltIcon, MapPinIcon, UserIcon } from "../components/Icons";
-import { SuccessModal } from "../components/SuccessModal";
+import { priceLabel } from "../components/ProductCard";
+import { Button, Card, Field, IconBadge, IcCheck, IcImage, IcMinus, IcPin, IcPlus, IcTrash, ui } from "../components/ui";
+import { CartIcon } from "../components/Icons";
+
+const PAY_METHOD = "Do'konda to'lash (Olib ketishda)";
+
+const L = {
+  uz: {
+    buyer: "Buyurtmachi", pickupTitle: "Do'kondan olib ketish.", pickupText: "Namangan sh., Beruniy ko'chasi, 2-uy. To'lov do'konda.",
+    total: "Jami", pcs: "dona", lockedHint: "Buyurtma akkauntingizdagi tasdiqlangan raqamga beriladi.", phoneHint: "Shu raqamga 6 xonali tasdiqlash kodi yuboriladi.",
+    commentPh: "Ixtiyoriy: klinika nomi, olib ketish vaqti", codeLabel: "SMS kod", codeHint: "raqamiga yuborilgan 6 xonali kod",
+    clearQ: "Savatchadagi barcha mahsulotlar o'chirilsinmi?", cancel: "Bekor qilish", successTitle: "Buyurtma qabul qilindi",
+    successText: "Buyurtma raqami: {code}. Menejer tez orada siz bilan bog'lanadi.", myOrders: "Buyurtmalarimni ko'rish", ok: "Davom etish", remove: "O'chirish",
+  },
+  ru: {
+    buyer: "Покупатель", pickupTitle: "Самовывоз из магазина.", pickupText: "г. Наманган, ул. Беруни, 2. Оплата в магазине.",
+    total: "Итого", pcs: "шт.", lockedHint: "Заказ оформляется на подтверждённый номер аккаунта.", phoneHint: "На этот номер придёт 6-значный код.",
+    commentPh: "Необязательно: клиника, время самовывоза", codeLabel: "SMS-код", codeHint: "— на этот номер отправлен 6-значный код",
+    clearQ: "Удалить все товары из корзины?", cancel: "Отмена", successTitle: "Заказ принят",
+    successText: "Номер заказа: {code}. Менеджер скоро свяжется с вами.", myOrders: "Мои заказы", ok: "Продолжить", remove: "Удалить",
+  },
+  en: {
+    buyer: "Customer", pickupTitle: "Store pickup.", pickupText: "Namangan, Beruniy street 2. Pay at the store.",
+    total: "Total", pcs: "pcs", lockedHint: "The order is placed on your account's verified number.", phoneHint: "A 6-digit code will be sent to this number.",
+    commentPh: "Optional: clinic name, pickup time", codeLabel: "SMS code", codeHint: "— 6-digit code sent to this number",
+    clearQ: "Remove all items from the cart?", cancel: "Cancel", successTitle: "Order received",
+    successText: "Order number: {code}. A manager will contact you shortly.", myOrders: "View my orders", ok: "Continue", remove: "Remove",
+  },
+};
 
 export function CartScreen({ navigation }: any) {
   const insets = useSafeAreaInsets();
   const { lang, t } = useI18n();
-  const { colors, theme } = useTheme();
+  const { colors } = useTheme();
+  const c = L[lang] || L.uz;
   const { items, updateQuantity, removeFromCart, clearCart, totalPrice, totalItems } = useCart();
   const { customer, token, logout } = useAuth();
 
   const [customerName, setCustomerName] = useState(customer?.name || "");
   const [phone, setPhone] = useState(customer?.phone || "+998 ");
   const [comment, setComment] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<string>("Do'konda to'lash (Olib ketishda)");
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [otpCode, setOtpCode] = useState("");
   const [resendTimer, setResendTimer] = useState(0);
-  const [orderSuccessModal, setOrderSuccessModal] = useState<{ visible: boolean; orderCode: string }>({
-    visible: false,
-    orderCode: "",
-  });
+  const [successCode, setSuccessCode] = useState<string | null>(null);
 
-  // Savatcha ekrani ochiq turganda mijoz tizimga kirsa/chiqsa, forma yangilanadi
+  // Savatcha ochiq turganda mijoz tizimga kirsa, forma yangilanadi
   useEffect(() => {
     if (customer) {
       setCustomerName((prev) => prev.trim() || customer.name || "");
@@ -51,6 +74,12 @@ export function CartScreen({ navigation }: any) {
       setOtpCode("");
     }
   }, [customer?.id]);
+
+  useEffect(() => {
+    if (resendTimer <= 0) return;
+    const timer = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [resendTimer]);
 
   const handlePhoneChange = (value: string) => {
     setPhone(value);
@@ -61,625 +90,272 @@ export function CartScreen({ navigation }: any) {
     }
   };
 
-  useEffect(() => {
-    let t: any;
-    if (resendTimer > 0) {
-      t = setTimeout(() => setResendTimer(resendTimer - 1), 1000);
+  const requestOtp = async () => {
+    setLoading(true);
+    const otpRes = await sendOrderOtp(phone.trim());
+    setLoading(false);
+    if (!otpRes.ok) {
+      Alert.alert(t("error"), otpRes.error || "SMS tasdiqlash kodini yuborishda xatolik yuz berdi.");
+      return false;
     }
-    return () => clearTimeout(t);
-  }, [resendTimer]);
-
+    setOtpSent(true);
+    setOtpCode("");
+    setResendTimer(otpRes.resendIn || 60);
+    return true;
+  };
 
   const handleCheckout = async () => {
     if (!customerName.trim()) {
-      Alert.alert("Diqqat", "Iltimos, to'liq ismingizni kiriting.");
+      Alert.alert(t("error"), "Iltimos, ismingizni kiriting.");
       return;
     }
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.length < 9) {
-      Alert.alert("Diqqat", "Iltimos, to'g'ri telefon raqamini kiriting (+998 __ ___ __ __).");
+    const digits = phone.replace(/\D/g, "");
+    if (!(digits.length === 12 && digits.startsWith("998")) && digits.length !== 9) {
+      Alert.alert(t("error"), "Iltimos, to'liq telefon raqamini kiriting (+998 __ ___ __ __).");
       return;
     }
-
-    // Agar mijoz tizimga kirmagan bo'lsa va hali SMS kod yuborilmagan bo'lsa
+    // Mehmon: avval SMS kod
     if (!token && !otpSent) {
-      setLoading(true);
-      const otpRes = await sendOrderOtp(phone.trim());
-      setLoading(false);
-      if (!otpRes.ok) {
-        Alert.alert("Xatolik", otpRes.error || "SMS tasdiqlash kodini yuborishda xatolik yuz berdi.");
-        return;
-      }
-      setOtpSent(true);
-      setOtpCode("");
-      setResendTimer(otpRes.resendIn || 60);
-      Alert.alert("SMS yuborildi 📩", "Telefoningizga 6 xonali tasdiqlash kodi yuborildi. Kodni kiriting.");
+      await requestOtp();
       return;
     }
-
-    // Agar tizimga kirmagan bo'lsa va kod kiritilmagan bo'lsa
-    if (!token && otpSent && otpCode.trim().length !== 6) {
-      Alert.alert("Diqqat", "SMS orqali kelgan 6 xonali tasdiqlash kodini kiriting.");
+    if (!token && otpCode.trim().length !== 6) {
+      Alert.alert(t("error"), "SMS orqali kelgan 6 xonali kodni kiriting.");
       return;
     }
-
-    const selectedMethod = paymentMethod;
 
     setLoading(true);
-    const orderItems = items.map((i) => ({
-      productId: i.product.id,
-      quantity: i.quantity,
-    }));
-
     const res = await submitOrder({
       customerName: customerName.trim(),
       phone: phone.trim(),
       deliveryAddress: t("contact_address") || "Namangan sh., Ozod MFY, Abu Rayhon Beruniy ko'chasi, 2-uy",
       comment: comment.trim(),
-      paymentMethod: selectedMethod,
-      items: orderItems,
+      paymentMethod: PAY_METHOD,
+      items: items.map((i) => ({ productId: i.product.id, quantity: i.quantity })),
       code: !token ? otpCode.trim() : undefined,
     });
-
     setLoading(false);
 
     if (res.ok) {
+      setSuccessCode(String(res.code || res.orderId || ""));
       clearCart();
       setOtpSent(false);
       setOtpCode("");
-      setOrderSuccessModal({
-        visible: true,
-        orderCode: String(res.code || res.orderId || "yangi"),
-      });
-    } else {
-      if (token && res.error && (res.error.includes("SMS tasdiqlash kodini") || res.error.includes("401"))) {
-        await logout();
-        const otpRes = await sendOrderOtp(phone.trim());
-        if (otpRes.ok) {
-          setOtpSent(true);
-          setOtpCode("");
-          setResendTimer(otpRes.resendIn || 60);
-          Alert.alert(
-            "Sessiya yangilandi",
-            "Avvalgi profilingiz sessiyasi eskirgan. Telefoningizga tasdiqlash kodi yuborildi, kodni kiritib buyurtmani tasdiqlang."
-          );
-        } else {
-          Alert.alert("Xatolik", otpRes.error || "SMS tasdiqlash kodini yuborishda xatolik yuz berdi.");
-        }
-        return;
-      }
-      Alert.alert("Xatolik", res.error || "Buyurtma yuborishda xatolik yuz berdi");
+      setComment("");
+      return;
     }
+    // Sessiya eskirgan bo'lsa: chiqib, mehmon sifatida SMS kod bilan davom etamiz
+    if (token && res.error && (res.error.includes("SMS tasdiqlash kodini") || res.error.includes("401"))) {
+      await logout();
+      if (await requestOtp()) {
+        Alert.alert("Sessiya yangilandi", "Sessiyangiz eskirgan. Telefoningizga tasdiqlash kodi yuborildi, kodni kiritib buyurtmani tasdiqlang.");
+      }
+      return;
+    }
+    Alert.alert(t("error"), res.error || "Buyurtma yuborishda xatolik yuz berdi");
   };
+
+  const successModal = (
+    <Modal visible={successCode !== null} transparent animationType="fade" onRequestClose={() => setSuccessCode(null)}>
+      <View style={[s.scrim, { backgroundColor: colors.scrim }]}>
+        <View style={[s.modal, { backgroundColor: colors.card }]}>
+          <View style={[s.okCircle, { backgroundColor: colors.successSoft }]}>
+            <IcCheck size={28} color={colors.success} strokeWidth={2.4} />
+          </View>
+          <Text style={[s.modalTitle, { color: colors.text }]}>{c.successTitle}</Text>
+          <Text style={[s.modalText, { color: colors.textSecondary }]}>{c.successText.replace("{code}", successCode || "")}</Text>
+          {token ? (
+            <Button
+              title={c.myOrders}
+              style={{ marginTop: 20, alignSelf: "stretch" }}
+              onPress={() => {
+                setSuccessCode(null);
+                navigation.navigate("Profil");
+              }}
+            />
+          ) : null}
+          <Button
+            title={c.ok}
+            variant={token ? "ghost" : "primary"}
+            style={{ marginTop: token ? 6 : 20, alignSelf: "stretch" }}
+            onPress={() => {
+              setSuccessCode(null);
+              navigation.navigate("Asosiy");
+            }}
+          />
+        </View>
+      </View>
+    </Modal>
+  );
 
   if (items.length === 0) {
     return (
-      <View style={[styles.emptyContainer, { backgroundColor: colors.bg, paddingTop: insets.top + 20 }]}>
-        <View style={[styles.emptyIconCircle, { backgroundColor: colors.inputBg }]}>
-          <CartIcon size={46} color={colors.primary} />
-        </View>
-        <Text style={[styles.emptyTitle, { color: colors.text }]}>{t("cart_empty_title")}</Text>
-        <Text style={[styles.emptyDesc, { color: colors.textMuted }]}>
-          {t("cart_empty_sub")}
-        </Text>
-        <TouchableOpacity
-          style={[styles.shopBtn, { backgroundColor: "#0284c7" }]}
-          onPress={() => navigation.navigate("Katalog")}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.shopBtnText}>{t("cart_go_catalog")}</Text>
-        </TouchableOpacity>
+      <View style={[s.empty, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+        <IconBadge size={72}>
+          <CartIcon size={34} color={colors.primary} />
+        </IconBadge>
+        <Text style={[s.emptyTitle, { color: colors.text }]}>{t("cart_empty_title")}</Text>
+        <Text style={[s.emptySub, { color: colors.textMuted }]}>{t("cart_empty_sub")}</Text>
+        <Button title={t("cart_go_catalog")} onPress={() => navigation.navigate("Katalog")} style={{ marginTop: 20, paddingHorizontal: 28 }} />
+        {successModal}
       </View>
     );
   }
 
+  const ready = !!token || otpSent;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10, backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-          <CartIcon size={22} color={colors.primary} />
-          <Text style={[styles.headerTitle, { color: colors.text }]}>{t("nav_cart")} ({totalItems})</Text>
-        </View>
+    <View style={[s.screen, { backgroundColor: colors.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 10, backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+        <Text style={[ui.h1, { color: colors.text }]}>{t("nav_cart")}</Text>
         <TouchableOpacity
+          hitSlop={10}
           onPress={() =>
-            Alert.alert(t("cart_clear"), "Savatchadagi barcha mahsulotlar o'chirilsinmi?", [
-              { text: "Bekor qilish", style: "cancel" },
+            Alert.alert(t("cart_clear"), c.clearQ, [
+              { text: c.cancel, style: "cancel" },
               { text: t("cart_clear"), style: "destructive", onPress: clearCart },
             ])
           }
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Text style={styles.clearAll}>{t("cart_clear")}</Text>
+          <Text style={{ fontSize: 14, fontWeight: "500", color: colors.danger }}>{t("cart_clear")}</Text>
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ padding: 16, paddingBottom: 60 }}
-        >
-          {/* Cart Items */}
-          <View style={styles.itemList}>
-            {items.map(({ product, quantity }) => {
-              const imgUrl = getImageUrl(product.images?.[0]?.url);
-              const price = product.priceFrom ? Number(product.priceFrom) : 0;
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+          <Card>
+            {items.map(({ product, quantity }, i) => {
+              const img = product.images?.[0]?.thumbUrl || product.images?.[0]?.url;
+              const max = Math.min(100, typeof product.stock === "number" ? product.stock : 100);
               return (
-                <View key={product.id} style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
-                  <Image source={{ uri: imgUrl }} style={[styles.cardImg, { backgroundColor: theme === "dark" ? "#0e1822" : "#f8fafc" }]} resizeMode="contain" />
-                  <View style={styles.cardInfo}>
-                    <Text style={[styles.cardName, { color: colors.text }]} numberOfLines={2}>
-                      {localizeProductName(product, lang)}
-                    </Text>
-                    <Text style={[styles.cardPrice, { color: colors.primary }]}>
-                      {price ? `${(price * quantity).toLocaleString()} UZS` : "Kelishuv asosida"}
-                    </Text>
-                    {product.stock !== undefined && (
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: (product.stock ?? 0) > 0 ? colors.primary : "#ef4444",
-                          fontWeight: "600",
-                          marginTop: 2,
-                        }}
-                      >
-                        {(product.stock ?? 0) > 0
-                          ? t("stock_in").replace("{n}", String(product.stock))
-                          : t("stock_cart_empty")}
+                <View key={product.id} style={[s.item, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                  <View style={[s.thumb, { backgroundColor: colors.inputBg }]}>
+                    {img ? <Image source={{ uri: getImageUrl(img) }} style={s.thumbImg} /> : <IcImage size={22} color={colors.textMuted} strokeWidth={1.4} />}
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <View style={{ flexDirection: "row", gap: 8 }}>
+                      <Text style={[s.itemName, { color: colors.text }]} numberOfLines={2}>
+                        {localizeProductName(product, lang)}
                       </Text>
-                    )}
-
-                    <View style={styles.cardActions}>
-                      <View style={[styles.qtyBox, { backgroundColor: colors.inputBg }]}>
-                        <TouchableOpacity
-                          style={[styles.qtyBtn, { backgroundColor: colors.card }]}
-                          onPress={() => updateQuantity(product.id, quantity - 1)}
-                        >
-                          <Text style={[styles.qtyBtnText, { color: colors.text }]}>−</Text>
+                      <TouchableOpacity onPress={() => removeFromCart(product.id)} hitSlop={10} accessibilityLabel={c.remove}>
+                        <IcTrash size={18} color={colors.textMuted} strokeWidth={1.8} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={s.itemBottom}>
+                      <Text style={[s.itemPrice, { color: colors.text }]}>
+                        {priceLabel(product.priceFrom ? Number(product.priceFrom) * quantity : null, lang)}
+                      </Text>
+                      <View style={[s.stepper, { borderColor: colors.borderStrong }]}>
+                        <TouchableOpacity style={s.stepBtn} onPress={() => updateQuantity(product.id, quantity - 1)} accessibilityLabel="Kamaytirish">
+                          <IcMinus size={16} color={colors.text} strokeWidth={2} />
                         </TouchableOpacity>
-                        <Text style={[styles.qtyNumber, { color: colors.text }]}>{quantity}</Text>
+                        <Text style={[s.stepText, { color: colors.text }]}>{quantity}</Text>
                         <TouchableOpacity
-                          style={[styles.qtyBtn, { backgroundColor: colors.card }]}
-                          disabled={product.stock !== undefined && quantity >= product.stock}
-                          onPress={() => updateQuantity(product.id, Math.min(product.stock ?? 100, quantity + 1))}
+                          style={s.stepBtn}
+                          onPress={() => updateQuantity(product.id, quantity + 1)}
+                          disabled={quantity >= max}
+                          accessibilityLabel="Ko'paytirish"
                         >
-                          <Text style={[styles.qtyBtnText, { color: colors.text }]}>+</Text>
+                          <IcPlus size={16} color={quantity >= max ? colors.textMuted : colors.text} strokeWidth={2} />
                         </TouchableOpacity>
                       </View>
-
-                      <TouchableOpacity
-                        onPress={() => removeFromCart(product.id)}
-                        style={styles.removeBtn}
-                      >
-                        <CloseIcon size={14} color="#ef4444" />
-                        <Text style={styles.removeText}>{t("cart_clear") || "O'chirish"}</Text>
-                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
               );
             })}
-          </View>
+          </Card>
 
-          {/* SMS Verified info or guest tip */}
-          {customer ? (
-            <View style={[styles.authBadge, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-              <UserIcon size={16} color={colors.primary} />
-              <Text style={[styles.authBadgeText, { color: colors.textMuted }]}>
-                Hisob: <Text style={{ fontWeight: "800", color: colors.text }}>{customer.name}</Text>
-              </Text>
-            </View>
-          ) : null}
-
-          {/* Checkout Form */}
-          <View style={[styles.checkoutBox, { backgroundColor: colors.card, borderColor: colors.border }]}>
-            <Text style={[styles.checkoutTitle, { color: colors.text }]}>{t("cart_checkout_title")}</Text>
-            <Text style={[styles.checkoutSub, { color: colors.textMuted }]}>{t("cart_checkout_sub")}</Text>
-
-            <Text style={[styles.label, { color: colors.textMuted }]}>{t("cart_name_label")}</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-              placeholder="Masalan: Azizbek Karimov"
-              value={customerName}
-              onChangeText={setCustomerName}
-              placeholderTextColor={colors.textMuted}
-            />
-
-            <Text style={[styles.label, { color: colors.textMuted }]}>{t("cart_phone_label")}</Text>
-            <TextInput
-              style={[styles.input, { backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-              placeholder="+998 90 123 45 67"
+          <Card style={{ padding: 16, paddingBottom: 4, marginTop: 14 }}>
+            <Text style={[s.cardTitle, { color: colors.text }]}>{c.buyer}</Text>
+            <Field label={t("cart_name_label")} value={customerName} onChangeText={setCustomerName} placeholder="Ism va familiya" autoComplete="name" />
+            <Field
+              label={t("cart_phone_label")}
               value={phone}
               onChangeText={handlePhoneChange}
               keyboardType="phone-pad"
-              editable={!token}
-              placeholderTextColor={colors.textMuted}
+              locked={!!token}
+              hint={token ? c.lockedHint : c.phoneHint}
             />
-            {token ? (
-              <Text style={{ fontSize: 11.5, color: colors.textMuted, marginTop: -6, marginBottom: 10 }}>
-                Buyurtma akkauntingizdagi tasdiqlangan raqamga rasmiylashtiriladi.
-              </Text>
-            ) : null}
-
-            <Text style={[styles.label, { color: colors.textMuted }]}>{t("contact_store") || "Olib ketish manzili"}</Text>
-            <View style={[styles.storeAddressCard, theme === "dark" && { backgroundColor: "#064e3b25", borderColor: "#05966950" }]}>
-              <View style={styles.storeAddressIconWrap}>
-                <MapPinIcon size={20} color="#10b981" />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.storeAddressTitle, { color: "#10b981" }]}>Medax tibbiyot texnikalari markazi</Text>
-                <Text style={[styles.storeAddressDesc, { color: colors.text }]}>
-                  {t("contact_address")}
-                </Text>
-                <Text style={[styles.storeAddressPickupNote, { color: theme === "dark" ? "#a7f3d0" : "#047857" }]}>
-                  ℹ️ Hozircha faqat do'kondan olib ketish mavjud. Uskunani do'konda tekshirib qabul qilib olasiz.
-                </Text>
-              </View>
-            </View>
-
-            <Text style={[styles.label, { color: colors.textMuted }]}>{t("cart_comment_label")}</Text>
-            <TextInput
-              style={[styles.input, { height: 64, textAlignVertical: "top", backgroundColor: colors.inputBg, borderColor: colors.border, color: colors.text }]}
-              placeholder="Klinika nomi, o'rnatish yoki olib ketish vaqti"
-              value={comment}
-              onChangeText={setComment}
-              multiline
-              placeholderTextColor={colors.textMuted}
-            />
-
-            {/* Payment Method Selection */}
-            <Text style={[styles.label, { marginTop: 8, marginBottom: 8, color: colors.textMuted }]}>{t("cart_pay_method")}</Text>
-
-            {/* Option: Cash / Store pickup */}
-            <TouchableOpacity
-              style={[
-                styles.payOption,
-                styles.payOptionActive,
-                { marginTop: 4, backgroundColor: theme === "dark" ? "rgba(56, 189, 248, 0.12)" : "#f0f9ff", borderColor: colors.primary },
-              ]}
-              onPress={() => setPaymentMethod("Do'konda to'lash (Olib ketishda)")}
-              activeOpacity={0.8}
-            >
-              <View style={[styles.radioCircle, { borderColor: colors.primary }]}>
-                <View style={[styles.radioDot, { backgroundColor: colors.primary }]} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <View style={styles.payOptionHeader}>
-                  <Text style={[styles.payTitle, { color: colors.text }]}>{t("cart_pay_cash_title")}</Text>
-                </View>
-                <Text style={[styles.payDesc, { color: colors.textMuted }]}>
-                  {t("cart_pay_cash_desc")}
-                </Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Total Row */}
-            <View style={[styles.totalRow, { borderTopColor: colors.border }]}>
-              <Text style={[styles.totalLabel, { color: colors.textMuted }]}>{t("cart_total_label")}</Text>
-              <Text style={[styles.totalValue, { color: colors.primary }]}>
-                {totalPrice > 0 ? `${totalPrice.toLocaleString()} UZS` : "Kelishuv asosida"}
+            <Field label={t("cart_comment_label")} value={comment} onChangeText={setComment} placeholder={c.commentPh} multiline style={{ height: 76, paddingTop: 12, textAlignVertical: "top" }} />
+            <View style={[s.pickup, { borderTopColor: colors.border }]}>
+              <IcPin size={18} color={colors.primary} strokeWidth={1.9} />
+              <Text style={[s.pickupText, { color: colors.textSecondary }]}>
+                <Text style={{ fontWeight: "600", color: colors.text }}>{c.pickupTitle} </Text>
+                {c.pickupText}
               </Text>
             </View>
+          </Card>
 
-            {/* Mehmonlar uchun OTP Kod kiritish maydoni */}
-            {!token && otpSent && (
-              <View style={[styles.otpCard, theme === "dark" && { backgroundColor: "#1e3a8a25", borderColor: "#3b82f650" }]}>
-                <Text style={[styles.otpTitle, { color: colors.primary }]}>{t("cart_otp_title")}</Text>
-                <Text style={[styles.otpSubtitle, { color: colors.textMuted }]}>
-                  {phone} {t("cart_otp_sub")}
+          {!token && otpSent ? (
+            <Card style={{ padding: 16, marginTop: 14, borderColor: colors.primary }}>
+              <Text style={[s.cardTitle, { color: colors.text, marginBottom: 4 }]}>{t("cart_otp_title")}</Text>
+              <Text style={{ fontSize: 13.5, color: colors.textSecondary, marginBottom: 12 }}>
+                {phone} {c.codeHint}
+              </Text>
+              <TextInput
+                value={otpCode}
+                onChangeText={(v) => setOtpCode(v.replace(/\D/g, ""))}
+                keyboardType="number-pad"
+                maxLength={6}
+                textContentType="oneTimeCode"
+                autoComplete="sms-otp"
+                placeholder="000000"
+                placeholderTextColor={colors.textMuted}
+                accessibilityLabel={c.codeLabel}
+                style={[s.otp, { color: colors.text, borderColor: colors.primary, backgroundColor: colors.card }]}
+              />
+              <TouchableOpacity disabled={resendTimer > 0 || loading} onPress={requestOtp} style={{ paddingVertical: 10 }}>
+                <Text style={{ fontSize: 14, fontWeight: "500", color: resendTimer > 0 ? colors.textMuted : colors.primary }}>
+                  {t("cart_resend_code")}
+                  {resendTimer > 0 ? ` (${resendTimer}s)` : ""}
                 </Text>
-                <TextInput
-                  style={[styles.otpInput, { backgroundColor: colors.inputBg, borderColor: colors.primary, color: colors.text }]}
-                  placeholder="------"
-                  value={otpCode}
-                  onChangeText={(v) => setOtpCode(v.replace(/\D/g, ""))}
-                  keyboardType="number-pad"
-                  textContentType="oneTimeCode"
-                  autoComplete="sms-otp"
-                  maxLength={6}
-                  placeholderTextColor={colors.textMuted}
-                />
-                <TouchableOpacity
-                  disabled={resendTimer > 0 || loading}
-                  onPress={async () => {
-                    setLoading(true);
-                    const r = await sendOrderOtp(phone.trim());
-                    setLoading(false);
-                    if (r.ok) {
-                      setResendTimer(r.resendIn || 60);
-                      Alert.alert("SMS qayta yuborildi", "Yangi tasdiqlash kodi yuborildi.");
-                    } else {
-                      Alert.alert("Xatolik", r.error || "SMS yuborilmadi.");
-                    }
-                  }}
-                  style={styles.resendBtn}
-                >
-                  <Text style={[styles.resendText, { color: colors.primary }, resendTimer > 0 && { color: colors.textMuted }]}>
-                    {resendTimer > 0 ? `${t("cart_resend_code")} (${resendTimer}s)` : t("cart_resend_code")}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.orderBtn, { backgroundColor: "#0284c7" }, loading && { opacity: 0.7 }]}
-              onPress={handleCheckout}
-              disabled={loading}
-              activeOpacity={0.88}
-            >
-              {loading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={styles.orderBtnText}>
-                    {!token && !otpSent
-                      ? t("cart_get_code_btn")
-                      : t("cart_confirm_btn")}
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
+              </TouchableOpacity>
+            </Card>
+          ) : null}
         </ScrollView>
-      </KeyboardAvoidingView>
 
-      <SuccessModal
-        visible={orderSuccessModal.visible}
-        title={t("order_success_title")}
-        message={t("order_success_sub").replace("{code}", orderSuccessModal.orderCode)}
-        buttonText={t("btn_continue")}
-        onClose={() => {
-          setOrderSuccessModal({ visible: false, orderCode: "" });
-          navigation.navigate("Asosiy");
-        }}
-      />
+        <View style={[s.summary, { backgroundColor: colors.card, borderTopColor: colors.border }]}>
+          <View style={s.totalRow}>
+            <Text style={{ fontSize: 14, color: colors.textSecondary }}>
+              {c.total}, {totalItems} {c.pcs}
+            </Text>
+            <Text style={[s.totalValue, { color: colors.text }]}>{priceLabel(totalPrice || null, lang)}</Text>
+          </View>
+          <Button title={ready ? t("cart_confirm_btn") : t("cart_get_code_btn")} loading={loading} onPress={handleCheckout} />
+        </View>
+      </KeyboardAvoidingView>
+      {successModal}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8fafc" },
-  header: {
-    paddingHorizontal: 20,
-    paddingBottom: 14,
-    backgroundColor: "#ffffff",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-  },
-  headerTitle: { fontSize: 19, fontWeight: "900", color: "#0f172a" },
-  clearAll: { fontSize: 13, color: "#ef4444", fontWeight: "700" },
-  itemList: { marginBottom: 14 },
-  card: {
-    flexDirection: "row",
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 12,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  cardImg: { width: 75, height: 75, borderRadius: 10, backgroundColor: "#f8fafc", marginRight: 12 },
-  cardInfo: { flex: 1, justifyContent: "space-between" },
-  cardName: { fontSize: 13.5, fontWeight: "700", color: "#0f172a", lineHeight: 18 },
-  cardPrice: { fontSize: 14.5, fontWeight: "900", color: "#0284c7", marginVertical: 4 },
-  cardActions: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  qtyBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 8,
-    padding: 2,
-  },
-  qtyBtn: { width: 28, height: 28, borderRadius: 6, backgroundColor: "#ffffff", alignItems: "center", justifyContent: "center" },
-  qtyBtnText: { fontSize: 16, fontWeight: "700", color: "#0f172a" },
-  qtyNumber: { marginHorizontal: 10, fontSize: 13, fontWeight: "700", color: "#0f172a" },
-  removeBtn: { flexDirection: "row", alignItems: "center", gap: 3 },
-  removeText: { fontSize: 12, color: "#ef4444", fontWeight: "600" },
-
-  authBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "#e0f2fe",
-    borderWidth: 1,
-    borderColor: "#bae6fd",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 12,
-    marginBottom: 14,
-  },
-  authBadgeText: { fontSize: 12.5, color: "#0369a1" },
-
-  checkoutBox: {
-    backgroundColor: "#ffffff",
-    borderRadius: 20,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  checkoutTitle: { fontSize: 17, fontWeight: "900", color: "#0f172a" },
-  checkoutSub: { fontSize: 12, color: "#64748b", marginTop: 2, marginBottom: 14 },
-  label: { fontSize: 12, fontWeight: "700", color: "#334155", marginBottom: 5 },
-  input: {
-    backgroundColor: "#f8fafc",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    fontSize: 13,
-    color: "#0f172a",
-    marginBottom: 12,
-  },
-
-  payOption: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    padding: 12,
-    borderRadius: 14,
-    borderWidth: 1.5,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#ffffff",
-  },
-  payOptionActive: {
-    borderColor: "#0284c7",
-    backgroundColor: "#f0f9ff",
-  },
-  payOptionDisabled: {
-    opacity: 0.5,
-  },
-  radioCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#0284c7",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#0284c7",
-  },
-  payOptionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  payTitle: { fontSize: 13.5, fontWeight: "800", color: "#0f172a" },
-  payDesc: { fontSize: 11.5, color: "#64748b", marginTop: 3, lineHeight: 16 },
-  payBadgesRow: {
-    flexDirection: "row",
-    gap: 5,
-    marginTop: 6,
-  },
-  payPill: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  payPillText: { fontSize: 10, fontWeight: "800", color: "#ffffff" },
-
-  storeAddressCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
-    backgroundColor: "#f0fdf4",
-    borderWidth: 1.5,
-    borderColor: "rgba(5, 150, 105, 0.35)",
-    borderRadius: 14,
-    padding: 14,
-    marginBottom: 14,
-  },
-  storeAddressIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "rgba(5, 150, 105, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 2,
-  },
-  storeAddressTitle: {
-    fontSize: 13.5,
-    fontWeight: "800",
-    color: "#065f46",
-    marginBottom: 2,
-  },
-  storeAddressDesc: {
-    fontSize: 12,
-    color: "#1e293b",
-    lineHeight: 17,
-  },
-  storeAddressPickupNote: {
-    fontSize: 11,
-    color: "#047857",
-    fontWeight: "600",
-    marginTop: 6,
-    lineHeight: 15,
-  },
-
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-    marginTop: 14,
-    marginBottom: 8,
-  },
-  totalLabel: { fontSize: 14, fontWeight: "700", color: "#64748b" },
-  totalValue: { fontSize: 18, fontWeight: "900", color: "#0284c7" },
-  secNote: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    marginBottom: 14,
-  },
-  secNoteText: { fontSize: 11, color: "#059669", fontWeight: "600" },
-
-  orderBtn: {
-    backgroundColor: "#0284c7",
-    paddingVertical: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  orderBtnText: { color: "#ffffff", fontSize: 14.5, fontWeight: "800" },
-
-  otpCard: {
-    backgroundColor: "#eff6ff",
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
-    marginBottom: 16,
-    alignItems: "center",
-  },
-  otpTitle: { fontSize: 14, fontWeight: "800", color: "#1e3a8a", marginBottom: 4 },
-  otpSubtitle: { fontSize: 12, color: "#3b82f6", textAlign: "center", marginBottom: 12 },
-  otpInput: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1.5,
-    borderColor: "#0284c7",
-    borderRadius: 12,
-    fontSize: 22,
-    fontWeight: "900",
-    letterSpacing: 6,
-    textAlign: "center",
-    width: "70%",
-    paddingVertical: 8,
-    color: "#0f172a",
-    marginBottom: 10,
-  },
-  resendBtn: { paddingVertical: 4 },
-  resendText: { fontSize: 12, color: "#0284c7", fontWeight: "700" },
-
-  emptyContainer: { flex: 1, alignItems: "center", justifyContent: "center", padding: 30, backgroundColor: "#ffffff" },
-  emptyIconCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: "#e0f2fe",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  emptyTitle: { fontSize: 19, fontWeight: "900", color: "#0f172a", marginBottom: 6 },
-  emptyDesc: { fontSize: 13, color: "#64748b", textAlign: "center", marginBottom: 24, lineHeight: 18 },
-  shopBtn: { backgroundColor: "#0284c7", paddingHorizontal: 24, paddingVertical: 12, borderRadius: 14 },
-  shopBtnText: { color: "#ffffff", fontWeight: "800", fontSize: 14 },
+const s = StyleSheet.create({
+  screen: { flex: 1 },
+  header: { paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  content: { padding: 20, paddingTop: 14, paddingBottom: 24 },
+  item: { flexDirection: "row", gap: 12, padding: 12 },
+  thumb: { width: 64, height: 64, borderRadius: 10, overflow: "hidden", alignItems: "center", justifyContent: "center" },
+  thumbImg: { width: "100%", height: "100%" },
+  itemName: { flex: 1, fontSize: 14, lineHeight: 19, fontWeight: "500" },
+  itemBottom: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8 },
+  itemPrice: { fontSize: 14.5, fontWeight: "600", flexShrink: 1, marginRight: 8 },
+  stepper: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 10, height: 38 },
+  stepBtn: { width: 38, height: 36, alignItems: "center", justifyContent: "center" },
+  stepText: { minWidth: 22, textAlign: "center", fontSize: 14, fontWeight: "600" },
+  cardTitle: { fontSize: 15, fontWeight: "600", marginBottom: 12 },
+  pickup: { flexDirection: "row", gap: 10, paddingTop: 12, paddingBottom: 12, borderTopWidth: 1, marginTop: 2 },
+  pickupText: { flex: 1, fontSize: 13.5, lineHeight: 19 },
+  otp: { height: 56, borderWidth: 1.5, borderRadius: 12, textAlign: "center", fontSize: 24, fontWeight: "600", letterSpacing: 10 },
+  summary: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 12, borderTopWidth: 1 },
+  totalRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 },
+  totalValue: { fontSize: 17, fontWeight: "700" },
+  empty: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 32 },
+  emptyTitle: { fontSize: 18, fontWeight: "600", marginTop: 18, textAlign: "center" },
+  emptySub: { fontSize: 14.5, lineHeight: 21, marginTop: 6, textAlign: "center" },
+  scrim: { flex: 1, alignItems: "center", justifyContent: "center", padding: 28 },
+  modal: { width: "100%", borderRadius: 20, padding: 24, paddingBottom: 18, alignItems: "center" },
+  okCircle: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", marginBottom: 14 },
+  modalTitle: { fontSize: 20, fontWeight: "700", textAlign: "center" },
+  modalText: { fontSize: 15, lineHeight: 22, marginTop: 8, textAlign: "center" },
 });

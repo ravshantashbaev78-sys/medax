@@ -54,6 +54,8 @@ model User {
   passwordHash String
   role         Role     @default(MANAGER)
   createdAt    DateTime @default(now())
+  // Shu vaqtdan oldin berilgan tokenlar yaroqsiz (parol almashtirilganda eski sessiyalar yopiladi)
+  passwordChangedAt DateTime?
 }
 
 model Category {
@@ -177,6 +179,7 @@ model Customer {
   balance                Decimal        @default(0) @db.Decimal(14, 2)
   avatar                 String?
   passwordHash           String?
+  passwordChangedAt      DateTime?
   resetPasswordOtpSentAt DateTime?
   pushToken              String?
   hasApp                 Boolean        @default(false)

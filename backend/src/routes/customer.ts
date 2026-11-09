@@ -47,18 +47,20 @@ function extractCustomerToken(req: Request): string {
  * Telefon va ism tokendan emas, bazadan olinadi (eskirgan ma'lumot ishlatilmaydi).
  */
 async function resolveCustomer(token: string): Promise<CustomerAuthPayload | null> {
-  let decoded: CustomerAuthPayload;
+  let decoded: CustomerAuthPayload & { iat?: number };
   try {
-    decoded = jwt.verify(token, config.customerJwtSecret) as CustomerAuthPayload;
+    decoded = jwt.verify(token, config.customerJwtSecret) as CustomerAuthPayload & { iat?: number };
   } catch {
     return null;
   }
   if (!decoded || decoded.type !== "CUSTOMER" || !decoded.id) return null;
   const row = await prisma.customer.findUnique({
     where: { id: decoded.id },
-    select: { id: true, phone: true, name: true },
+    select: { id: true, phone: true, name: true, passwordChangedAt: true },
   });
   if (!row || !row.phone) return null;
+  // Parol almashtirilgandan oldin berilgan tokenlar (masalan, o'g'irlangan telefondagi sessiya) yaroqsiz
+  if (row.passwordChangedAt && (decoded.iat ?? 0) < Math.floor(row.passwordChangedAt.getTime() / 1000)) return null;
   return { id: row.id, type: "CUSTOMER", phone: row.phone, name: row.name };
 }
 
@@ -119,6 +121,19 @@ const customerLoginLimiter = rateLimit({
     return `${getClientIp(req)}_${rawPhone}`;
   },
   message: { error: "Kirish urinishlari ko'payib ketdi. 15 daqiqadan keyin qayta urinib ko'ring." },
+});
+
+// Bitta raqamga turli IP'lardan parol tanlashni cheklash
+const customerPhoneLoginLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => {
+    const raw = req.body && typeof req.body.phone === "string" ? req.body.phone : "";
+    return "phone:" + (normalizePhone(raw) || raw.replace(/\D/g, ""));
+  },
+  message: { error: "Bu raqamga juda ko'p kirish urinishi bo'ldi. 1 soatdan keyin urinib ko'ring." },
 });
 
 // Profil rasmini yuklash limiti (xotira va disk to'lishidan himoya)
@@ -278,7 +293,7 @@ customerRouter.post("/auth/verify-otp", authLimiter, async (req, res) => {
     customer = await prisma.customer.update({
       where: { id: customer.id },
       data: {
-        ...(passwordHash ? { passwordHash } : {}),
+        ...(passwordHash ? { passwordHash, passwordChangedAt: new Date() } : {}),
         ...(name ? { name } : {}),
         ...(organization !== undefined ? { organization } : {}),
       },
@@ -301,7 +316,7 @@ customerRouter.post("/auth/verify-otp", authLimiter, async (req, res) => {
 });
 
 // 3. Telefon raqam + Parol orqali kirish (SMS siz tezkor kirish)
-customerRouter.post("/auth/login", customerLoginLimiter, async (req, res) => {
+customerRouter.post("/auth/login", customerLoginLimiter, customerPhoneLoginLimiter, async (req, res) => {
   const { phone: raw, password } = z
     .object({
       phone: z.string().trim().min(3, "Telefon raqamini kiriting").max(30),
@@ -386,6 +401,14 @@ customerRouter.post("/auth/forgot-password-otp", customerOtpLimiter, async (req,
   // Eskiz SMS balansi va limitlar
   await assertSmsBudgetAvailable(ip);
 
+  // Bitta raqamga soatlik SMS limiti (SMS-bombing himoyasi)
+  const hourlyReset = await prisma.otpCode.count({
+    where: { phone, createdAt: { gt: new Date(Date.now() - 3600_000) } },
+  });
+  if (hourlyReset >= config.hourlyPhoneOtpLimit) {
+    throw new HttpError(429, `Bir soatda ${config.hourlyPhoneOtpLimit} tadan ortiq kod so'rab bo'lmaydi. Keyinroq urinib ko'ring.`);
+  }
+
   const code = String(crypto.randomInt(100000, 1000000));
 
   try {
@@ -449,7 +472,7 @@ customerRouter.post("/auth/reset-password", authLimiter, async (req, res) => {
   const passwordHash = await bcrypt.hash(newPassword, 10);
   const updated = await prisma.customer.update({
     where: { id: customer.id },
-    data: { passwordHash },
+    data: { passwordHash, passwordChangedAt: new Date() },
   });
 
   const token = createCustomerToken({ id: updated.id, phone: updated.phone || phone, name: updated.name });
@@ -564,13 +587,16 @@ customerRouter.put("/auth/password", requireCustomerAuth, async (req, res) => {
     if (!match) throw new HttpError(400, "Joriy parol noto'g'ri.");
   }
 
+  validatePasswordStrength(newPassword);
   const passwordHash = await bcrypt.hash(newPassword, 10);
-  await prisma.customer.update({
+  const changed = await prisma.customer.update({
     where: { id: customer.id },
-    data: { passwordHash },
+    data: { passwordHash, passwordChangedAt: new Date() },
   });
 
-  res.json({ ok: true, message: "Parol muvaffaqiyatli saqlandi ✓" });
+  // Boshqa qurilmalardagi sessiyalar yopiladi, joriy qurilma uchun yangi token beriladi
+  const token = createCustomerToken({ id: changed.id, phone: changed.phone || "", name: changed.name });
+  res.json({ ok: true, token, message: "Parol muvaffaqiyatli saqlandi" });
 });
 
 // 6b. Hisobni butunlay o'chirish (Google Play / App Store talabi: ilova ichidan hisobni o'chirish)
@@ -642,8 +668,30 @@ customerRouter.get("/orders", requireCustomerAuth, async (req, res) => {
     },
   });
 
+  // Faqat mijozga tegishli maydonlar: menejer izohi, IP, ichki belgilar (flags) tashqariga chiqmaydi.
+  // "FAKE" — ichki belgi, mijozga oddiy "bekor qilindi" sifatida ko'rinadi.
   const mapped = orders.map((o) => ({
-    ...o,
+    id: o.id,
+    code: o.code,
+    status: o.status === "FAKE" ? "CANCELED" : o.status,
+    customerName: o.customerName,
+    organization: o.organization,
+    deliveryAddress: o.deliveryAddress,
+    paymentMethod: o.paymentMethod,
+    comment: o.comment,
+    totalAmount: o.totalAmount,
+    isPaid: o.isPaid,
+    paidAt: o.paidAt,
+    createdAt: o.createdAt,
+    updatedAt: o.updatedAt,
+    items: o.items.map((it) => ({
+      id: it.id,
+      productId: it.productId,
+      productName: it.productName,
+      quantity: it.quantity,
+      price: it.price,
+      product: it.product,
+    })),
     cancelReason: o.status === "CANCELED" ? o.managerNote : undefined,
   }));
 
@@ -686,7 +734,7 @@ customerRouter.post("/orders/:id/cancel", requireCustomerAuth, async (req, res) 
     },
   });
 
-  res.json({ ok: true, order: updated });
+  res.json({ ok: true, order: { id: updated.id, code: updated.code, status: updated.status } });
 });
 
 // 7. Mobil ilova Push Tokenini saqlash

@@ -36,7 +36,7 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
   if (!token) return next(new HttpError(401, "Tizimga kiring"));
 
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as AuthUser;
+    const decoded = jwt.verify(token, config.jwtSecret) as AuthUser & { iat?: number };
     const validRoles = ["OWNER", "ADMIN", "MANAGER"];
     if (!decoded || !decoded.id || !validRoles.includes(decoded.role)) {
       return next(new HttpError(401, "Noto'g'ri yoki ruxsatsiz token"));
@@ -45,11 +45,15 @@ export async function requireAuth(req: Request, _res: Response, next: NextFuncti
     // Xavfsizlik: xodim hali ham bazada mavjudmi va roli to'g'rimi?
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
-      select: { id: true, role: true, email: true, name: true },
+      select: { id: true, role: true, email: true, name: true, passwordChangedAt: true },
     });
 
     if (!user || !validRoles.includes(user.role)) {
       return next(new HttpError(401, "Xodim hisobi o'chirilgan yoki huquqlari bekor qilingan"));
+    }
+    // Parol almashtirilgandan oldin berilgan token — yaroqsiz
+    if (user.passwordChangedAt && (decoded.iat ?? 0) < Math.floor(user.passwordChangedAt.getTime() / 1000)) {
+      return next(new HttpError(401, "Parol o'zgartirilgan. Qayta kiring"));
     }
 
     req.user = { id: user.id, role: user.role, email: user.email, name: user.name };
@@ -84,7 +88,17 @@ const loginLimiter = rateLimit({
   message: { error: "Juda koʻp urinish. 15 daqiqadan keyin qayta urinib koʻring." },
 });
 
-authRouter.post("/login", loginLimiter, async (req, res) => {
+// Bitta hisobga turli IP'lardan parol tanlashni cheklash
+const loginAccountLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => "acct:" + String(req.body?.email || "").toLowerCase().trim(),
+  message: { error: "Bu hisobga juda ko'p urinish bo'ldi. 1 soatdan keyin qayta urinib ko'ring." },
+});
+
+authRouter.post("/login", loginLimiter, loginAccountLimiter, async (req, res) => {
   const { email, password } = z
     .object({ email: z.string().email(), password: z.string().min(1) })
     .parse(req.body);

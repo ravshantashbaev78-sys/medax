@@ -7,23 +7,40 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
+  FlatList,
+  Share,
+  useWindowDimensions,
+  NativeSyntheticEvent,
+  NativeScrollEvent,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { fetchProductDetail, Product, getImageUrl, formatPrice } from "../api";
+import { fetchProductDetail, getImageUrl, Product } from "../api";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
 import { useI18n, localizeCategoryName, localizeProductName, localizeProductDescription } from "../context/I18nContext";
-import { ShieldIcon, CartIcon } from "../components/Icons";
+import { priceLabel } from "../components/ProductCard";
+import { Button, IcBack, IcExternal, IcImage, IcMinus, IcPlus } from "../components/ui";
+
+const L = {
+  uz: { desc: "Tavsif", specs: "Xususiyatlari", more: "Ko'proq", less: "Yig'ish", notFound: "Mahsulot topilmadi", back: "Orqaga", share: "Ulashish" },
+  ru: { desc: "Описание", specs: "Характеристики", more: "Подробнее", less: "Свернуть", notFound: "Товар не найден", back: "Назад", share: "Поделиться" },
+  en: { desc: "Description", specs: "Specifications", more: "Show more", less: "Show less", notFound: "Product not found", back: "Back", share: "Share" },
+};
 
 export function ProductDetailScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
   const { lang, t } = useI18n();
-  const { colors, theme } = useTheme();
+  const { colors } = useTheme();
+  const c = L[lang] || L.uz;
   const { slug } = route.params;
+  const { addToCart } = useCart();
+
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
-  const { addToCart } = useCart();
+  const [imgIndex, setImgIndex] = useState(0);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     fetchProductDetail(slug).then((data) => {
@@ -32,148 +49,148 @@ export function ProductDetailScreen({ route, navigation }: any) {
     });
   }, [slug]);
 
-  if (loading) {
+  const back = () => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate("MainTabs"));
+
+  if (loading || !product) {
     return (
-      <View style={[styles.center, { backgroundColor: colors.bg }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
+      <View style={[s.center, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary} />
+        ) : (
+          <>
+            <Text style={{ fontSize: 16, color: colors.textSecondary }}>{c.notFound}</Text>
+            <Button title={c.back} variant="secondary" onPress={back} style={{ marginTop: 16, paddingHorizontal: 28 }} />
+          </>
+        )}
       </View>
     );
   }
 
-  if (!product) {
-    return (
-      <View style={[styles.center, { backgroundColor: colors.bg }]}>
-        <Text style={[styles.notFound, { color: colors.textMuted }]}>Mahsulot topilmadi</Text>
-      </View>
-    );
-  }
+  const images = product.images?.length ? product.images : [];
+  const stock = typeof product.stock === "number" ? product.stock : undefined;
+  const outOfStock = stock !== undefined && stock <= 0;
+  const maxQty = Math.min(100, stock ?? 100);
+  const name = localizeProductName(product, lang);
+  const description = localizeProductDescription(product, lang);
+  const specs: { name?: string; key?: string; value?: string }[] = Array.isArray(product.specs) ? product.specs : [];
 
-  const imgUrl = getImageUrl(product.images?.[0]?.url);
+  const onImageScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    setImgIndex(Math.round(e.nativeEvent.contentOffset.x / width));
+  };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.scroll, { backgroundColor: colors.bg, paddingBottom: 120 + insets.bottom }]}
-      >
-        {/* Main Product Image */}
-        <View style={[styles.mainImgWrap, { backgroundColor: theme === "dark" ? "#0e1822" : "#f8fafc", borderBottomColor: colors.border }]}>
-          <Image source={{ uri: imgUrl }} style={styles.mainImg} resizeMode="contain" />
-          {product.isHit && (
-            <View style={styles.hitBadge}>
-              <Text style={styles.hitBadgeText}>XIT MAHSULOT</Text>
+    <View style={[s.screen, { backgroundColor: colors.card }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 110 + insets.bottom }}>
+        <View style={{ height: 340, backgroundColor: colors.inputBg }}>
+          {images.length ? (
+            <FlatList
+              data={images}
+              horizontal
+              pagingEnabled
+              showsHorizontalScrollIndicator={false}
+              onMomentumScrollEnd={onImageScroll}
+              keyExtractor={(_, i) => String(i)}
+              renderItem={({ item }) => <Image source={{ uri: getImageUrl(item.url) }} style={{ width, height: 340 }} resizeMode="cover" />}
+            />
+          ) : (
+            <View style={[s.center, { flex: 1 }]}>
+              <IcImage size={44} color={colors.textMuted} strokeWidth={1.3} />
             </View>
           )}
-        </View>
-
-        <View style={[styles.body, { backgroundColor: colors.bg }]}>
-          {product.category && (
-            <Text style={[styles.catName, { color: colors.primary }]}>
-              {localizeCategoryName(product.category.slug || product.category.name, lang)}
-            </Text>
-          )}
-
-          <Text style={[styles.title, { color: colors.text }]}>{localizeProductName(product, lang)}</Text>
-
-          <View style={styles.priceRow}>
-            <Text style={[styles.price, { color: colors.primary }]}>{formatPrice(product.priceFrom)}</Text>
-            {product.country && (
-              <View style={[styles.countryBadge, { backgroundColor: colors.inputBg, borderColor: colors.border, borderWidth: 1 }]}>
-                <Text style={[styles.countryText, { color: colors.text }]}>🌍 {product.country}</Text>
-              </View>
-            )}
-          </View>
-
-          <View style={styles.stockRow}>
-            <Text style={[styles.stockText, { color: (product.stock ?? 1) > 0 ? colors.primary : "#dc2626" }]}>
-              {product.stock !== undefined && product.stock !== null ? (
-                product.stock > 0
-                  ? `📦 ${t("stock_in").replace("{n}", String(product.stock))}`
-                  : `❌ ${t("stock_out")}`
-              ) : (
-                `📦 ${t("stock_in").replace("{n}", "10+")}`
-              )}
-            </Text>
-          </View>
-
-          {/* Description */}
-          {product.description || product.descriptionRu || product.descriptionEn ? (
-            <View style={[styles.section, { borderTopColor: colors.border }]}>
-              <Text style={[styles.sectionHeader, { color: colors.text }]}>
-                {lang === "ru" ? "Описание и назначение" : lang === "en" ? "Description & Details" : "Tavsif va ma'lumot"}
-              </Text>
-              <Text style={[styles.desc, { color: colors.text }]}>{localizeProductDescription(product, lang)}</Text>
+          {images.length > 1 ? (
+            <View style={s.dots} pointerEvents="none">
+              {images.map((_, i) => (
+                <View key={i} style={[s.dot, i === imgIndex ? { width: 18, backgroundColor: "#101828" } : { backgroundColor: "#C2C8D0" }]} />
+              ))}
             </View>
           ) : null}
+          <TouchableOpacity style={[s.floatBtn, { top: insets.top + 8, left: 16 }]} onPress={back} accessibilityRole="button" accessibilityLabel={c.back}>
+            <IcBack size={20} color="#101828" strokeWidth={2} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[s.floatBtn, { top: insets.top + 8, right: 16 }]}
+            onPress={() => Share.share({ message: `${name} — https://medax.uz/product/${product.slug}` })}
+            accessibilityRole="button"
+            accessibilityLabel={c.share}
+          >
+            <IcExternal size={19} color="#101828" strokeWidth={1.9} />
+          </TouchableOpacity>
+        </View>
 
-          {/* Specs Table */}
-          {Array.isArray(product.specs) && product.specs.length > 0 && (
-            <View style={[styles.section, { borderTopColor: colors.border }]}>
-              <Text style={[styles.sectionHeader, { color: colors.text }]}>
-                {lang === "ru" ? "Характеристики" : lang === "en" ? "Specifications" : "Xususiyatlari"}
+        <View style={s.body}>
+          {product.category ? (
+            <Text style={[s.meta, { color: colors.textMuted }]}>
+              {localizeCategoryName(product.category.slug || product.category.name, lang)}
+              {product.country ? ` · ${product.country}` : ""}
+            </Text>
+          ) : null}
+          <Text style={[s.name, { color: colors.text }]}>{name}</Text>
+          <View style={s.priceRow}>
+            <Text style={[s.price, { color: colors.text }]}>{priceLabel(product.priceFrom, lang)}</Text>
+            {stock !== undefined ? (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: outOfStock ? colors.danger : colors.success }} />
+                <Text style={{ fontSize: 13, fontWeight: "500", color: outOfStock ? colors.danger : colors.success }}>
+                  {outOfStock ? t("stock_out") : t("stock_in").replace("{n}", String(stock))}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+
+          {description ? (
+            <>
+              <Text style={[s.h2, { color: colors.text }]}>{c.desc}</Text>
+              <Text style={[s.desc, { color: colors.textSecondary }]} numberOfLines={expanded ? undefined : 4}>
+                {description}
               </Text>
-              <View style={[styles.specsWrap, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-                {product.specs.map((spec: any, idx: number) => (
-                  <View key={idx} style={[styles.specRow, idx % 2 === 1 && { backgroundColor: colors.card }]}>
-                    <Text style={[styles.specName, { color: colors.textMuted }]}>{spec.name || spec.key}:</Text>
-                    <Text style={[styles.specValue, { color: colors.text }]}>{spec.value}</Text>
+              {description.length > 180 ? (
+                <TouchableOpacity onPress={() => setExpanded((v) => !v)} hitSlop={8} style={{ paddingVertical: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "500", color: colors.primary }}>{expanded ? c.less : c.more}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
+          ) : null}
+
+          {specs.length > 0 ? (
+            <>
+              <Text style={[s.h2, { color: colors.text }]}>{c.specs}</Text>
+              <View style={[s.specs, { borderColor: colors.border }]}>
+                {specs.map((sp, i) => (
+                  <View key={i} style={[s.specRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
+                    <Text style={[s.specKey, { color: colors.textMuted }]}>{sp.name || sp.key}</Text>
+                    <Text style={[s.specVal, { color: colors.text }]}>{sp.value}</Text>
                   </View>
                 ))}
               </View>
-            </View>
-          )}
-
-          {/* Kafolat va yetkazib berish (Web sayt kabi) */}
-          <View style={[styles.guaranteeBox, theme === "dark" && { backgroundColor: "#064e3b25", borderColor: "#05966950" }]}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 4 }}>
-              <ShieldIcon size={17} color="#10b981" />
-              <Text style={[styles.guaranteeTitle, { color: "#10b981" }]}>Medax Rasmiy Kafolati</Text>
-            </View>
-            <Text style={[styles.guaranteeDesc, { color: theme === "dark" ? "#a7f3d0" : "#047857" }]}>
-              Barcha uskunalarimiz 100% sertifikatlangan, rasmiy zavod kafolatiga ega va butun O'zbekiston bo'ylab mutaxassislarimiz tomonidan yetkazib o'rnatiladi.
-            </Text>
-          </View>
+            </>
+          ) : null}
         </View>
       </ScrollView>
 
-      {/* Bottom Bar: Quantity & Add to Cart */}
-      <View style={[styles.bottomBar, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) }]}>
-        {product.stock !== undefined && product.stock <= 0 ? (
-          <View style={[styles.addToCartBtn, { backgroundColor: "#fee2e2", flex: 1, elevation: 0 }]}>
-            <Text style={{ color: "#dc2626", fontWeight: "800", fontSize: 15 }}>
-              {t("stock_cart_empty")}
-            </Text>
+      <View style={[s.bottom, { backgroundColor: colors.card, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, 12) + 4 }]}>
+        {outOfStock ? (
+          <View style={[s.soldOut, { backgroundColor: colors.dangerSoft }]}>
+            <Text style={{ color: colors.danger, fontWeight: "600", fontSize: 15 }}>{t("stock_cart_empty")}</Text>
           </View>
         ) : (
           <>
-            <View style={[styles.qtyControl, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[styles.qtyBtn, { backgroundColor: colors.card }]}
-                onPress={() => setQuantity((q) => Math.max(1, q - 1))}
-              >
-                <Text style={[styles.qtyBtnText, { color: colors.text }]}>-</Text>
+            <View style={[s.qty, { borderColor: colors.borderStrong }]}>
+              <TouchableOpacity style={s.qtyBtn} onPress={() => setQuantity((q) => Math.max(1, q - 1))} accessibilityLabel="Kamaytirish">
+                <IcMinus size={18} color={colors.text} strokeWidth={2} />
               </TouchableOpacity>
-              <Text style={[styles.qtyText, { color: colors.text }]}>{quantity}</Text>
-              <TouchableOpacity
-                style={[styles.qtyBtn, { backgroundColor: colors.card }]}
-                onPress={() => setQuantity((q) => Math.min(product.stock ?? 100, q + 1))}
-              >
-                <Text style={[styles.qtyBtnText, { color: colors.text }]}>+</Text>
+              <Text style={[s.qtyText, { color: colors.text }]}>{quantity}</Text>
+              <TouchableOpacity style={s.qtyBtn} onPress={() => setQuantity((q) => Math.min(maxQty, q + 1))} disabled={quantity >= maxQty} accessibilityLabel="Ko'paytirish">
+                <IcPlus size={18} color={quantity >= maxQty ? colors.textMuted : colors.text} strokeWidth={2} />
               </TouchableOpacity>
             </View>
-
-            <TouchableOpacity
-              style={[styles.addToCartBtn, { backgroundColor: "#0284c7" }]}
+            <Button
+              title={t("prod_add_cart")}
+              style={{ flex: 1 }}
               onPress={() => {
                 addToCart(product, quantity);
-                navigation.navigate("Savatcha");
+                navigation.navigate("MainTabs", { screen: "Savatcha" });
               }}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <CartIcon size={18} color="#ffffff" />
-                <Text style={styles.addToCartText}>Savatchaga qo'shish</Text>
-              </View>
-            </TouchableOpacity>
+            />
           </>
         )}
       </View>
@@ -181,97 +198,26 @@ export function ProductDetailScreen({ route, navigation }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#ffffff" },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
-  notFound: { fontSize: 16, color: "#64748b" },
-  scroll: { backgroundColor: "#ffffff" },
-  mainImgWrap: {
-    width: "100%",
-    height: 300,
-    backgroundColor: "#f8fafc",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 16,
-    position: "relative",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-  },
-  mainImg: { width: "100%", height: "100%" },
-  hitBadge: {
-    position: "absolute",
-    top: 14,
-    left: 14,
-    backgroundColor: "#ef4444",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  hitBadgeText: { color: "#ffffff", fontSize: 10, fontWeight: "900" },
-  body: { padding: 18 },
-  catName: { fontSize: 11.5, fontWeight: "800", color: "#0284c7", textTransform: "uppercase", marginBottom: 6 },
-  title: { fontSize: 20, fontWeight: "800", color: "#0f172a", lineHeight: 28, marginBottom: 12 },
-  priceRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 },
-  stockRow: { marginBottom: 16 },
-  stockText: { fontSize: 13, fontWeight: "700" },
-  price: { fontSize: 22, fontWeight: "900", color: "#0284c7" },
-  countryBadge: { backgroundColor: "#f1f5f9", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
-  countryText: { fontSize: 12, fontWeight: "600", color: "#334155" },
-  section: { marginTop: 14, borderTopWidth: 1, borderTopColor: "#f1f5f9", paddingTop: 14 },
-  sectionHeader: { fontSize: 15, fontWeight: "800", color: "#0f172a", marginBottom: 8 },
-  desc: { fontSize: 13.5, color: "#334155", lineHeight: 21 },
-  specsWrap: { backgroundColor: "#f8fafc", borderRadius: 12, overflow: "hidden", borderWidth: 1, borderColor: "#e2e8f0" },
-  specRow: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 9, paddingHorizontal: 12 },
-  specRowAlt: { backgroundColor: "#f1f5f9" },
-  specName: { fontSize: 12, color: "#64748b", fontWeight: "600", flex: 1 },
-  specValue: { fontSize: 12, color: "#0f172a", fontWeight: "700", flex: 1, textAlign: "right" },
-  guaranteeBox: {
-    marginTop: 18,
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(16, 185, 129, 0.25)",
-    borderRadius: 14,
-    padding: 14,
-  },
-  guaranteeTitle: { fontSize: 13.5, fontWeight: "800", color: "#065f46", marginBottom: 4 },
-  guaranteeDesc: { fontSize: 12, color: "#047857", lineHeight: 17 },
-  bottomBar: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    shadowColor: "#0f172a",
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-  qtyControl: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 12,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  qtyBtn: { width: 34, height: 34, borderRadius: 8, backgroundColor: "#ffffff", justifyContent: "center", alignItems: "center" },
-  qtyBtnText: { fontSize: 18, fontWeight: "700", color: "#0f172a" },
-  qtyText: { marginHorizontal: 12, fontSize: 15, fontWeight: "800", color: "#0f172a" },
-  addToCartBtn: {
-    flex: 1,
-    backgroundColor: "#0284c7",
-    paddingVertical: 13,
-    borderRadius: 14,
-    alignItems: "center",
-  },
-  addToCartText: { color: "#ffffff", fontSize: 14.5, fontWeight: "800" },
+const s = StyleSheet.create({
+  screen: { flex: 1 },
+  center: { flex: 1, alignItems: "center", justifyContent: "center" },
+  floatBtn: { position: "absolute", width: 44, height: 44, borderRadius: 22, backgroundColor: "#FFFFFF", alignItems: "center", justifyContent: "center", elevation: 2, shadowColor: "#101828", shadowOpacity: 0.12, shadowRadius: 3, shadowOffset: { width: 0, height: 1 } },
+  dots: { position: "absolute", bottom: 14, left: 0, right: 0, flexDirection: "row", justifyContent: "center", gap: 6 },
+  dot: { width: 6, height: 6, borderRadius: 3 },
+  body: { paddingHorizontal: 20, paddingTop: 18 },
+  meta: { fontSize: 13 },
+  name: { fontSize: 21, lineHeight: 27, fontWeight: "600", marginTop: 6, letterSpacing: -0.3 },
+  priceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 12, gap: 12 },
+  price: { fontSize: 21, fontWeight: "700", letterSpacing: -0.3, flexShrink: 1 },
+  h2: { fontSize: 15, fontWeight: "600", marginTop: 22, marginBottom: 6 },
+  desc: { fontSize: 14.5, lineHeight: 22 },
+  specs: { borderWidth: 1, borderRadius: 12, overflow: "hidden" },
+  specRow: { flexDirection: "row", justifyContent: "space-between", gap: 12, paddingHorizontal: 14, paddingVertical: 11 },
+  specKey: { fontSize: 13.5, flex: 1 },
+  specVal: { fontSize: 13.5, fontWeight: "500", flex: 1, textAlign: "right" },
+  bottom: { position: "absolute", left: 0, right: 0, bottom: 0, flexDirection: "row", gap: 10, paddingHorizontal: 20, paddingTop: 12, borderTopWidth: 1 },
+  qty: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderRadius: 12, height: 52 },
+  qtyBtn: { width: 44, height: 50, alignItems: "center", justifyContent: "center" },
+  qtyText: { minWidth: 28, textAlign: "center", fontSize: 16, fontWeight: "600" },
+  soldOut: { flex: 1, height: 52, borderRadius: 12, alignItems: "center", justifyContent: "center" },
 });

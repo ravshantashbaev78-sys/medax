@@ -8,7 +8,7 @@ export const CUSTOMER_CACHE_KEY = "@medax_customer_profile";
 /** Server JSON o'rniga HTML (masalan 502 xato sahifasi) qaytarsa ham ilova yiqilmaydi */
 async function readJson(res: Response): Promise<any> {
   try {
-    return await readJson(res);
+    return await res.json();
   } catch {
     return { error: res.ok ? "Serverdan noto'g'ri javob keldi" : `Server vaqtincha ishlamayapti (${res.status}). Birozdan so'ng urinib ko'ring.` };
   }
@@ -176,7 +176,8 @@ export async function verifyCustomerOtp(phone: string, code: string, name?: stri
         phone: cleanPhone,
         code: code.trim(),
         name: name?.trim(),
-        password: password?.trim() || undefined,
+        // Parol qirqilmaydi: login va reset ham uni aynan shunday yuboradi
+        password: password || undefined,
       }),
     });
     const data = await readJson(res);

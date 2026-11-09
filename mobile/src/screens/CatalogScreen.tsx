@@ -1,52 +1,51 @@
 import React, { useEffect, useRef, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  Image,
-  ActivityIndicator,
-  Dimensions,
-  RefreshControl,
-} from "react-native";
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, ActivityIndicator, RefreshControl } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Category, fetchCategories, fetchProductsPage, Product, getImageUrl, formatPrice } from "../api";
+import { Category, fetchCategories, fetchProductsPage, Product } from "../api";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
-import { useI18n, localizeCategoryName, localizeProductName } from "../context/I18nContext";
-import { SearchIcon, CloseIcon, CartIcon } from "../components/Icons";
+import { useI18n, localizeCategoryName } from "../context/I18nContext";
+import { ProductCard } from "../components/ProductCard";
+import { Button, IcClose, IcSearch, ui } from "../components/ui";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const L = {
+  uz: { all: "Barchasi", offline: "Internet aloqasi yo'q", offlineSub: "Tarmoqni tekshirib, qayta urinib ko'ring.", retry: "Qayta urinish", count: "ta mahsulot" },
+  ru: { all: "Все", offline: "Нет подключения к интернету", offlineSub: "Проверьте сеть и попробуйте снова.", retry: "Повторить", count: "товаров" },
+  en: { all: "All", offline: "No internet connection", offlineSub: "Check your connection and try again.", retry: "Try again", count: "products" },
+};
 
 export function CatalogScreen({ navigation, route }: any) {
   const insets = useSafeAreaInsets();
   const { lang, t } = useI18n();
-  const { colors, theme } = useTheme();
-  const initialCategory = route?.params?.categoryId;
+  const { colors } = useTheme();
+  const c = L[lang] || L.uz;
+  const { addToCart } = useCart();
+
   const [categories, setCategories] = useState<Category[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [selectedCat, setSelectedCat] = useState<number | undefined>(initialCategory);
+  const [selectedCat, setSelectedCat] = useState<number | undefined>(route?.params?.categoryId || undefined);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [addedId, setAddedId] = useState<number | null>(null);
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [page, setPage] = useState(1);
-  const [pages, setPages] = useState(1);
+  const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState(false);
+  const [page, setPage] = useState(1);
+  const [pages, setPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [addedId, setAddedId] = useState<number | null>(null);
   const requestId = useRef(0);
-  const { addToCart } = useCart();
+  const searchRef = useRef<TextInput>(null);
 
+  // Bosh sahifadan kategoriya yoki qidiruv bilan kelinganda
   useEffect(() => {
-    if (route?.params?.categoryId !== undefined) {
-      setSelectedCat(route.params.categoryId);
-    }
+    if (route?.params?.categoryId !== undefined) setSelectedCat(route.params.categoryId || undefined);
   }, [route?.params?.categoryId]);
+  useEffect(() => {
+    if (route?.params?.focusSearch) setTimeout(() => searchRef.current?.focus(), 250);
+  }, [route?.params?.focusSearch]);
 
-  // Har bir harf uchun so'rov yubormaslik uchun qidiruvni 350ms kechiktiramiz
+  // Har bir harf uchun so'rov yubormaslik uchun qidiruvni kechiktiramiz
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(search.trim()), 350);
     return () => clearTimeout(timer);
@@ -54,15 +53,15 @@ export function CatalogScreen({ navigation, route }: any) {
 
   const loadFirstPage = async (isRefresh = false) => {
     const myId = ++requestId.current;
-    if (isRefresh || categories.length === 0) fetchCategories().then((c) => c.length && setCategories(c));
+    if (isRefresh || categories.length === 0) fetchCategories().then((cs) => cs.length && setCategories(cs));
     if (isRefresh) setRefreshing(true);
     else setLoading(true);
     const res = await fetchProductsPage({ categoryId: selectedCat, search: debouncedSearch, page: 1 });
-    // Eskirgan javob (foydalanuvchi allaqachon boshqa narsa qidiryapti) — e'tiborsiz qoldiramiz
-    if (myId !== requestId.current) return;
+    if (myId !== requestId.current) return; // eskirgan javob
     setProducts(res.items);
     setPage(1);
     setPages(res.pages);
+    setTotal(res.total);
     setLoadError(!res.ok);
     setLoading(false);
     setRefreshing(false);
@@ -88,60 +87,55 @@ export function CatalogScreen({ navigation, route }: any) {
     setLoadingMore(false);
   };
 
-  const handleAddToCart = (product: Product) => {
-    addToCart(product, 1);
-    setAddedId(product.id);
-    setTimeout(() => setAddedId(null), 1200);
+  const handleAdd = (p: Product) => {
+    addToCart(p, 1);
+    setAddedId(p.id);
+    setTimeout(() => setAddedId((cur) => (cur === p.id ? null : cur)), 1200);
   };
 
+  const chips = [{ id: 0, name: c.all, slug: "" } as Category, ...categories];
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.bg }]}>
-      {/* Search Header with Safe Area */}
-      <View style={[styles.searchWrap, { paddingTop: insets.top + 8, backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
-        <View style={[styles.searchInputRow, { backgroundColor: colors.inputBg, borderColor: colors.border }]}>
-          <SearchIcon size={18} color={colors.primary} />
+    <View style={[s.screen, { backgroundColor: colors.bg }]}>
+      <View style={[s.header, { paddingTop: insets.top + 10, backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
+        <Text style={[ui.h1, { color: colors.text, paddingHorizontal: 20, marginBottom: 12 }]}>{t("cat_title")}</Text>
+        <View style={[s.search, { backgroundColor: colors.inputBg }]}>
+          <IcSearch size={18} color={colors.textMuted} strokeWidth={2} />
           <TextInput
-            style={[styles.searchInput, { color: colors.text }]}
+            ref={searchRef}
+            style={[s.searchInput, { color: colors.text }]}
             placeholder={t("cat_search_ph")}
+            placeholderTextColor={colors.textMuted}
             value={search}
             onChangeText={setSearch}
-            placeholderTextColor={colors.textMuted}
+            returnKeyType="search"
+            accessibilityLabel={t("cat_search_ph")}
           />
           {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch("")} style={styles.clearBtn}>
-              <CloseIcon size={16} color={colors.textMuted} />
+            <TouchableOpacity onPress={() => setSearch("")} hitSlop={10} accessibilityLabel="Tozalash">
+              <IcClose size={18} color={colors.textMuted} strokeWidth={2} />
             </TouchableOpacity>
           )}
         </View>
-      </View>
-
-      {/* Category Pills */}
-      <View style={[styles.pillsWrap, { backgroundColor: colors.headerBg, borderBottomColor: colors.border }]}>
         <FlatList
           horizontal
+          data={chips}
+          keyExtractor={(i) => String(i.id)}
           showsHorizontalScrollIndicator={false}
-          data={[{ id: 0, name: t("cat_all_count"), slug: "all" }, ...categories]}
-          keyExtractor={(item) => String(item.id)}
-          contentContainerStyle={{ paddingRight: 16 }}
+          contentContainerStyle={{ paddingHorizontal: 20, gap: 8, paddingTop: 12 }}
           renderItem={({ item }) => {
-            const active = (!selectedCat && item.id === 0) || selectedCat === item.id;
+            const on = (item.id === 0 && !selectedCat) || selectedCat === item.id;
             return (
               <TouchableOpacity
-                style={[
-                  styles.pill,
-                  { backgroundColor: colors.inputBg, borderColor: colors.border },
-                  active && { backgroundColor: "#0284c7", borderColor: "#0284c7" },
-                ]}
                 onPress={() => setSelectedCat(item.id === 0 ? undefined : item.id)}
+                accessibilityState={{ selected: on }}
+                style={[
+                  s.chip,
+                  on ? { backgroundColor: colors.chipActiveBg, borderColor: colors.chipActiveBg } : { backgroundColor: colors.card, borderColor: colors.borderStrong },
+                ]}
               >
-                <Text
-                  style={[
-                    styles.pillText,
-                    { color: colors.text },
-                    active && { color: "#ffffff", fontWeight: "700" },
-                  ]}
-                >
-                  {item.slug === "all" ? t("cat_all_count") : localizeCategoryName(item.slug || item.name, lang)}
+                <Text style={{ fontSize: 13.5, fontWeight: on ? "600" : "500", color: on ? colors.chipActiveText : colors.textSecondary }}>
+                  {item.id === 0 ? c.all : localizeCategoryName(item.slug || item.name, lang)}
                 </Text>
               </TouchableOpacity>
             );
@@ -149,229 +143,60 @@ export function CatalogScreen({ navigation, route }: any) {
         />
       </View>
 
-      {/* Product List */}
       {loading ? (
         <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 40 }} />
       ) : products.length === 0 && loadError ? (
-        <View style={styles.emptyWrap}>
-          <Text style={{ fontSize: 40, marginBottom: 12 }}>📡</Text>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>Internet aloqasi yo'q</Text>
-          <Text style={[styles.emptySub, { color: colors.textMuted }]}>Tarmoqni tekshirib, qayta urinib ko'ring.</Text>
-          <TouchableOpacity
-            onPress={() => loadFirstPage()}
-            style={{ marginTop: 16, paddingHorizontal: 22, paddingVertical: 11, borderRadius: 12, backgroundColor: "#0284c7" }}
-          >
-            <Text style={{ color: "#ffffff", fontWeight: "800" }}>Qayta urinish</Text>
-          </TouchableOpacity>
+        <View style={s.empty}>
+          <Text style={[s.emptyTitle, { color: colors.text }]}>{c.offline}</Text>
+          <Text style={[s.emptySub, { color: colors.textMuted }]}>{c.offlineSub}</Text>
+          <Button title={c.retry} onPress={() => loadFirstPage()} style={{ marginTop: 16, paddingHorizontal: 28 }} />
         </View>
       ) : products.length === 0 ? (
-        <View style={styles.emptyWrap}>
-          <Text style={{ fontSize: 40, marginBottom: 12 }}>🔎</Text>
-          <Text style={[styles.emptyTitle, { color: colors.text }]}>{t("cat_not_found")}</Text>
-          <Text style={[styles.emptySub, { color: colors.textMuted }]}>{t("cat_not_found_sub")}</Text>
+        <View style={s.empty}>
+          <Text style={[s.emptyTitle, { color: colors.text }]}>{t("cat_not_found")}</Text>
+          <Text style={[s.emptySub, { color: colors.textMuted }]}>{t("cat_not_found_sub")}</Text>
         </View>
       ) : (
         <FlatList
           data={products}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(i) => String(i.id)}
           numColumns={2}
-          contentContainerStyle={styles.listContent}
-          columnWrapperStyle={styles.columnWrapper}
+          columnWrapperStyle={{ gap: 10 }}
+          contentContainerStyle={{ padding: 20, paddingTop: 0, gap: 10, paddingBottom: 28 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          ListHeaderComponent={
+            <Text style={{ fontSize: 13.5, color: colors.textSecondary, paddingTop: 14, paddingBottom: 2 }}>
+              {total} {c.count}
+            </Text>
+          }
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => loadFirstPage(true)} colors={[colors.primary]} tintColor={colors.primary} />
-          }
-          ListFooterComponent={
-            loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 18 }} /> : null
-          }
-          renderItem={({ item }) => {
-            const imgUrl = getImageUrl(item.images?.[0]?.url);
-            const isAdded = addedId === item.id;
-            return (
-              <TouchableOpacity
-                style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]}
-                activeOpacity={0.9}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => loadFirstPage(true)} colors={[colors.primary]} tintColor={colors.primary} />}
+          ListFooterComponent={loadingMore ? <ActivityIndicator color={colors.primary} style={{ marginVertical: 18 }} /> : null}
+          renderItem={({ item, index }) => (
+            <View style={{ flex: 1, maxWidth: index === products.length - 1 && products.length % 2 === 1 ? "48.6%" : undefined }}>
+              <ProductCard
+                product={item}
+                added={addedId === item.id}
+                onAdd={() => handleAdd(item)}
                 onPress={() => navigation.navigate("ProductDetail", { slug: item.slug })}
-              >
-                <View style={[styles.productImgWrap, { backgroundColor: theme === "dark" ? "#0e1822" : "#f8fafc" }]}>
-                  <Image source={{ uri: imgUrl }} style={styles.productImg} resizeMode="contain" />
-                  {item.isHit && (
-                    <View style={styles.hitBadge}>
-                      <Text style={styles.hitBadgeText}>XIT</Text>
-                    </View>
-                  )}
-                  {item.isNew && !item.isHit && (
-                    <View style={styles.newBadge}>
-                      <Text style={styles.newBadgeText}>YANGI</Text>
-                    </View>
-                  )}
-                </View>
-
-                <View style={styles.productBody}>
-                  {item.category?.name && (
-                    <Text style={[styles.productCatName, { color: colors.primary }]} numberOfLines={1}>
-                      {localizeCategoryName(item.category.slug || item.category.name, lang)}
-                    </Text>
-                  )}
-                  <Text style={[styles.productName, { color: colors.text }]} numberOfLines={2}>
-                    {localizeProductName(item, lang)}
-                  </Text>
-                  {item.country && (
-                    <Text style={[styles.productCountry, { color: colors.textMuted }]}>🌍 {item.country}</Text>
-                  )}
-
-                  {item.stock !== undefined && (
-                    <Text
-                      style={{
-                        fontSize: 11,
-                        fontWeight: "700",
-                        color: (item.stock ?? 0) > 0 ? colors.primary : "#ef4444",
-                        marginBottom: 4,
-                      }}
-                    >
-                      {(item.stock ?? 0) > 0
-                        ? t("stock_in").replace("{n}", String(item.stock))
-                        : t("stock_out")}
-                    </Text>
-                  )}
-
-                  <Text style={[styles.productPrice, { color: colors.primary }]}>{formatPrice(item.priceFrom)}</Text>
-
-                  {item.stock !== undefined && item.stock <= 0 ? (
-                    <View style={[styles.addCartBtn, { backgroundColor: "#fee2e2", borderColor: "#fca5a5" }]}>
-                      <Text style={[styles.addCartText, { color: "#dc2626" }]}>
-                        {t("stock_cart_empty")}
-                      </Text>
-                    </View>
-                  ) : (
-                    <TouchableOpacity
-                      style={[
-                        styles.addCartBtn,
-                        { backgroundColor: theme === "dark" ? "rgba(56, 189, 248, 0.15)" : "rgba(2, 132, 199, 0.09)" },
-                        isAdded && styles.addCartBtnDone,
-                      ]}
-                      onPress={() => handleAddToCart(item)}
-                    >
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 5 }}>
-                        <CartIcon size={14} color={isAdded ? "#ffffff" : colors.primary} />
-                        <Text style={[styles.addCartText, { color: isAdded ? "#ffffff" : colors.primary }, isAdded && styles.addCartTextDone]}>
-                          {isAdded ? "Qo'shildi" : "Savatchaga"}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          }}
+              />
+            </View>
+          )}
         />
       )}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#f8fafc" },
-  searchWrap: {
-    paddingHorizontal: 16,
-    paddingBottom: 10,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-  },
-  searchInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  searchInput: {
-    flex: 1,
-    paddingVertical: 10,
-    fontSize: 13.5,
-    color: "#0f172a",
-  },
-  clearBtn: { padding: 4 },
-  pillsWrap: {
-    backgroundColor: "#ffffff",
-    paddingVertical: 10,
-    paddingLeft: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-  },
-  pill: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 20,
-    backgroundColor: "#f1f5f9",
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  pillActive: { backgroundColor: "#0284c7", borderColor: "#0284c7" },
-  pillText: { fontSize: 12.5, fontWeight: "600", color: "#475569" },
-  pillTextActive: { color: "#ffffff", fontWeight: "700" },
-  listContent: { padding: 14, paddingBottom: 24 },
-  columnWrapper: { justifyContent: "space-between" },
-  productCard: {
-    width: (SCREEN_WIDTH - 40) / 2,
-    backgroundColor: "#ffffff",
-    borderRadius: 18,
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    overflow: "hidden",
-  },
-  productImgWrap: {
-    height: 140,
-    backgroundColor: "#f8fafc",
-    position: "relative",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 8,
-  },
-  productImg: { width: "100%", height: "100%" },
-  hitBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "#ef4444",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  hitBadgeText: { color: "#ffffff", fontSize: 9.5, fontWeight: "900" },
-  newBadge: {
-    position: "absolute",
-    top: 8,
-    left: 8,
-    backgroundColor: "#10b981",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  newBadgeText: { color: "#ffffff", fontSize: 9.5, fontWeight: "900" },
-  productBody: { padding: 10 },
-  productCatName: { fontSize: 9.5, fontWeight: "700", color: "#0284c7", textTransform: "uppercase", marginBottom: 3 },
-  productName: { fontSize: 12.5, fontWeight: "700", color: "#0f172a", minHeight: 34, marginBottom: 4, lineHeight: 17 },
-  productCountry: { fontSize: 10, color: "#64748b", marginBottom: 6 },
-  productPrice: { fontSize: 13.5, fontWeight: "900", color: "#0284c7", marginBottom: 8 },
-  addCartBtn: {
-    backgroundColor: "rgba(2, 132, 199, 0.09)",
-    paddingVertical: 8,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-  addCartBtnDone: { backgroundColor: "#10b981" },
-  addCartText: { color: "#0284c7", fontWeight: "800", fontSize: 11.5 },
-  addCartTextDone: { color: "#ffffff" },
-  emptyWrap: { alignItems: "center", justifyContent: "center", marginTop: 60, paddingHorizontal: 30 },
-  emptyTitle: { fontSize: 16, fontWeight: "800", color: "#1e293b", marginBottom: 4 },
-  emptySub: { fontSize: 12.5, color: "#94a3b8", textAlign: "center" },
+const s = StyleSheet.create({
+  screen: { flex: 1 },
+  header: { paddingBottom: 12, borderBottomWidth: 1 },
+  search: { marginHorizontal: 20, height: 46, borderRadius: 12, paddingHorizontal: 14, flexDirection: "row", alignItems: "center", gap: 10 },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 0 },
+  chip: { height: 36, paddingHorizontal: 14, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  empty: { alignItems: "center", paddingHorizontal: 32, marginTop: 64 },
+  emptyTitle: { fontSize: 17, fontWeight: "600", textAlign: "center" },
+  emptySub: { fontSize: 14.5, marginTop: 6, textAlign: "center", lineHeight: 21 },
 });

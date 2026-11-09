@@ -352,11 +352,13 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
     try {
       setBusy(true);
-      await api("/admin/me/password", {
+      const r = await api<{ token?: string }>("/admin/me/password", {
         method: "PATCH",
         json: { currentPassword, newPassword },
         admin: true,
       });
+      // Server boshqa sessiyalarni yopadi va shu qurilma uchun yangi token beradi
+      if (r?.token) setToken(r.token);
       setSuccess(
         lang === "uz"
           ? "Parol muvaffaqiyatli o'zgartirildi!"

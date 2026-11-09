@@ -1,6 +1,8 @@
 import { Router } from "express";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { config } from "../config";
 import ExcelJS from "exceljs";
 import { z } from "zod";
 import { prisma } from "../db";
@@ -763,9 +765,12 @@ adminRouter.patch("/me/password", async (req, res) => {
   const hash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({
     where: { id: user.id },
-    data: { passwordHash: hash },
+    data: { passwordHash: hash, passwordChangedAt: new Date() },
   });
 
-  res.json({ ok: true, message: "Parol muvaffaqiyatli yangilandi" });
+  // Boshqa qurilmalardagi sessiyalar yopiladi; shu qurilma uchun yangi token beriladi
+  const payload = { id: user.id, role: user.role, email: user.email, name: user.name };
+  const token = jwt.sign(payload, config.jwtSecret, { expiresIn: "12h" });
+  res.json({ ok: true, token, message: "Parol muvaffaqiyatli yangilandi" });
 });
 

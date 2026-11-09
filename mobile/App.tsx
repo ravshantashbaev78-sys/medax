@@ -11,8 +11,7 @@ import { ThemeProvider, useTheme } from "./src/context/ThemeContext";
 import { I18nProvider } from "./src/context/I18nContext";
 import { AppNavigator } from "./src/navigation/AppNavigator";
 import { OnboardingScreen, ONBOARDING_KEY } from "./src/screens/OnboardingScreen";
-import { AuthGateScreen } from "./src/screens/AuthGateScreen";
-import { MedaxEmblem } from "./src/components/Icons";
+import { BrandLogo } from "./src/components/ui";
 
 // Suppress harmless Expo CLI connection warning banner from development
 LogBox.ignoreLogs([
@@ -23,7 +22,8 @@ LogBox.ignoreLogs([
 function MainApp() {
   const { theme, colors } = useTheme();
   const [initLoading, setInitLoading] = useState(true);
-  const [step, setStep] = useState<"onboarding" | "auth" | "app">("app");
+  const [step, setStep] = useState<"onboarding" | "app">("app");
+  const [startTab, setStartTab] = useState<"Asosiy" | "Profil">("Asosiy");
 
   useEffect(() => {
     AsyncStorage.getItem(ONBOARDING_KEY)
@@ -41,24 +41,31 @@ function MainApp() {
   if (initLoading) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, justifyContent: "center", alignItems: "center" }}>
-        <MedaxEmblem size={64} />
+        <BrandLogo width={180} />
         <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 20 }} />
       </View>
     );
   }
 
-  const navTheme = theme === "dark" ? DarkTheme : DefaultTheme;
+  const base = theme === "dark" ? DarkTheme : DefaultTheme;
+  const navTheme = {
+    ...base,
+    colors: { ...base.colors, background: colors.bg, card: colors.card, border: colors.border, primary: colors.primary, text: colors.text },
+  };
 
   return (
     <>
       <StatusBar style={colors.statusBar} />
       {step === "onboarding" ? (
-        <OnboardingScreen onFinish={() => setStep("app")} />
-      ) : step === "auth" ? (
-        <AuthGateScreen onContinue={() => setStep("app")} />
+        <OnboardingScreen
+          onFinish={(openProfile) => {
+            setStartTab(openProfile ? "Profil" : "Asosiy");
+            setStep("app");
+          }}
+        />
       ) : (
         <NavigationContainer theme={navTheme}>
-          <AppNavigator />
+          <AppNavigator initialTab={startTab} />
         </NavigationContainer>
       )}
     </>

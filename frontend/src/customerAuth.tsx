@@ -201,6 +201,8 @@ export function CustomerAuthProvider({ children }: { children: React.ReactNode }
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Parolni o'zgartirishda xatolik");
+    // Server parol almashganda eski sessiyalarni yopadi va shu qurilma uchun yangi token beradi
+    if (data.token) saveToken(data.token);
     if (customer) setCustomer({ ...customer, hasPassword: true });
   };
 

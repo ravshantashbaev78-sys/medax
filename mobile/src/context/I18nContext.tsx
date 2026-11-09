@@ -58,9 +58,9 @@ const translations: Record<Language, Record<string, string>> = {
     contact_address: "Namangan viloyati, Namangan sh., Ozod MFY, Abu Rayhon Beruniy ko'chasi, 2-uy",
     contact_privacy: "Maxfiylik siyosati",
     view_on_map: "Xaritada ko'rish ↗",
-    stock_in: "Omborda: {n} dona mavjud",
-    stock_out: "Omborda qolmagan (Tugagan)",
-    stock_cart_empty: "Omborda tugagan",
+    stock_in: "Omborda: {n} dona",
+    stock_out: "Tugagan",
+    stock_cart_empty: "Omborda qolmagan",
 
     // Home
     home_search_ph: "Uskuna yoki sarflov materiallarini qidirish...",
@@ -80,14 +80,14 @@ const translations: Record<Language, Record<string, string>> = {
     // Cart
     cart_empty_title: "Savatchangiz bo'sh",
     cart_empty_sub: "Katalogimizdan tibbiyot uskunalari va asbob-uskunalarni tanlang",
-    cart_go_catalog: "Katalogni ko'rish →",
+    cart_go_catalog: "Katalogga o'tish",
     cart_clear: "Tozalash",
     cart_checkout_title: "Buyurtmani rasmiylashtirish",
     cart_checkout_sub: "Ma'lumotlarni to'ldiring va to'lov usulini tanlang",
-    cart_name_label: "Ism va Familiya *",
-    cart_phone_label: "Telefon raqamingiz *",
+    cart_name_label: "Ism va familiya",
+    cart_phone_label: "Telefon raqami",
     cart_address_label: "Yetkazib berish / Olib ketish manzili *",
-    cart_comment_label: "Qo'shimcha izoh (ixtiyoriy)",
+    cart_comment_label: "Izoh (ixtiyoriy)",
     cart_pay_method: "To'lov usuli *",
     cart_cash_title: "Qabul qilishda to'lash",
     cart_cash_desc: "Do'kondan olib ketishda yoki topshirilganda naqd/karta bilan to'lov.",
@@ -96,7 +96,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Catalog
     cat_title: "Katalog",
-    cat_search_ph: "Uskunalar nomi bo'yicha qidirish...",
+    cat_search_ph: "Uskuna, brend yoki artikul",
     cat_not_found: "Uskuna topilmadi",
     cat_not_found_sub: "Boshqa toifa yoki kalit so'z bilan qidirib ko'ring",
     cat_all_count: "Barchasi",
@@ -127,7 +127,7 @@ const translations: Record<Language, Record<string, string>> = {
     trust_cert_sub: "100% asl uskunalar",
     trust_eng: "24/7 Muhandis",
     trust_eng_sub: "O'rnatib berish",
-    prod_add_cart: "Savatchaga",
+    prod_add_cart: "Savatchaga qo'shish",
     prod_added: "Qo'shildi",
     home_catalog_btn: "Katalog →",
 
@@ -135,11 +135,11 @@ const translations: Record<Language, Record<string, string>> = {
     cart_pay_cash_title: "🏪 Do'konda to'lash (Olib ketishda)",
     cart_pay_cash_desc: "Uskunani ko'rib, tekshirib olgach to'laysiz (Naqd pul, karta/terminal yoki hisob-faktura).",
     cart_sec_note: "Barcha to'lovlar va ma'lumotlar 256-bit shifrlangan",
-    cart_otp_title: "SMS tasdiqlash kodi *",
+    cart_otp_title: "SMS tasdiqlash kodi",
     cart_otp_sub: "raqamiga yuborilgan 6 xonali kodni kiriting",
     cart_resend_code: "Kodni qayta yuborish",
-    cart_get_code_btn: "SMS kod olish va buyurtma berish →",
-    cart_confirm_btn: "Buyurtmani tasdiqlash →",
+    cart_get_code_btn: "Tasdiqlash kodini olish",
+    cart_confirm_btn: "Buyurtmani tasdiqlash",
 
     // Auth & Modal
     auth_success_title: "Muvaffaqiyatli! 🎉",
@@ -209,9 +209,9 @@ const translations: Record<Language, Record<string, string>> = {
     contact_address: "Наманганская область, г. Наманган, сгм Озод, улица Абу Райхона Беруни, дом 2",
     contact_privacy: "Политика конфиденциальности",
     view_on_map: "Посмотреть на карте ↗",
-    stock_in: "В наличии: {n} шт",
-    stock_out: "Нет в наличии (Закончился)",
-    stock_cart_empty: "Закончился",
+    stock_in: "В наличии: {n} шт.",
+    stock_out: "Нет в наличии",
+    stock_cart_empty: "Нет в наличии",
 
     // Home
     home_search_ph: "Поиск оборудования или расходных материалов...",
@@ -231,14 +231,14 @@ const translations: Record<Language, Record<string, string>> = {
     // Cart
     cart_empty_title: "Ваша корзина пуста",
     cart_empty_sub: "Выберите медицинское оборудование и принадлежности из каталога",
-    cart_go_catalog: "Перейти в каталог →",
+    cart_go_catalog: "Перейти в каталог",
     cart_clear: "Очистить",
     cart_checkout_title: "Оформление заказа",
     cart_checkout_sub: "Заполните данные и выберите способ оплаты",
-    cart_name_label: "Имя и Фамилия *",
-    cart_phone_label: "Номер телефона *",
+    cart_name_label: "Имя и фамилия",
+    cart_phone_label: "Номер телефона",
     cart_address_label: "Адрес доставки / самовывоза *",
-    cart_comment_label: "Дополнительный комментарий (необязательно)",
+    cart_comment_label: "Комментарий (необязательно)",
     cart_pay_method: "Способ оплаты *",
     cart_cash_title: "Оплата при получении",
     cart_cash_desc: "Оплата при самовывозе или доставке наличными / картой.",
@@ -247,7 +247,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Catalog
     cat_title: "Каталог",
-    cat_search_ph: "Поиск по названию оборудования...",
+    cat_search_ph: "Оборудование, бренд или артикул",
     cat_not_found: "Оборудование не найдено",
     cat_not_found_sub: "Попробуйте изменить категорию или поисковый запрос",
     cat_all_count: "Все",
@@ -286,11 +286,11 @@ const translations: Record<Language, Record<string, string>> = {
     cart_pay_cash_title: "🏪 Оплата в магазине (Самовывоз)",
     cart_pay_cash_desc: "Оплата после осмотра оборудования (Наличные, карта или перечисление).",
     cart_sec_note: "Все платежи и данные защищены 256-битным шифрованием",
-    cart_otp_title: "Код подтверждения из SMS *",
+    cart_otp_title: "SMS-код подтверждения",
     cart_otp_sub: "введите 6-значный код, отправленный на номер",
     cart_resend_code: "Отправить код повторно",
-    cart_get_code_btn: "Получить SMS код и заказать →",
-    cart_confirm_btn: "Подтвердить заказ →",
+    cart_get_code_btn: "Получить код подтверждения",
+    cart_confirm_btn: "Подтвердить заказ",
 
     // Auth & Modal
     auth_success_title: "Успешно! 🎉",
@@ -360,7 +360,7 @@ const translations: Record<Language, Record<string, string>> = {
     contact_address: "Namangan region, Namangan city, Ozod MCC, Abu Rayhon Beruniy street, 2",
     contact_privacy: "Privacy Policy",
     view_on_map: "View on map ↗",
-    stock_in: "In stock: {n} pcs",
+    stock_in: "In stock: {n}",
     stock_out: "Out of stock",
     stock_cart_empty: "Out of stock",
 
@@ -382,14 +382,14 @@ const translations: Record<Language, Record<string, string>> = {
     // Cart
     cart_empty_title: "Your cart is empty",
     cart_empty_sub: "Browse our catalog to select medical equipment and supplies",
-    cart_go_catalog: "Browse Catalog →",
+    cart_go_catalog: "Browse catalog",
     cart_clear: "Clear",
     cart_checkout_title: "Checkout",
     cart_checkout_sub: "Fill in your details and select payment method",
-    cart_name_label: "Full Name *",
-    cart_phone_label: "Phone Number *",
+    cart_name_label: "Full name",
+    cart_phone_label: "Phone number",
     cart_address_label: "Delivery / Pickup Address *",
-    cart_comment_label: "Order Note (optional)",
+    cart_comment_label: "Comment (optional)",
     cart_pay_method: "Payment Method *",
     cart_cash_title: "Pay on Delivery / Pickup",
     cart_cash_desc: "Pay by cash or card upon receipt or pickup.",
@@ -398,7 +398,7 @@ const translations: Record<Language, Record<string, string>> = {
 
     // Catalog
     cat_title: "Catalog",
-    cat_search_ph: "Search by equipment name...",
+    cat_search_ph: "Equipment, brand or SKU",
     cat_not_found: "No equipment found",
     cat_not_found_sub: "Try searching with another category or keyword",
     cat_all_count: "All",
@@ -437,11 +437,11 @@ const translations: Record<Language, Record<string, string>> = {
     cart_pay_cash_title: "🏪 Pay at Store (Pickup)",
     cart_pay_cash_desc: "Pay after inspecting the equipment (Cash, card or bank transfer).",
     cart_sec_note: "All data and transactions are 256-bit encrypted",
-    cart_otp_title: "SMS Verification Code *",
+    cart_otp_title: "SMS verification code",
     cart_otp_sub: "enter the 6-digit code sent to",
     cart_resend_code: "Resend Code",
-    cart_get_code_btn: "Get SMS Code & Checkout →",
-    cart_confirm_btn: "Confirm Order →",
+    cart_get_code_btn: "Get verification code",
+    cart_confirm_btn: "Confirm order",
 
     // Auth & Modal
     auth_success_title: "Success! 🎉",

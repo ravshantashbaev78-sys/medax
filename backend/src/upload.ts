@@ -13,8 +13,13 @@ export const memoryUpload = multer({
 
 export const avatarUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  // Zamonaviy telefon kamerasi (50-108 MP) suratlari 5 MB dan oshishi mumkin
+  limits: { fileSize: 15 * 1024 * 1024, files: 1 },
 });
+
+// sharp uchun piksel chegarasi: 108 MP kamera suratlari ham qabul qilinadi (standart 16 MP juda kam edi).
+// JPEG'ni kichraytirishda sharp "shrink-on-load" ishlatadi, shuning uchun xotira sarfi past bo'ladi.
+const MAX_INPUT_PIXELS = 120_000_000;
 
 async function ensure(sub: string) {
   const dir = path.join(config.uploadDir, sub);
@@ -27,7 +32,7 @@ export async function saveImage(buf: Buffer): Promise<{ url: string; thumbUrl: s
   const dir = await ensure("products");
   const id = crypto.randomUUID();
   try {
-    const img = sharp(buf, { failOn: "error", limitInputPixels: 4096 * 4096 }).rotate();
+    const img = sharp(buf, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS }).rotate();
     await img.clone().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toFile(path.join(dir, `${id}.webp`));
     await img.clone().resize({ width: 480, height: 480, fit: "inside", withoutEnlargement: true }).webp({ quality: 78 }).toFile(path.join(dir, `${id}-t.webp`));
   } catch {
@@ -41,7 +46,7 @@ export async function saveAvatar(buf: Buffer): Promise<string> {
   const dir = await ensure("avatars");
   const id = crypto.randomUUID();
   try {
-    const img = sharp(buf, { failOn: "error", limitInputPixels: 4096 * 4096 }).rotate();
+    const img = sharp(buf, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS }).rotate();
     await img.resize({ width: 360, height: 360, fit: "cover" }).webp({ quality: 85 }).toFile(path.join(dir, `${id}.webp`));
   } catch {
     throw new HttpError(400, "Rasm fayli yaroqsiz");
