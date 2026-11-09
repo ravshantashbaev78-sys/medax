@@ -541,149 +541,105 @@ export function ProductCard({ p }: { p: Product }) {
   const { lang, t } = useI18n();
   const [added, setAdded] = useState(false);
   const img = p.images?.[0];
-  const localizedName = localizeProductName(p, lang);
+  const name = localizeProductName(p, lang);
+  const tr = (uz: string, ru: string, en: string) => (lang === "ru" ? ru : lang === "en" ? en : uz);
+  const fmt = (n: number) => n.toLocaleString("ru-RU").replace(/,/g, " ").replace(/\u00a0/g, " ");
 
-  const onAddToCart = (e: React.MouseEvent) => {
+  const stock = p.stock ?? null;
+  const soldOut = stock !== null && stock <= 0;
+  const lowStock = stock !== null && stock > 0 && stock <= 5;
+
+  const price = p.priceFrom ? Number(p.priceFrom) : null;
+  const hasDiscount = Boolean(p.oldPrice && price && Number(p.oldPrice) > price);
+  const discount = p.discountPercent || (hasDiscount ? Math.round(((Number(p.oldPrice) - price!) / Number(p.oldPrice)) * 100) : null);
+  const perPiece = price && p.packageQty && p.packageQty > 1 ? Math.round(price / p.packageQty) : null;
+
+  const onAdd = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (soldOut) return;
     cart.add(p, 1);
     setAdded(true);
-    setTimeout(() => setAdded(false), 1500);
+    window.setTimeout(() => setAdded(false), 1600);
   };
 
-  const priceLabel = p.priceFrom
-    ? `${Number(p.priceFrom).toLocaleString("ru-RU").replace(/,/g, " ")} ${t("sum_currency")}`
-    : lang === "ru"
-    ? "По запросу"
-    : lang === "en"
-    ? "On request"
-    : "Narx so'rang";
-
-  const addedLabel = lang === "ru" ? "✓ Добавлено" : lang === "en" ? "✓ Added" : "✓ Qo'shildi";
-  const btnLabel = lang === "ru" ? "В корзину" : lang === "en" ? "Add" : "Savatga";
-
-  const hasDiscount = Boolean(p.oldPrice && p.priceFrom && Number(p.oldPrice) > Number(p.priceFrom));
-  const discountVal = p.discountPercent || (hasDiscount ? Math.round(((Number(p.oldPrice) - Number(p.priceFrom)) / Number(p.oldPrice)) * 100) : null);
-  const unitLabel = p.unit ? ` / ${localizeUnit(p.unit, lang)}` : "";
-
-  // Donalab narx hisobi (agar 1 qutida masalan 50 yoki 100 dona bo'lsa)
-  const perPiecePrice = p.priceFrom && p.packageQty && p.packageQty > 1
-    ? Math.round(Number(p.priceFrom) / p.packageQty)
-    : null;
-
   return (
-    <article className="p med-product-card">
-      <Link className="img" to={`/product/${p.slug}`} aria-label={localizedName}>
-        {/* Top Badges: Chegirma, Xit, Yangi */}
-        <div className="card-badges-top">
-          {discountVal && <span className="tag discount-badge">-{discountVal}%</span>}
-          {p.isHit && <span className="tag hit">{t("badge_hit")}</span>}
-          {p.isNew && <span className="tag new">{t("badge_new")}</span>}
-        </div>
-
-        {/* Rasm bo'lmasa — boshqa mahsulot surati emas, kategoriya belgisi ko'rsatiladi */}
+    <article className={`pc${soldOut ? " pc-out" : ""}`}>
+      <Link className="pc-media" to={`/product/${p.slug}`} aria-label={name}>
         {img?.thumbUrl || img?.url ? (
           <img
             src={img.thumbUrl || img.url}
-            alt={localizedName}
+            alt={name}
             loading="lazy"
-            width={480}
-            height={360}
+            width={640}
+            height={640}
             onError={(e) => {
               (e.currentTarget as HTMLImageElement).style.visibility = "hidden";
             }}
           />
         ) : (
-          <DeviceIcon category={p.category?.slug} name={p.name} />
+          <span className="pc-placeholder">
+            <DeviceIcon category={p.category?.slug} name={p.name} />
+          </span>
+        )}
+        {(discount || p.isHit || p.isNew) && (
+          <span className="pc-badges">
+            {discount ? <span className="pc-badge sale">−{discount}%</span> : null}
+            {p.isHit && <span className="pc-badge hit">{t("badge_hit")}</span>}
+            {p.isNew && <span className="pc-badge new">{t("badge_new")}</span>}
+          </span>
         )}
       </Link>
 
-      <div className="b">
-        <span className="card-brand-name">{p.brand?.name || "Medax"}</span>
-
-        <h3 className="card-product-title">
-          <Link to={`/product/${p.slug}`} title={localizedName}>
-            {localizedName}
+      <div className="pc-body">
+        <span className="pc-meta">{p.brand?.name || p.category?.name || "\u00a0"}</span>
+        <h3 className="pc-title">
+          <Link to={`/product/${p.slug}`} title={name}>
+            {name}
           </Link>
         </h3>
 
-        {/* Qutida ko'p dona bo'lsa, donalab hisobi */}
-        {perPiecePrice && (
-          <div className="card-package-subtext">
-            {lang === "ru"
-              ? `В упаковке ${p.packageQty} шт (1 шт ~ ${perPiecePrice.toLocaleString("ru-RU").replace(/,/g, " ")} сум)`
-              : lang === "en"
-              ? `${p.packageQty} pcs/box (~ ${perPiecePrice.toLocaleString("ru-RU").replace(/,/g, " ")} UZS each)`
-              : `1 qutida ${p.packageQty} ta (1 donasi ~ ${perPiecePrice.toLocaleString("ru-RU").replace(/,/g, " ")} so'm)`}
-          </div>
-        )}
+        <span className={`pc-stock${soldOut ? " out" : lowStock ? " low" : ""}`}>
+          <i aria-hidden="true" />
+          {soldOut
+            ? tr("Tugagan", "Нет в наличии", "Out of stock")
+            : lowStock
+            ? tr(`Faqat ${stock} ta qoldi`, `Осталось ${stock} шт`, `Only ${stock} left`)
+            : tr("Mavjud", "В наличии", "In stock")}
+        </span>
 
-        <div className="pr card-bottom-bar">
-          <div className="price-block">
-            {p.stock !== undefined && (
-              <span
-                style={{
-                  display: "block",
-                  fontSize: 11,
-                  fontWeight: 700,
-                  color: (p.stock ?? 0) > 0 ? "#0284c7" : "#dc2626",
-                  marginBottom: 2,
-                }}
-              >
-                {(p.stock ?? 0) > 0
-                  ? lang === "ru"
-                    ? `В наличии: ${p.stock} шт`
-                    : lang === "en"
-                    ? `In stock: ${p.stock} pcs`
-                    : `Omborda: ${p.stock} dona`
-                  : lang === "ru"
-                  ? "Нет в наличии"
-                  : lang === "en"
-                  ? "Out of stock"
-                  : "Omborda tugagan"}
-              </span>
-            )}
-            {hasDiscount && (
-              <span className="price-old">
-                {Number(p.oldPrice).toLocaleString("ru-RU").replace(/,/g, " ")} {t("sum_currency")}
-              </span>
-            )}
-            <span className="price-val">
-              {priceLabel}
-              <span className="price-unit-sub">{unitLabel}</span>
-            </span>
-          </div>
-
-          {p.stock !== undefined && p.stock <= 0 ? (
-            <span
-              style={{
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#dc2626",
-                background: "#fef2f2",
-                padding: "6px 10px",
-                borderRadius: 8,
-              }}
-            >
-              {lang === "ru" ? "Закончился" : lang === "en" ? "Out of stock" : "Tugagan"}
-            </span>
+        <div className="pc-price">
+          {hasDiscount && <s>{fmt(Number(p.oldPrice))}</s>}
+          {price ? (
+            <strong>
+              {fmt(price)} <small>{t("sum_currency")}</small>
+            </strong>
           ) : (
-            <button
-              type="button"
-              className={`btn-quick-cart ${added ? "added" : ""}`}
-              onClick={onAddToCart}
-              aria-label={added ? addedLabel : t("pd_add_to_cart")}
-              title={added ? addedLabel : t("pd_add_to_cart")}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="9" cy="21" r="1" />
-                <circle cx="20" cy="21" r="1" />
-                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
-              </svg>
-              <span>{added ? addedLabel : btnLabel}</span>
-            </button>
+            <strong className="pc-ask">{tr("Narxi kelishiladi", "Цена по запросу", "Price on request")}</strong>
+          )}
+          {perPiece && (
+            <span className="pc-per">
+              {tr(`1 qutida ${p.packageQty} ta · donasi ~${fmt(perPiece)}`, `${p.packageQty} шт/уп · ~${fmt(perPiece)} за шт`, `${p.packageQty}/box · ~${fmt(perPiece)} each`)}
+            </span>
           )}
         </div>
+
+        <button type="button" className={`pc-btn${added ? " added" : ""}`} onClick={onAdd} disabled={soldOut}>
+          {added ? (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : (
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="9" cy="21" r="1" />
+              <circle cx="20" cy="21" r="1" />
+              <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+            </svg>
+          )}
+          <span>
+            {soldOut ? tr("Tugagan", "Нет в наличии", "Sold out") : added ? tr("Qo'shildi", "Добавлено", "Added") : tr("Savatga", "В корзину", "Add to cart")}
+          </span>
+        </button>
       </div>
     </article>
   );

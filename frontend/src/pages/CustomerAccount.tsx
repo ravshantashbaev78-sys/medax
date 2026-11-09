@@ -5,6 +5,7 @@ import { DeviceIcon } from "../components/Shell";
 import { ClinicIcon, PhoneSmsIcon, OrderBoxIcon, SettingsIcon } from "../components/Icons";
 import { useI18n, Lang } from "../context/I18nContext";
 import { useTheme } from "../context/ThemeContext";
+import { toast } from "../components/Toaster";
 
 interface OrderItem {
   id: number;
@@ -127,7 +128,7 @@ export default function CustomerAccount() {
 
       await refreshCustomer();
     } catch (err: any) {
-      alert(err.message || "Rasm yuklashda xatolik yuz berdi");
+      toast.error(err.message || "Rasm yuklashda xatolik yuz berdi");
     } finally {
       setAvatarUploading(false);
       e.target.value = "";
@@ -177,7 +178,7 @@ export default function CustomerAccount() {
 
   const handleCancelOrder = async (orderId: number) => {
     if (!cancelReasonText.trim()) {
-      alert("Iltimos, bekor qilish sababini yozing.");
+      toast.error("Iltimos, bekor qilish sababini yozing.");
       return;
     }
     setCancelBusy(true);
@@ -198,7 +199,7 @@ export default function CustomerAccount() {
       setCancelReasonText("");
       loadOrders();
     } catch (e: any) {
-      alert(e.message);
+      toast.error(e.message);
     } finally {
       setCancelBusy(false);
     }

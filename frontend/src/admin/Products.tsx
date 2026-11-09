@@ -1,5 +1,6 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "../components/Toaster";
 import { api, ApiError, Brand, Category, Paged, Product, money } from "../api";
 import { Pager } from "../components/Shell";
 import { useAdminI18n } from "./i18n";
@@ -643,6 +644,10 @@ export function ProductForm() {
   const [warehouses, setWarehouses] = useState<{ id: number; name: string }[]>([]);
   const [images, setImages] = useState<Product["images"]>([]);
   const [newFiles, setNewFiles] = useState<{ file: File; preview: string }[]>([]);
+  const [uploading, setUploading] = useState(0);
+  const [dragOver, setDragOver] = useState(false);
+  // Forma ochilgandagi qoldiq: o'zgartirilmasa, server haqiqiy qoldiqni saqlab qoladi
+  const [stockBefore, setStockBefore] = useState<number | undefined>(undefined);
   const [docs, setDocs] = useState<NonNullable<Product["documents"]>>([]);
 
   // Yig'ma bo'limlar holati (Accordion)
@@ -711,6 +716,7 @@ export function ProductForm() {
         setWarranty(warSpec);
         setImages(p.images);
         setDocs(p.documents || []);
+        setStockBefore(p.stock ?? 0);
 
         // Agar boshqa tillarda matn bo'lsa, til bo'limini ochiq ko'rsatish
         if (p.nameRu || p.nameEn || p.descriptionRu || p.descriptionEn) {
@@ -835,34 +841,93 @@ export function ProductForm() {
         if (newFiles.length > 0) {
           try {
             const fd = new FormData();
-            newFiles.forEach((x) => fd.append("files", x.file));
+            for (const x of newFiles) fd.append("files", await shrinkImage(x.file));
             await api(`/admin/products/${p.id}/images`, { form: fd, admin: true });
           } catch (imgErr) {
             nav(`/admin/products/${p.id}`);
             throw new Error(`Mahsulot qo'shildi, lekin rasm yuklashda xatolik yuz berdi: ${(imgErr as any)?.message || ""}`);
           }
         }
+        toast.success("Mahsulot qo'shildi");
         nav("/admin/products");
       } else {
-        await api(`/admin/products/${id}`, { method: "PUT", json: body, admin: true });
-        setMsg("Mahsulot muvaffaqiyatli saqlandi.");
+        const saved = await api<Product>(`/admin/products/${id}`, { method: "PUT", json: { ...body, stockBefore }, admin: true });
+        setStockBefore(saved.stock ?? body.stock);
+        setF((cur) => ({ ...cur, stock: saved.stock ?? cur.stock, isActive: saved.isActive }));
+        toast.success("Mahsulot saqlandi");
       }
     } catch (err) {
       setError((err as ApiError).message);
+      toast.error((err as ApiError).message || "Saqlanmadi");
     } finally {
       setBusy(false);
     }
   };
 
-  const onPickNewFiles = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files?.length) return;
-    const added = Array.from(files).map((file) => ({
-      file,
-      preview: URL.createObjectURL(file),
-    }));
-    setNewFiles((cur) => [...cur, ...added]);
-    e.target.value = "";
+  /** Telefon fotosi (5-12 MB) mobil internetda sekin yuklanadi: brauzerda 2000px gacha kichraytiramiz */
+  const shrinkImage = async (file: File): Promise<File> => {
+    if (file.size < 1.5 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/.test(file.type)) return file;
+    try {
+      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" } as ImageBitmapOptions);
+      const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(bmp.width * scale);
+      canvas.height = Math.round(bmp.height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.9));
+      if (!blob || blob.size >= file.size) return file;
+      return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
+    } catch {
+      return file;
+    }
+  };
+
+  const addFiles = async (files: File[]) => {
+    const tooBig = files.filter((f) => f.size > 15 * 1024 * 1024);
+    if (tooBig.length) toast.error(`${tooBig.length} ta rasm 15 MB dan katta, o'tkazib yuborildi`);
+    const ok = files.filter((f) => f.size <= 15 * 1024 * 1024).slice(0, 10);
+    if (!ok.length) return;
+    if (isNew) {
+      const added = ok.map((file) => ({ file, preview: URL.createObjectURL(file) }));
+      setNewFiles((cur) => [...cur, ...added]);
+      return;
+    }
+    setUploading(ok.length);
+    try {
+      const fd = new FormData();
+      for (const f of ok) fd.append("files", await shrinkImage(f));
+      const added = await api<Product["images"]>(`/admin/products/${id}/images`, { form: fd, admin: true });
+      setImages((cur) => [...cur, ...added]);
+      toast.success(`${added.length} ta rasm yuklandi`);
+    } catch (err) {
+      toast.error((err as ApiError).message || "Rasm yuklanmadi");
+    } finally {
+      setUploading(0);
+    }
+  };
+
+  const makeMain = async (imageId: number) => {
+    try {
+      const list = await api<Product["images"]>(`/admin/images/${imageId}/main`, { method: "POST", admin: true });
+      setImages(list);
+      toast.success("Asosiy rasm o'zgartirildi");
+    } catch (err) {
+      toast.error((err as ApiError).message);
+    }
+  };
+
+  const deleteImage = async (imageId: number) => {
+    if (!window.confirm("Rasm o'chirilsinmi?")) return;
+    try {
+      await api(`/admin/images/${imageId}`, { method: "DELETE", admin: true });
+      setImages((c) => c.filter((x) => x.id !== imageId));
+    } catch (err) {
+      toast.error((err as ApiError).message);
+    }
   };
 
   const removeNewFile = (idx: number) => {
@@ -871,20 +936,6 @@ export function ProductForm() {
       if (target) URL.revokeObjectURL(target.preview);
       return cur.filter((_, i) => i !== idx);
     });
-  };
-
-  const upload = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files?.length) return;
-    const fd = new FormData();
-    Array.from(files).forEach((x) => fd.append("files", x));
-    try {
-      const added = await api<Product["images"]>(`/admin/products/${id}/images`, { form: fd, admin: true });
-      setImages((cur) => [...cur, ...added]);
-    } catch (err) {
-      setError((err as ApiError).message);
-    }
-    e.target.value = "";
   };
 
   const uploadDoc = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -1069,93 +1120,74 @@ export function ProductForm() {
             </div>
           </div>
 
-          {/* Rasmlar yuklash qismi */}
-          <div style={{ marginTop: 16, borderTop: "1px solid var(--line, #e2e8f0)", paddingTop: 14 }}>
-            <label style={{ display: "block", fontSize: 13, fontWeight: 700, color: "var(--ink)", marginBottom: 8 }}>
-              Mahsulot rasmlari
-            </label>
-            <div className="imgs" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
-              {newFiles.map((nf, i) => (
-                <div
-                  className="it"
-                  key={`new-${i}`}
-                  style={{
-                    position: "relative",
-                    width: 80,
-                    height: 80,
-                    borderRadius: 8,
-                    overflow: "hidden",
-                    border: "2px solid var(--teal, #0d9488)",
-                  }}
-                >
-                  <img src={nf.preview} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <button
-                    type="button"
-                    aria-label="O'chirish"
-                    onClick={() => removeNewFile(i)}
-                    style={{
-                      position: "absolute",
-                      top: 2,
-                      right: 2,
-                      background: "rgba(0,0,0,0.7)",
-                      color: "#fff",
-                      border: "none",
-                      borderRadius: "50%",
-                      width: 20,
-                      height: 20,
-                      cursor: "pointer",
-                      display: "grid",
-                      placeItems: "center",
-                      fontSize: 12,
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
-
-              {images.map((im) => (
-                <div className="it" key={im.id} style={{ width: 80, height: 80 }}>
-                  <img src={im.thumbUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                  <button
-                    type="button"
-                    aria-label="Rasmni o'chirish"
-                    onClick={async () => {
-                      await api(`/admin/images/${im.id}`, { method: "DELETE", admin: true });
-                      setImages((c) => c.filter((x) => x.id !== im.id));
-                    }}
-                  >
-                    ✕
-                  </button>
-                </div>
-              ))}
+          {/* Rasmlar: birinchi rasm katalog kartochkasida ko'rinadi */}
+          <div className="pimg-section">
+            <div className="pimg-head">
+              <label>Mahsulot rasmlari</label>
+              <span className="pimg-hint">Birinchi rasm katalogda ko'rinadi. Server rasmni avtomatik oq kvadrat fonga moslaydi.</span>
             </div>
-
-            <label
-              className="btn ghost sm"
-              style={{
-                cursor: "pointer",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                fontWeight: 600,
+            <div
+              className={`pimg-grid${dragOver ? " drag" : ""}`}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragOver(false);
+                const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith("image/"));
+                if (files.length) void addFiles(files);
               }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-              {isNew || newFiles.length > 0 ? "Rasmlarni tanlash" : "Rasm yuklash"}
-              <input
-                type="file"
-                accept="image/*"
-                multiple
-                onChange={isNew ? onPickNewFiles : upload}
-                style={{ display: "none" }}
-              />
-            </label>
+              {images.map((im, idx) => (
+                <div className={`pimg-item${idx === 0 ? " main" : ""}`} key={im.id}>
+                  <img src={im.thumbUrl} alt="" />
+                  {idx === 0 ? (
+                    <span className="pimg-badge">Asosiy</span>
+                  ) : (
+                    <button type="button" className="pimg-main-btn" onClick={() => im.id && makeMain(im.id)} title="Asosiy rasm qilish">
+                      Asosiy qilish
+                    </button>
+                  )}
+                  <button type="button" className="pimg-del" aria-label="Rasmni o'chirish" title="O'chirish" onClick={() => im.id && deleteImage(im.id)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              ))}
+              {newFiles.map((nf, i) => (
+                <div className={`pimg-item pending${images.length === 0 && i === 0 ? " main" : ""}`} key={`new-${i}`}>
+                  <img src={nf.preview} alt="" />
+                  {images.length === 0 && i === 0 && <span className="pimg-badge">Asosiy</span>}
+                  <button type="button" className="pimg-del" aria-label="O'chirish" onClick={() => removeNewFile(i)}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              ))}
+              {uploading > 0 &&
+                Array.from({ length: uploading }).map((_, i) => (
+                  <div className="pimg-item loading" key={`up-${i}`}>
+                    <span className="pimg-spinner" aria-hidden="true" />
+                  </div>
+                ))}
+              <label className="pimg-add">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="3" width="18" height="18" rx="3" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <path d="M21 15l-5-5L5 21" />
+                </svg>
+                <span>{uploading ? "Yuklanmoqda..." : "Rasm qo'shish"}</span>
+                <small>yoki shu yerga tashlang</small>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  disabled={uploading > 0}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    e.target.value = "";
+                    if (files.length) void addFiles(files);
+                  }}
+                />
+              </label>
+            </div>
           </div>
         </div>
 

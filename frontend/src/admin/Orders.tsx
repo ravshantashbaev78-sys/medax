@@ -39,6 +39,7 @@ interface Order {
 }
 
 import { useAdminI18n } from "./i18n";
+import { toast } from "../components/Toaster";
 
 const FLAG_LABEL: Record<string, Record<string, string>> = {
   FIRST: { uz: "Yangi mijoz (1-buyurtma)", ru: "Новый клиент (1-й заказ)", en: "New customer (1st order)" },
@@ -85,7 +86,7 @@ export default function Orders() {
 
   const exportToCsv = () => {
     if (!data?.items?.length) {
-      alert(lang === "ru" ? "Нет заказов для экспорта" : "Eksport qilish uchun buyurtmalar mavjud emas");
+      toast.error(lang === "ru" ? "Нет заказов для экспорта" : "Eksport qilish uchun buyurtmalar mavjud emas");
       return;
     }
     const headers = [
@@ -251,8 +252,15 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
     try {
       const r = await api<{ blocked: boolean }>(`/admin/orders/${order.id}`, { method: "PATCH", json: body, admin: true });
       if (r.blocked) {
-        setInfo(`${order.phone} raqami soxta buyurtmalar sababli avtomatik bloklandi.`);
+        toast.info(`${order.phone} raqami soxta buyurtmalar sababli avtomatik bloklandi.`);
       }
+      toast.success(
+        body.status
+          ? `${order.code}: ${STATUS_LABEL[body.status as keyof typeof STATUS_LABEL] || body.status}`
+          : body.isPaid
+          ? `${order.code}: to'lov kassaga yozildi`
+          : "Saqlandi"
+      );
       onChanged();
     } catch (e) { setError((e as ApiError).message); setBusy(false); }
   };

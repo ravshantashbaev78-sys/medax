@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { useAdminI18n } from "./i18n";
 import { numberToWordsUz, numberToWordsRu } from "./numberToWords";
+import { toast } from "../components/Toaster";
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -222,6 +223,7 @@ export default function Erp() {
   const [invSearch, setInvSearch] = useState("");
   const [invFilter, setInvFilter] = useState<"all" | "low" | "expiring" | "out">("all");
   const [editingProduct, setEditingProduct] = useState<ErpProduct | null>(null);
+  const [countMode, setCountMode] = useState(false);
 
   // Alerts State
   const [alerts, setAlerts] = useState<{ lowStock: any[]; expiring: any[] }>({ lowStock: [], expiring: [] });
@@ -298,7 +300,7 @@ export default function Erp() {
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      alert(err?.message || "Eksportda xatolik yuz berdi");
+      toast.error(err?.message || "Eksportda xatolik yuz berdi");
     } finally {
       setExportingExcel(false);
     }
@@ -323,7 +325,7 @@ export default function Erp() {
 
   const loadInventory = () => {
     setLoadingProducts(true);
-    api<{ items: ErpProduct[] }>(`/admin/erp/inventory?search=${encodeURIComponent(invSearch)}&status=${invFilter}&limit=300`, { admin: true })
+    api<{ items: ErpProduct[] }>(`/admin/erp/inventory?search=${encodeURIComponent(invSearch)}&status=${invFilter}&limit=3000`, { admin: true })
       .then((r) => setProducts(r.items || []))
       .catch(() => {})
       .finally(() => setLoadingProducts(false));
@@ -372,7 +374,7 @@ export default function Erp() {
     setLoadingSverka(true);
     api<any>(`/admin/erp/reports/act-sverka?type=${sverkaEntityType}&id=${sverkaEntityId}`, { admin: true })
       .then(setSverkaData)
-      .catch((err) => alert(err.message || "Xatolik"))
+      .catch((err) => toast.error(err.message || "Xatolik"))
       .finally(() => setLoadingSverka(false));
   };
 
@@ -424,12 +426,13 @@ export default function Erp() {
       },
     })
       .then(() => {
+        toast.success("Tovar ma'lumotlari saqlandi");
         setEditingProduct(null);
         loadInventory();
         loadAlerts();
         loadOverview();
       })
-      .catch((err: any) => alert(err.message || "Xatolik yuz berdi"));
+      .catch((err: any) => toast.error(err.message || "Xatolik yuz berdi"));
   };
 
   /* ------------------------------------------------------------------------ */
@@ -477,7 +480,7 @@ export default function Erp() {
     setDocError("");
     setDocSearch("");
     setShowCreateDocModal(true);
-    api<{ items: ErpProduct[] }>("/admin/erp/inventory?status=all&limit=300", { admin: true })
+    api<{ items: ErpProduct[] }>("/admin/erp/inventory?status=all&limit=3000", { admin: true })
       .then((r) => setDocCatalog(r.items || []))
       .catch(() => {});
   };
@@ -551,7 +554,8 @@ export default function Erp() {
     setDocSaving(true);
     setDocError("");
     api("/admin/erp/documents", { admin: true, json: payload })
-      .then(() => {
+      .then((r: any) => {
+        toast.success(`Hujjat ${r?.document?.docNumber || ""} o'tkazildi`.replace("  ", " "));
         setShowCreateDocModal(false);
         setDocForm(emptyDocForm("INCOME"));
         loadDocs();
@@ -587,7 +591,7 @@ export default function Erp() {
   const handleSaveCash = (e: React.FormEvent) => {
     e.preventDefault();
     if (cashForm.amount <= 0) {
-      alert("Summa musbat bo'lishi kerak");
+      toast.error("Summa musbat bo'lishi kerak");
       return;
     }
 
@@ -604,6 +608,7 @@ export default function Erp() {
       },
     })
       .then(() => {
+        toast.success("Kassa orderi saqlandi");
         setShowCashModal(false);
         setCashForm({
           category: "MIJOZ_TOLOV",
@@ -616,7 +621,7 @@ export default function Erp() {
         loadCash();
         loadOverview();
       })
-      .catch((err: any) => alert(err.message || "Xatolik"));
+      .catch((err: any) => toast.error(err.message || "Xatolik"));
   };
 
   /* ------------------------------------------------------------------------ */
@@ -628,11 +633,12 @@ export default function Erp() {
     if (!newSupplier.name.trim()) return;
     api("/admin/erp/suppliers", { admin: true, json: newSupplier })
       .then(() => {
+        toast.success("Kontragent qo'shildi");
         setShowSupplierModal(false);
         setNewSupplier({ name: "", company: "", phone: "", inn: "", address: "" });
         loadSuppliers();
       })
-      .catch((err: any) => alert(err.message || "Xatolik"));
+      .catch((err: any) => toast.error(err.message || "Xatolik"));
   };
 
   return (
@@ -993,6 +999,16 @@ export default function Erp() {
             <div className="erp-toolbar-actions">
               <button
                 type="button"
+                className={`btn ${countMode ? "btn-erp-primary" : "btn-erp-secondary"}`}
+                onClick={() => {
+                  setCountMode((v) => !v);
+                  setInvFilter("all");
+                }}
+              >
+                {countMode ? "Jadvalga qaytish" : "Reviziya"}
+              </button>
+              <button
+                type="button"
                 className="btn btn-erp-primary"
                 onClick={() => {
                   openDocModal("INCOME");
@@ -1018,7 +1034,9 @@ export default function Erp() {
             </div>
           </div>
 
-          {/* 1C Table matching Image 2 */}
+          {countMode ? (
+            <CountPanel products={products} loading={loadingProducts} onDone={() => { setCountMode(false); loadInventory(); loadOverview(); loadAlerts(); loadDocs(); }} />
+          ) : (
           <div className="erp-card-table print-section">
             <table className="erp-table erp-1c-table">
               <thead>
@@ -1107,6 +1125,7 @@ export default function Erp() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       )}
 
@@ -2738,6 +2757,179 @@ export default function Erp() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Reviziya (inventarizatsiya) paneli                                          */
+/* -------------------------------------------------------------------------- */
+const COUNT_DRAFT_KEY = "medax_reviziya_draft";
+
+function CountPanel({ products, loading, onDone }: { products: ErpProduct[]; loading: boolean; onDone: () => void }) {
+  // Sanoq qoralamasi brauzerda saqlanadi: sahifa yopilsa yoki internet uzilsa ham yo'qolmaydi
+  const [counts, setCounts] = useState<Record<number, string>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem(COUNT_DRAFT_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const [onlyDiff, setOnlyDiff] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(COUNT_DRAFT_KEY, JSON.stringify(counts));
+    } catch {
+      /* private mode */
+    }
+  }, [counts]);
+
+  const byId = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
+  const entered = Object.entries(counts)
+    .filter(([, v]) => v !== "" && Number.isFinite(Number(v)))
+    .map(([k, v]) => ({ productId: Number(k), counted: Math.max(0, Math.floor(Number(v))) }));
+  const diffs = entered
+    .map((e) => ({ ...e, p: byId.get(e.productId) }))
+    .filter((e) => e.p && e.counted !== e.p.stock) as { productId: number; counted: number; p: ErpProduct }[];
+  const shortageSum = diffs.reduce((s, d) => s + Math.max(0, d.p.stock - d.counted) * (Number(d.p.costPrice) || Number(d.p.priceFrom) || 0), 0);
+  const surplusSum = diffs.reduce((s, d) => s + Math.max(0, d.counted - d.p.stock) * (Number(d.p.costPrice) || Number(d.p.priceFrom) || 0), 0);
+
+  const rows = onlyDiff ? products.filter((p) => diffs.some((d) => d.productId === p.id)) : products;
+
+  const finish = async () => {
+    if (!diffs.length) {
+      setCounts({});
+      toast.success("Farq yo'q: hisob va haqiqiy qoldiq bir xil");
+      onDone();
+      return;
+    }
+    setSaving(true);
+    try {
+      const r = await api<{ documents: string[] }>("/admin/erp/inventory/count", {
+        admin: true,
+        json: { items: diffs.map((d) => ({ productId: d.productId, counted: d.counted })) },
+      });
+      setCounts({});
+      toast.success(`Reviziya yakunlandi. Hujjatlar: ${r.documents.join(", ")}`);
+      onDone();
+    } catch (err: any) {
+      toast.error(err?.message || "Reviziya saqlanmadi");
+    } finally {
+      setSaving(false);
+      setConfirming(false);
+    }
+  };
+
+  return (
+    <div className="count-panel">
+      <div className="count-intro">
+        <strong>Reviziya</strong>
+        <span>
+          Har bir tovarni sanab, "Haqiqatda" ustuniga sonini yozing. Bo'sh qoldirilgan tovarlar o'zgarmaydi. Yakunlanganda kamomad
+          "Hisobdan chiqarish", ortiqcha "Kirim" hujjati bo'lib yoziladi. Yozganlaringiz shu brauzerda saqlanib turadi.
+        </span>
+      </div>
+
+      <div className="erp-card-table">
+        <table className="erp-table count-table">
+          <thead>
+            <tr>
+              <th>Tovar</th>
+              <th className="num" style={{ width: 110 }}>Hisobda</th>
+              <th style={{ width: 150 }}>Haqiqatda</th>
+              <th className="num" style={{ width: 110 }}>Farq</th>
+            </tr>
+          </thead>
+          <tbody>
+            {loading ? (
+              <tr><td colSpan={4} className="erp-empty-cell">Yuklanmoqda...</td></tr>
+            ) : rows.length ? (
+              rows.map((p) => {
+                const v = counts[p.id] ?? "";
+                const diff = v === "" ? null : Math.floor(Number(v)) - p.stock;
+                return (
+                  <tr key={p.id} className={diff ? (diff < 0 ? "row-minus" : "row-plus") : v !== "" ? "row-ok" : ""}>
+                    <td className="cell-name">
+                      <strong>{p.name}</strong>
+                      <small className="cell-sku">#{p.id}{p.sku ? ` · ${p.sku}` : ""}</small>
+                    </td>
+                    <td className="num">{p.stock} {p.unit || "dona"}</td>
+                    <td>
+                      <input
+                        className="count-input"
+                        type="number"
+                        inputMode="numeric"
+                        min={0}
+                        placeholder="—"
+                        value={v}
+                        aria-label={`${p.name}: haqiqiy soni`}
+                        onChange={(e) => setCounts((c) => ({ ...c, [p.id]: e.target.value.replace(/[^\d]/g, "") }))}
+                        onKeyDown={(e) => {
+                          // Enter: keyingi qatorga o'tish (tez sanash uchun)
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            const all = Array.from(document.querySelectorAll<HTMLInputElement>(".count-input"));
+                            all[all.indexOf(e.currentTarget) + 1]?.focus();
+                          }
+                        }}
+                      />
+                    </td>
+                    <td className="num">
+                      {diff === null ? <span className="muted-dash">—</span> : diff === 0 ? <span className="count-ok">✓</span> : (
+                        <strong className={diff < 0 ? "text-danger" : "text-success"}>{diff > 0 ? `+${diff}` : `−${Math.abs(diff)}`}</strong>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr><td colSpan={4} className="erp-empty-cell">{onlyDiff ? "Farqli tovar yo'q" : "Tovar topilmadi"}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="count-bar">
+        <div className="count-stats">
+          <span><b>{entered.length}</b> / {products.length} sanaldi</span>
+          <span><b>{diffs.length}</b> ta farq</span>
+          {shortageSum > 0 && <span className="text-danger">Kamomad: {formatMoney(shortageSum)} so'm</span>}
+          {surplusSum > 0 && <span className="text-success">Ortiqcha: {formatMoney(surplusSum)} so'm</span>}
+        </div>
+        <div className="count-actions">
+          <label className="count-toggle">
+            <input type="checkbox" checked={onlyDiff} onChange={(e) => setOnlyDiff(e.target.checked)} /> Faqat farqlar
+          </label>
+          <button
+            type="button"
+            className="btn btn-erp-secondary"
+            disabled={!entered.length || saving}
+            onClick={() => {
+              if (window.confirm("Kiritilgan barcha sonlar o'chirilsinmi?")) setCounts({});
+            }}
+          >
+            Tozalash
+          </button>
+          {confirming ? (
+            <>
+              <span className="count-confirm-text">{diffs.length} ta tovar qoldig'i o'zgaradi. Tasdiqlaysizmi?</span>
+              <button type="button" className="btn btn-erp-primary" disabled={saving} onClick={finish}>
+                {saving ? "Saqlanmoqda..." : "Ha, yakunlash"}
+              </button>
+              <button type="button" className="btn btn-erp-secondary" disabled={saving} onClick={() => setConfirming(false)}>
+                Yo'q
+              </button>
+            </>
+          ) : (
+            <button type="button" className="btn btn-erp-primary" disabled={!entered.length} onClick={() => setConfirming(true)}>
+              Reviziyani yakunlash
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

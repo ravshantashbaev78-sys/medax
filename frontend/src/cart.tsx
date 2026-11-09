@@ -1,5 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import type { Product } from "./api";
+import { toast as notify } from "./components/Toaster";
 
 export interface CartItem {
   productId: number;
@@ -71,6 +72,27 @@ export function CartProvider({ children }: { children: ReactNode }) {
       toast,
       dismissToast,
       add: (p, qty = 1) => {
+        // Haqiqatda qo'shilmasa, "qo'shildi" deb aldamaymiz
+        const existing = items.find((i) => i.productId === p.id);
+        const cap = Math.min(100, p.stock !== undefined && p.stock !== null ? p.stock : 100);
+        let ru = false;
+        try {
+          ru = localStorage.getItem("med_lang") === "ru";
+        } catch {
+          /* private mode */
+        }
+        if (cap <= 0) {
+          notify.error(ru ? "Товар закончился" : "Bu mahsulot omborda tugagan");
+          return;
+        }
+        if (existing && existing.quantity >= cap) {
+          notify.info(ru ? `В корзине уже максимум: ${cap} шт` : `Savatda allaqachon ${cap} dona bor (ombordagi maksimum)`);
+          return;
+        }
+        if (!existing && items.length >= 20) {
+          notify.error(ru ? "В корзине может быть не более 20 товаров" : "Savatga 20 tadan ortiq mahsulot qo'shib bo'lmaydi");
+          return;
+        }
         setToast({
           id: Date.now(),
           productName: p.name,

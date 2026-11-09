@@ -80,6 +80,87 @@ async function decrementStockOrThrow(tx: Tx, productId: number, quantity: number
   await tx.product.updateMany({ where: { id: productId, stock: 0 }, data: { isActive: false } });
 }
 
+export interface StockChange {
+  productId: number;
+  /** Yangi (haqiqiy) qoldiq */
+  to: number;
+}
+
+/**
+ * Qoldiqni qo'lda belgilash (reviziya, tezkor tahrir, mahsulot formasi) hujjatsiz bo'lmasligi uchun:
+ * ortiqcha -> "Kirim" hujjati, kamomad -> "Hisobdan chiqarish" hujjati (tannarxda) yaratiladi va
+ * qoldiq aynan berilgan songa o'rnatiladi. Hisobotlar va tovar aylanmasi shu hujjatlardan to'g'ri chiqadi.
+ * Qaytaradi: yaratilgan hujjat raqamlari.
+ */
+export async function applyStockChanges(tx: Tx, changes: StockChange[], reason: string): Promise<string[]> {
+  if (!changes.length) return [];
+  const products = await tx.product.findMany({
+    where: { id: { in: changes.map((c) => c.productId) } },
+    select: { id: true, name: true, stock: true, isActive: true, costPrice: true, priceFrom: true },
+  });
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const surplus: { productId: number; productName: string; quantity: number; price: number }[] = [];
+  const shortage: typeof surplus = [];
+
+  for (const c of changes) {
+    const p = byId.get(c.productId);
+    if (!p) throw new HttpError(400, `Tovar topilmadi (ID: ${c.productId})`);
+    const to = Math.max(0, Math.floor(c.to));
+    const diff = to - p.stock;
+    if (diff === 0) continue;
+    const price = Number(p.costPrice) || Number(p.priceFrom) || 0;
+    (diff > 0 ? surplus : shortage).push({ productId: p.id, productName: p.name, quantity: Math.abs(diff), price });
+    await tx.product.update({
+      where: { id: p.id },
+      data: {
+        stock: to,
+        // 0 ga tushsa saytdan yashiriladi; faqat 0 sababli yashirilgan bo'lsa, qayta ko'rsatiladi
+        ...(to === 0 ? { isActive: false } : p.stock <= 0 && !p.isActive ? { isActive: true } : {}),
+      },
+    });
+  }
+
+  const whId = await ensureDefaultWarehouse();
+  const numbers: string[] = [];
+  for (const [type, prefix, lines] of [
+    ["INCOME", "PR", surplus],
+    ["WRITE_OFF", "SP", shortage],
+  ] as const) {
+    if (!lines.length) continue;
+    const docNumber = await nextDocNumber(tx, prefix);
+    const totalAmount = lines.reduce((s, l) => s + l.price * l.quantity, 0);
+    await tx.erpDocument.create({
+      data: {
+        docNumber,
+        type,
+        warehouseId: whId,
+        totalAmount,
+        paidAmount: 0,
+        notes: reason === "Boshlang'ich qoldiq" ? reason : `${reason}: ${type === "INCOME" ? "ortiqcha" : "kamomad"}`,
+        items: {
+          create: lines.map((l) => ({
+            productId: l.productId,
+            productName: l.productName,
+            quantity: l.quantity,
+            costPrice: l.price,
+            sellPrice: l.price,
+            markup: 0,
+            totalPrice: l.price * l.quantity,
+          })),
+        },
+      },
+    });
+    numbers.push(docNumber);
+  }
+  return numbers;
+}
+
+/** Reviziya: sanalgan haqiqiy qoldiqlarni bitta tranzaksiyada qabul qiladi */
+const countSchema = z.object({
+  items: z.array(z.object({ productId: z.number().int().positive(), counted: z.number().int().min(0).max(1_000_000) })).min(1).max(2000),
+  note: z.string().trim().max(200).optional(),
+});
+
 async function ensureDefaultWarehouse(): Promise<number> {
   let wh = await prisma.warehouse.findFirst({ where: { isDefault: true } });
   if (!wh) {
@@ -215,7 +296,7 @@ erpRouter.get("/inventory", async (req, res) => {
   const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
   const categoryId = req.query.categoryId ? Number(req.query.categoryId) : undefined;
   const status = typeof req.query.status === "string" ? req.query.status : "all"; // all, low, expiring, out
-  const limit = Math.min(Number(req.query.limit) || 100, 500);
+  const limit = Math.min(Number(req.query.limit) || 100, 3000);
   const page = Math.max(Number(req.query.page) || 1, 1);
 
   const where: Prisma.ProductWhereInput = {};
@@ -277,22 +358,17 @@ erpRouter.post("/inventory/quick-update", async (req, res) => {
     body.markupPercent = Math.round(((sellPrice - body.costPrice) / body.costPrice) * 100);
   }
 
-  // Qoldiq qo'lda o'zgartirilsa: 0 -> yashirish, 0 dan oshsa (avtomatik yashirilgan bo'lsa) -> qayta ko'rsatish
-  let activeChange: { isActive: boolean } | {} = {};
-  if (body.stock !== undefined && body.stock !== null) {
-    const before = await prisma.product.findUnique({ where: { id: body.id }, select: { stock: true, isActive: true } });
-    if (body.stock === 0) activeChange = { isActive: false };
-    else if (before && before.stock <= 0 && !before.isActive) activeChange = { isActive: true };
-  }
-
-  const updated = await prisma.product.update({
+  // Qoldiq o'zgarishi hujjat bilan yoziladi (ortiqcha/kamomad), yashirish/ko'rsatish ham shu yerda
+  const updated = await withUniqueRetry(() => prisma.$transaction(async (tx) => {
+    if (body.stock !== undefined && body.stock !== null) {
+      await applyStockChanges(tx, [{ productId: body.id, to: body.stock }], "Qoldiqni qo'lda tuzatish");
+    }
+    return tx.product.update({
     where: { id: body.id },
     data: {
-      ...activeChange,
       costPrice: body.costPrice !== undefined ? body.costPrice : undefined,
       markupPercent: body.markupPercent !== undefined ? body.markupPercent : undefined,
       priceFrom: sellPrice !== undefined ? sellPrice : undefined,
-      stock: body.stock !== undefined && body.stock !== null ? body.stock : undefined,
       minStock: body.minStock !== undefined && body.minStock !== null ? body.minStock : undefined,
       batchNumber: body.batchNumber !== undefined ? body.batchNumber : undefined,
       expDate: body.expDate !== undefined ? body.expDate : undefined,
@@ -304,8 +380,20 @@ erpRouter.post("/inventory/quick-update", async (req, res) => {
       supplier: { select: { name: true } },
     },
   });
+  }));
 
   res.json({ ok: true, product: updated });
+});
+
+erpRouter.post("/inventory/count", async (req, res) => {
+  const body = countSchema.parse(req.body);
+  const docs = await withUniqueRetry(() =>
+    prisma.$transaction(
+      (tx) => applyStockChanges(tx, body.items.map((i) => ({ productId: i.productId, to: i.counted })), body.note ? `Reviziya (${body.note})` : "Reviziya"),
+      { timeout: 60_000 }
+    )
+  );
+  res.json({ ok: true, documents: docs });
 });
 
 /* -------------------------------------------------------------------------- */

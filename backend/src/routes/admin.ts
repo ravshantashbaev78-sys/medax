@@ -13,7 +13,7 @@ import { memoryUpload, removeFile, saveImage, savePdf } from "../upload";
 import { uniqueSlug } from "../utils";
 import { sendSms } from "../sms";
 import { notifyOrderConfirmed, notifyOrderReady, notifyOrderCanceled, notifyOrderDone } from "../notifications";
-import { erpRouter, nextCashNumber, withUniqueRetry } from "./erp";
+import { applyStockChanges, erpRouter, nextCashNumber, withUniqueRetry } from "./erp";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -225,7 +225,16 @@ adminRouter.get("/products/:id", async (req, res) => {
 
 adminRouter.post("/products", async (req, res) => {
   const d = productSchema.parse(req.body);
-  const p = await prisma.product.create({ data: { ...productData(d), slug: await uniqueSlug("product", d.name) } });
+  const slug = await uniqueSlug("product", d.name);
+  // Boshlang'ich qoldiq "Kirim" hujjati bilan yoziladi, shunda hisobotlarda tovar qayerdan kelgani ko'rinadi
+  const p = await withUniqueRetry(() => prisma.$transaction(async (tx) => {
+    const created = await tx.product.create({ data: { ...productData({ ...d, stock: 0 }), slug } });
+    if (d.stock > 0) {
+      await applyStockChanges(tx, [{ productId: created.id, to: d.stock }], "Boshlang'ich qoldiq");
+      return tx.product.update({ where: { id: created.id }, data: { isActive: d.isActive } });
+    }
+    return created;
+  }));
   res.status(201).json(p);
 });
 
@@ -315,7 +324,21 @@ adminRouter.post("/products/delete-all", requireAdmin, async (req, res) => {
 
 adminRouter.put("/products/:id", async (req, res) => {
   const d = productSchema.parse(req.body);
-  res.json(await prisma.product.update({ where: { id: id(req.params.id) }, data: productData(d) }));
+  // Forma ochilgandagi qoldiq: admin qoldiqni o'zgartirmagan bo'lsa, shu orada buyurtma bilan
+  // o'zgargan haqiqiy qoldiq eski qiymat bilan ustidan yozilmaydi
+  const stockBefore = z.coerce.number().int().optional().parse(req.body?.stockBefore ?? undefined);
+  const pid = id(req.params.id);
+  const current = await prisma.product.findUnique({ where: { id: pid }, select: { stock: true } });
+  if (!current) throw new HttpError(404, "Mahsulot topilmadi");
+  const stockChanged = stockBefore === undefined ? d.stock !== current.stock : d.stock !== stockBefore;
+  const { stock: _ignored, ...data } = productData({ ...d, stock: stockChanged ? d.stock : current.stock });
+
+  const updated = await withUniqueRetry(() => prisma.$transaction(async (tx) => {
+    await tx.product.update({ where: { id: pid }, data });
+    if (stockChanged) await applyStockChanges(tx, [{ productId: pid, to: d.stock }], "Mahsulot kartasida qoldiq o'zgartirildi");
+    return tx.product.findUniqueOrThrow({ where: { id: pid } });
+  }));
+  res.json(updated);
 });
 
 adminRouter.delete("/products/:id", requireAdmin, async (req, res) => {
@@ -344,6 +367,17 @@ adminRouter.post("/products/:id/images", memoryUpload.array("files", 10), async 
     created.push(await prisma.productImage.create({ data: { productId: pid, ...saved, sortOrder: order++ } }));
   }
   res.status(201).json(created);
+});
+
+// Rasmni asosiy (birinchi) qilish: kartochka va ilovada aynan shu rasm ko'rinadi
+adminRouter.post("/images/:imageId/main", async (req, res) => {
+  const img = await prisma.productImage.findUnique({ where: { id: id(req.params.imageId) } });
+  if (!img) throw new HttpError(404, "Rasm topilmadi");
+  const first = await prisma.productImage.findFirst({ where: { productId: img.productId }, orderBy: { sortOrder: "asc" } });
+  if (first && first.id !== img.id) {
+    await prisma.productImage.update({ where: { id: img.id }, data: { sortOrder: first.sortOrder - 1 } });
+  }
+  res.json(await prisma.productImage.findMany({ where: { productId: img.productId }, orderBy: { sortOrder: "asc" } }));
 });
 
 adminRouter.delete("/images/:imageId", async (req, res) => {
@@ -431,28 +465,48 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
       const price = priceRaw ? Number(priceRaw) : null;
       if (price !== null && Number.isNaN(price)) throw new Error("Narx raqam emas");
       const stockRaw = text(row, cStock).replace(/[\s,]/g, "");
-      const stock = stockRaw ? Math.max(0, parseInt(stockRaw, 10)) : 0;
+      const stock = stockRaw ? parseInt(stockRaw, 10) : null;
+      if (stock !== null && (!Number.isFinite(stock) || stock < 0)) throw new Error("Soni (qoldiq) musbat butun son bo'lishi kerak");
       const sku = text(row, cSku) || null;
-      const data = {
-        name,
-        categoryId,
-        brandId,
-        country: text(row, cCountry) || null,
-        priceFrom: price,
-        stock,
-        isActive: stock > 0,
-        sku,
-        description: text(row, cDesc),
-      };
+      const country = text(row, cCountry);
+      const description = text(row, cDesc);
 
       const existing = sku ? await prisma.product.findUnique({ where: { sku } }) : null;
-      if (existing) {
-        await prisma.product.update({ where: { id: existing.id }, data });
-        updated++;
-      } else {
-        await prisma.product.create({ data: { ...data, slug: await uniqueSlug("product", name) } });
-        created++;
-      }
+      await withUniqueRetry(() => prisma.$transaction(async (tx) => {
+        if (existing) {
+          // Bo'sh katakchalar mavjud ma'lumotni o'chirmaydi (masalan, qoldiq ustuni bo'sh bo'lsa, qoldiq saqlanadi)
+          await tx.product.update({
+            where: { id: existing.id },
+            data: {
+              name,
+              categoryId,
+              brandId: brandId ?? undefined,
+              ...(country ? { country } : {}),
+              ...(price !== null ? { priceFrom: price } : {}),
+              ...(description ? { description } : {}),
+            },
+          });
+          if (stock !== null) await applyStockChanges(tx, [{ productId: existing.id, to: stock }], "Excel import");
+        } else {
+          const createdP = await tx.product.create({
+            data: {
+              name,
+              categoryId,
+              brandId,
+              country: country || null,
+              priceFrom: price,
+              stock: 0,
+              isActive: false,
+              sku,
+              description,
+              slug: await uniqueSlug("product", name),
+            },
+          });
+          if (stock) await applyStockChanges(tx, [{ productId: createdP.id, to: stock }], "Excel import");
+        }
+      }));
+      if (existing) updated++;
+      else created++;
     } catch (e: any) {
       errors.push({ row: r, message: e.message || "Xato" });
     }

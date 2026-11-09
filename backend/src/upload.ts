@@ -28,13 +28,40 @@ async function ensure(sub: string) {
 }
 
 /** Rasmni WebP ga oʻtkazadi: asl (max 1600px) va kichik (max 480px) */
+/** Kartochka miniatyurasi o'lchami (kvadrat) va mahsulot atrofidagi bo'sh joy */
+const THUMB_SIZE = 640;
+const THUMB_PAD = 28;
+
+/**
+ * Mahsulot rasmini saqlaydi:
+ * - asosiy rasm: proporsiyasi saqlanadi (galereya uchun), shaffof fon oq bo'ladi;
+ * - miniatyura: har qanday rasm bir xil oq kvadratga joylanadi, ortiqcha bir xil rangli chetlar
+ *   kesiladi va mahsulot markazga qo'yiladi. Shu sababli katalogdagi kartochkalar bir xil ko'rinadi.
+ */
 export async function saveImage(buf: Buffer): Promise<{ url: string; thumbUrl: string }> {
   const dir = await ensure("products");
   const id = crypto.randomUUID();
   try {
-    const img = sharp(buf, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS }).rotate();
-    await img.clone().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true }).webp({ quality: 82 }).toFile(path.join(dir, `${id}.webp`));
-    await img.clone().resize({ width: 480, height: 480, fit: "inside", withoutEnlargement: true }).webp({ quality: 78 }).toFile(path.join(dir, `${id}-t.webp`));
+    const base = sharp(buf, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS }).rotate().flatten({ background: "#ffffff" });
+    await base
+      .clone()
+      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
+      .webp({ quality: 82 })
+      .toFile(path.join(dir, `${id}.webp`));
+
+    // Oq yoki bir xil fonli chetlarni kesamiz (studiya suratlari). Kesish imkonsiz bo'lsa, rasm o'zi olinadi.
+    let subject: Buffer;
+    try {
+      subject = await base.clone().trim({ threshold: 18 }).png().toBuffer();
+    } catch {
+      subject = await base.clone().png().toBuffer();
+    }
+    const inner = THUMB_SIZE - THUMB_PAD * 2;
+    await sharp(subject)
+      .resize({ width: inner, height: inner, fit: "contain", background: "#ffffff" })
+      .extend({ top: THUMB_PAD, bottom: THUMB_PAD, left: THUMB_PAD, right: THUMB_PAD, background: "#ffffff" })
+      .webp({ quality: 80 })
+      .toFile(path.join(dir, `${id}-t.webp`));
   } catch {
     throw new HttpError(400, "Rasm fayli yaroqsiz");
   }

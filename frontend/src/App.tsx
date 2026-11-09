@@ -13,6 +13,7 @@ import { AuthModal } from "./components/AuthModal";
 import { ThemeProvider } from "./context/ThemeContext";
 import { I18nProvider } from "./context/I18nContext";
 import { ScrollToTop } from "./components/ScrollToTop";
+import { Toaster } from "./components/Toaster";
 
 // Lazy-loaded Admin pages to optimize main client bundle
 const AdminLayout = lazy(() => import("./admin/AdminLayout").then((m) => ({ default: m.AdminLayout })));
@@ -96,6 +97,7 @@ export default function App() {
             </Route>
           </Routes>
           <AuthModal />
+          <Toaster />
         </CustomerAuthProvider>
       </I18nProvider>
     </ThemeProvider>
