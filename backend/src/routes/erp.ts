@@ -23,7 +23,7 @@ async function nextDocNumber(tx: Tx, prefix: string): Promise<string> {
   return base + String(maxSuffix(rows.map((r) => r.docNumber), base) + 1).padStart(4, "0");
 }
 
-async function nextCashNumber(tx: Tx): Promise<string> {
+export async function nextCashNumber(tx: Tx): Promise<string> {
   const base = `KAS-${new Date().getFullYear()}-`;
   const rows = await tx.cashEntry.findMany({ where: { entryNumber: { startsWith: base } }, select: { entryNumber: true } });
   return base + String(maxSuffix(rows.map((r) => r.entryNumber), base) + 1).padStart(4, "0");
@@ -39,7 +39,7 @@ function maxSuffix(codes: string[], base: string): number {
 }
 
 /** Parallel so'rovlarda raqam to'qnashsa (P2002), tranzaksiyani qayta urinadi */
-async function withUniqueRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
+export async function withUniqueRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
   for (let i = 0; ; i++) {
     try {
       return await fn();

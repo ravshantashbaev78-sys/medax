@@ -155,6 +155,7 @@ const CASH_CATEGORIES: Record<string, string> = {
   TRANSPORT: "Transport",
   KOMMUNAL: "Kommunal va internet",
   BOSHQA_CHIQIM: "Boshqa xarajat",
+  SAYT_BUYURTMA: "Sayt buyurtmasi",
 };
 const cashCategoryLabel = (c: string) => CASH_CATEGORIES[c] || c;
 

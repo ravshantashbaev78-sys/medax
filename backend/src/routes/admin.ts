@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { Prisma } from "@prisma/client";
+import { OrderStatus, Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { config } from "../config";
@@ -13,7 +13,7 @@ import { memoryUpload, removeFile, saveImage, savePdf } from "../upload";
 import { uniqueSlug } from "../utils";
 import { sendSms } from "../sms";
 import { notifyOrderConfirmed, notifyOrderReady, notifyOrderCanceled, notifyOrderDone } from "../notifications";
-import { erpRouter } from "./erp";
+import { erpRouter, nextCashNumber, withUniqueRetry } from "./erp";
 
 export const adminRouter = Router();
 adminRouter.use(requireAuth);
@@ -506,30 +506,121 @@ adminRouter.get("/orders", async (req, res) => {
   res.json({ items, total, page: q.page, pages: Math.max(1, Math.ceil(total / 30)) });
 });
 
+// Ruxsat etilgan holat o'tishlari. Topshirilgan (DONE) buyurtma ombordan chiqib ketgan:
+// uni bekor qilish yoki "soxta" deyish qoldiqni noto'g'ri qaytaradi, shuning uchun faqat
+// xato bosilgan bo'lsa READY ga qaytarish mumkin. Qaytgan tovar ERP'da "Mijozdan qaytim" bilan kiritiladi.
+const ORDER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  NEW: ["CONFIRMED", "READY", "DONE", "CANCELED", "FAKE"],
+  CONFIRMED: ["NEW", "READY", "DONE", "CANCELED", "FAKE"],
+  READY: ["CONFIRMED", "DONE", "CANCELED", "FAKE"],
+  DONE: ["READY"],
+  CANCELED: ["NEW", "FAKE"],
+  FAKE: ["NEW"],
+};
+const ORDER_STATUS_UZ: Record<OrderStatus, string> = {
+  NEW: "Yangi",
+  CONFIRMED: "Tasdiqlangan",
+  READY: "Tayyor",
+  DONE: "Topshirilgan",
+  CANCELED: "Bekor qilingan",
+  FAKE: "Soxta",
+};
+const SITE_ORDER_CASH_CATEGORY = "SAYT_BUYURTMA";
+
 adminRouter.patch("/orders/:id", async (req, res) => {
   const d = z.object({
     status: z.enum(["NEW", "CONFIRMED", "READY", "DONE", "CANCELED", "FAKE"]).optional(),
     managerNote: z.string().max(2000).optional(),
     isPaid: z.boolean().optional(),
+    // Haqiqatda qabul qilingan summa (kelishilgan narxli tovarlar bo'lsa, buyurtma summasidan farq qiladi)
+    paidAmount: z.number().min(0).max(1e12).optional(),
+    paymentType: z.enum(["CASH", "CARD", "BANK_TRANSFER"]).optional(),
   }).parse(req.body);
 
   const prevOrder = await prisma.order.findUnique({ where: { id: id(req.params.id) } });
   if (!prevOrder) throw new HttpError(404, "Buyurtma topilmadi");
+
+  if (d.status === prevOrder.status) delete d.status;
+  if (d.status && !ORDER_TRANSITIONS[prevOrder.status].includes(d.status)) {
+    throw new HttpError(
+      400,
+      prevOrder.status === "DONE"
+        ? "Topshirilgan buyurtmani bekor qilib bo'lmaydi. Tovar qaytarilsa, ERP'da \"Mijozdan qaytim\" hujjatini kiriting."
+        : `"${ORDER_STATUS_UZ[prevOrder.status]}" holatidan "${ORDER_STATUS_UZ[d.status]}" holatiga o'tkazib bo'lmaydi.`
+    );
+  }
+  const finalStatus = d.status || prevOrder.status;
+  if (d.isPaid === true && (finalStatus === "CANCELED" || finalStatus === "FAKE")) {
+    throw new HttpError(400, "Bekor qilingan buyurtmani to'langan deb belgilab bo'lmaydi.");
+  }
+  const { paidAmount, paymentType, ...orderData } = d;
+  // To'lov belgisi faqat birinchi marta qo'yilganda kassaga yoziladi
+  const becomesPaid = d.isPaid === true && !prevOrder.isPaid;
+  // To'langan buyurtma bekor qilinsa (yoki to'lov belgisi olib tashlansa), pul mijozga qaytariladi
+  const becomesRefunded =
+    prevOrder.isPaid && (d.isPaid === false || finalStatus === "CANCELED" || finalStatus === "FAKE");
+  if (becomesRefunded) orderData.isPaid = false;
 
   const needsDeduct =
     (d.status === "CONFIRMED" || d.status === "READY" || d.status === "DONE") && !prevOrder.stockDeducted;
   const needsRestore = (d.status === "CANCELED" || d.status === "FAKE") && prevOrder.stockDeducted;
 
   // Holat o'zgarishi va ombor harakati BITTA tranzaksiyada: qoldiq yetmasa, holat ham o'zgarmaydi.
-  const order = await prisma.$transaction(async (tx) => {
+  const order = await withUniqueRetry(() => prisma.$transaction(async (tx) => {
     const updated = await tx.order.update({
       where: { id: prevOrder.id },
       data: {
-        ...d,
-        ...(d.isPaid !== undefined && d.isPaid && !prevOrder.isPaid ? { paidAt: new Date() } : {}),
+        ...orderData,
+        ...(becomesPaid ? { paidAt: new Date() } : {}),
+        ...(becomesRefunded ? { paidAt: null } : {}),
       },
       include: { items: true },
     });
+
+    // Sayt buyurtmasi puli ERP kassasida ko'rinsin
+    if (becomesPaid) {
+      const amount = paidAmount ?? Number(prevOrder.totalAmount || 0);
+      if (amount > 0) {
+        await tx.cashEntry.create({
+          data: {
+            entryNumber: await nextCashNumber(tx),
+            type: "INCOME",
+            category: SITE_ORDER_CASH_CATEGORY,
+            amount,
+            paymentType: paymentType || (prevOrder.paymentMethod?.includes("Shartnoma") ? "BANK_TRANSFER" : "CASH"),
+            description: `Buyurtma ${prevOrder.code} to'lovi`,
+            customerId: prevOrder.customerId,
+          },
+        });
+      }
+    }
+    if (becomesRefunded) {
+      // Shu buyurtma bo'yicha kassaga tushgan summa qaytariladi (qaytarilgani ayirib hisoblanadi)
+      const [inc, exp] = await Promise.all([
+        tx.cashEntry.aggregate({
+          where: { category: SITE_ORDER_CASH_CATEGORY, type: "INCOME", description: { startsWith: `Buyurtma ${prevOrder.code} ` } },
+          _sum: { amount: true },
+        }),
+        tx.cashEntry.aggregate({
+          where: { category: SITE_ORDER_CASH_CATEGORY, type: "EXPENSE", description: { startsWith: `Buyurtma ${prevOrder.code} ` } },
+          _sum: { amount: true },
+        }),
+      ]);
+      const refund = Number(inc._sum.amount || 0) - Number(exp._sum.amount || 0);
+      if (refund > 0) {
+        await tx.cashEntry.create({
+          data: {
+            entryNumber: await nextCashNumber(tx),
+            type: "EXPENSE",
+            category: SITE_ORDER_CASH_CATEGORY,
+            amount: refund,
+            paymentType: paymentType || "CASH",
+            description: `Buyurtma ${prevOrder.code} bo'yicha pul qaytarildi`,
+            customerId: prevOrder.customerId,
+          },
+        });
+      }
+    }
 
     // 1. Tasdiqlash/tayyorlash/topshirishda qoldiq atomar ayiriladi (race condition bo'lmaydi)
     // stockDeducted bayrog'ini atomar "egallaymiz": parallel ikki so'rov qoldiqni ikki marta ayirmaydi
@@ -580,10 +671,10 @@ adminRouter.patch("/orders/:id", async (req, res) => {
     }
 
     return updated;
-  });
+  }));
 
   let blocked = false;
-  if (d.status === "FAKE") blocked = await applyFakeStrike(order.phone);
+  if (d.status === "FAKE" && prevOrder.status !== "FAKE") blocked = await applyFakeStrike(order.phone);
 
   // 3. Bildirishnomalar va SMS (CONFIRMED != READY, takrorlanmas SMS):
   if (d.status === "CONFIRMED" && prevOrder.status !== "CONFIRMED") {

@@ -1,7 +1,10 @@
-const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || "service_adkop5n";
-const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || "template_ilce5bo";
+// Zaxira qiymatlar faqat production'da: lokal/sinov serverlari haqiqiy pochtaga xat yubormasin
+const IS_PROD = process.env.NODE_ENV === "production";
+const prodDefault = (v: string) => (IS_PROD ? v : "");
+const EMAILJS_SERVICE_ID = process.env.EMAILJS_SERVICE_ID || prodDefault("service_adkop5n");
+const EMAILJS_TEMPLATE_ID = process.env.EMAILJS_TEMPLATE_ID || prodDefault("template_ilce5bo");
 const EMAILJS_ORDER_TEMPLATE_ID = process.env.EMAILJS_ORDER_TEMPLATE_ID || EMAILJS_TEMPLATE_ID;
-const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || process.env.EMAILJS_USER_ID || "kfwGWpE7XBQH2_06B";
+const EMAILJS_PUBLIC_KEY = process.env.EMAILJS_PUBLIC_KEY || process.env.EMAILJS_USER_ID || prodDefault("kfwGWpE7XBQH2_06B");
 const EMAILJS_PRIVATE_KEY = process.env.EMAILJS_PRIVATE_KEY || process.env.EMAILJS_ACCESS_TOKEN || "";
 const GMAIL_DESTINATION = process.env.GMAIL_DESTINATION || "medaxuz@gmail.com";
 

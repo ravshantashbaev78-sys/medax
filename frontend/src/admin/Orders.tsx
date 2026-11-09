@@ -222,7 +222,31 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
     onConfirm: () => void;
   } | null>(null);
 
-  const patch = async (body: { status?: string; managerNote?: string; isPaid?: boolean }) => {
+  const tr = (uz: string, ru: string, en: string) => (lang === "ru" ? ru : lang === "en" ? en : uz);
+  const orderTotal = Number(order.totalAmount || 0);
+  const hasUnpriced = order.items.some((i) => !i.price || Number(i.price) <= 0);
+  // To'lov paneli: "Olib ketildi" (topshirish + to'lov) yoki faqat "To'landi"
+  const [payPanel, setPayPanel] = useState<null | "done" | "paid">(null);
+  const [payReceived, setPayReceived] = useState(!order.isPaid);
+  const [payAmount, setPayAmount] = useState<number>(orderTotal);
+  const [payType, setPayType] = useState<"CASH" | "CARD" | "BANK_TRANSFER">(
+    order.paymentMethod?.includes("Shartnoma") ? "BANK_TRANSFER" : "CASH"
+  );
+
+  const submitPayPanel = () => {
+    const withPayment = payPanel === "paid" || (payReceived && !order.isPaid);
+    if (withPayment && !(payAmount > 0)) {
+      setError(tr("Qabul qilingan summani kiriting", "Введите полученную сумму", "Enter the amount received"));
+      return;
+    }
+    patch({
+      ...(payPanel === "done" ? { status: "DONE" } : {}),
+      managerNote: note,
+      ...(withPayment ? { isPaid: true, paidAmount: payAmount, paymentType: payType } : {}),
+    });
+  };
+
+  const patch = async (body: { status?: string; managerNote?: string; isPaid?: boolean; paidAmount?: number; paymentType?: string }) => {
     setBusy(true); setError("");
     try {
       const r = await api<{ blocked: boolean }>(`/admin/orders/${order.id}`, { method: "PATCH", json: body, admin: true });
@@ -264,18 +288,6 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
           await api("/admin/blocklist", { json: { type: "PHONE", value: order.phone, reason: `Buyurtma ${order.code}` }, admin: true });
           setInfo("OK");
         } catch (e) { setError((e as ApiError).message); }
-      },
-    });
-  };
-
-  const markPaid = () => {
-    setConfirmAction({
-      title: t("confirm_paid_title"),
-      message: t("confirm_paid_msg"),
-      danger: false,
-      onConfirm: () => {
-        setConfirmAction(null);
-        patch({ isPaid: true, managerNote: note });
       },
     });
   };
@@ -478,9 +490,78 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
           </div>
         )}
 
+        {payPanel && (
+          <div className="pay-panel">
+            <h4>
+              {payPanel === "done"
+                ? tr("Mijoz buyurtmani olib ketdimi?", "Клиент забрал заказ?", "Did the customer pick up the order?")
+                : tr("To'lovni qabul qilish", "Принять оплату", "Record payment")}
+            </h4>
+            {payPanel === "done" && !order.isPaid && (
+              <label className="pay-check">
+                <input type="checkbox" checked={payReceived} onChange={(e) => setPayReceived(e.target.checked)} />
+                {tr("To'lov ham qabul qilindi", "Оплата получена", "Payment received")}
+              </label>
+            )}
+            {payPanel === "done" && order.isPaid && (
+              <p className="pay-note">{tr("Buyurtma avval to'langan.", "Заказ уже оплачен.", "Already paid.")}</p>
+            )}
+            {(payPanel === "paid" || (payReceived && !order.isPaid)) && (
+              <div className="pay-fields">
+                <div className="field">
+                  <label htmlFor="pay-amount">{tr("Qabul qilingan summa (so'm)", "Получено (сум)", "Amount received (UZS)")}</label>
+                  <input
+                    id="pay-amount"
+                    type="number"
+                    min={0}
+                    value={payAmount || ""}
+                    onChange={(e) => setPayAmount(Math.max(0, Number(e.target.value) || 0))}
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="pay-type">{tr("To'lov usuli", "Способ оплаты", "Method")}</label>
+                  <select id="pay-type" value={payType} onChange={(e) => setPayType(e.target.value as any)}>
+                    <option value="CASH">{tr("Naqd", "Наличные", "Cash")}</option>
+                    <option value="CARD">{tr("Karta / terminal", "Карта / терминал", "Card / terminal")}</option>
+                    <option value="BANK_TRANSFER">{tr("Bank o'tkazmasi", "Перечисление", "Bank transfer")}</option>
+                  </select>
+                </div>
+                {hasUnpriced && (
+                  <p className="pay-note warn">
+                    {tr(
+                      "Buyurtmada narxi kelishiladigan tovar bor: mijozdan olingan haqiqiy summani kiriting.",
+                      "В заказе есть товары с договорной ценой: укажите фактически полученную сумму.",
+                      "Some items have a negotiated price: enter the amount actually received."
+                    )}
+                  </p>
+                )}
+                <p className="pay-note">{tr("Summa ERP kassasiga kirim bo'lib yoziladi.", "Сумма попадёт в кассу ERP как приход.", "The amount is recorded in the ERP cash book.")}</p>
+              </div>
+            )}
+            {error && <p className="err" style={{ margin: "12px 0 0" }}>{error}</p>}
+            <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+              <button className="btn" style={{ background: "#16a34a" }} disabled={busy} onClick={submitPayPanel}>
+                {t("confirm")}
+              </button>
+              <button className="btn ghost" disabled={busy} onClick={() => { setPayPanel(null); setError(""); }}>
+                {tr("Orqaga", "Назад", "Back")}
+              </button>
+            </div>
+          </div>
+        )}
+
         {canceling ? (
           <div style={{ background: "#fff1f2", border: "1px solid #fda4af", borderRadius: 12, padding: "16px", margin: "16px 0" }}>
             <h4 style={{ margin: "0 0 10px", color: "#be123c", fontSize: 16 }}>{t("cancel_modal_title")}</h4>
+            {order.isPaid && (
+              <p style={{ margin: "0 0 10px", fontSize: 13.5, color: "#7f1d1d" }}>
+                {tr(
+                  "Bu buyurtma to'langan. Bekor qilinsa, summa kassadan \"pul qaytarildi\" chiqimi bo'lib yoziladi.",
+                  "Заказ оплачен. При отмене в кассе будет записан возврат денег.",
+                  "This order is paid. Cancelling records a refund in the cash book."
+                )}
+              </p>
+            )}
             <div className="field" style={{ marginBottom: 10 }}>
               <label htmlFor="cancel-preset">{t("cancel_main_reason")}</label>
               <select
@@ -542,19 +623,24 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                   {t("ready_pickup_btn")}
                 </button>
               )}
-              {order.status === "READY" && (
-                <button className="btn" style={{ background: "#16a34a" }} disabled={busy} onClick={() => patch({ status: "DONE", managerNote: note })}>
+              {(order.status === "CONFIRMED" || order.status === "READY") && (
+                <button className="btn" style={{ background: "#16a34a" }} disabled={busy} onClick={() => setPayPanel("done")}>
                   {t("done_pickup_btn")}
                 </button>
               )}
               {!order.isPaid && order.status !== "CANCELED" && order.status !== "FAKE" && (
-                <button
-                  className="btn sm"
-                  style={{ background: "#059669", color: "#fff" }}
-                  disabled={busy}
-                  onClick={markPaid}
-                >
+                <button className="btn sm" style={{ background: "#059669", color: "#fff" }} disabled={busy} onClick={() => setPayPanel("paid")}>
                   {t("mark_paid_btn")}
+                </button>
+              )}
+              {order.status === "DONE" && (
+                <button className="btn ghost" disabled={busy} onClick={() => patch({ status: "READY", managerNote: note })}>
+                  {tr("Xato bosildi: \"Tayyor\"ga qaytarish", "Ошибка: вернуть в «Готов»", "Mistake: back to Ready")}
+                </button>
+              )}
+              {order.status === "CANCELED" && (
+                <button className="btn ghost" disabled={busy} onClick={() => patch({ status: "NEW", managerNote: note })}>
+                  {tr("Qayta ochish", "Открыть заново", "Reopen")}
                 </button>
               )}
               {(order.status === "NEW" || order.status === "CONFIRMED" || order.status === "READY") && (
@@ -562,7 +648,7 @@ function Detail({ order, onClose, onChanged }: { order: Order; onClose: () => vo
                   {t("action_cancel_order")}...
                 </button>
               )}
-              {order.status !== "FAKE" && <button className="btn danger" disabled={busy} onClick={markFake}>{t("fake_btn")}</button>}
+              {order.status !== "FAKE" && order.status !== "DONE" && <button className="btn danger" disabled={busy} onClick={markFake}>{t("fake_btn")}</button>}
               <button className="btn ghost" disabled={busy} onClick={() => patch({ managerNote: note })}>{t("save_note")}</button>
               <button className="btn ghost" disabled={busy} onClick={blockNow}>{t("block_phone_btn")}</button>
             </div>

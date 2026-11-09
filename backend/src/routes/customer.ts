@@ -178,20 +178,14 @@ customerRouter.post("/auth/send-otp", customerOtpLimiter, async (req, res) => {
   const phone = normalizePhone(raw);
   if (!phone) throw new HttpError(400, "Telefon raqami noto'g'ri. Misol: +998 90 123 45 67");
 
-  // Agar mijoz allaqachon ro'yxatdan o'tgan bo'lsa, qayta ro'yxatdan o'tish uchun kod yuborilmaydi!
+  // Paroli bor mijoz qayta ro'yxatdan o'tmaydi. Paroli yo'q profil (mehmon sifatida buyurtma berganda
+  // avtomatik yaratilgan) ro'yxatdan o'tishni davom ettira oladi: SMS kod raqam egaligini tasdiqlaydi.
   const existing = await prisma.customer.findUnique({ where: { phone } });
-  if (existing) {
-    if (existing.passwordHash) {
-      throw new HttpError(
-        400,
-        "Ushbu telefon raqami allaqachon ro'yxatdan o'tgan. Iltimos, 'Kirish' bo'limi orqali parolingiz bilan kiring."
-      );
-    } else {
-      throw new HttpError(
-        400,
-        "Ushbu telefon raqami allaqachon ro'yxatdan o'tgan. Iltimos, 'Kirish' bo'limi orqali kiring (parol o'rnatish uchun 'Parolni unutdim' tugmasidan foydalaning)."
-      );
-    }
+  if (existing?.passwordHash) {
+    throw new HttpError(
+      400,
+      "Ushbu telefon raqami allaqachon ro'yxatdan o'tgan. Iltimos, 'Kirish' bo'limi orqali parolingiz bilan kiring."
+    );
   }
 
   const ip = getClientIp(req);
@@ -726,15 +720,36 @@ customerRouter.post("/orders/:id/cancel", requireCustomerAuth, async (req, res) 
     );
   }
 
-  const updated = await prisma.order.update({
-    where: { id: orderId },
-    data: {
-      status: "CANCELED",
-      managerNote: `Mijoz tomonidan bekor qilindi. Sababi: ${reason}`,
-    },
+  // Atomar: shu orada admin tasdiqlagan bo'lsa (holat NEW emas), bekor qilinmaydi.
+  // Ombordan ayirilgan bo'lsa (masalan, tasdiqlanib, keyin NEW ga qaytarilgan), qoldiq qaytariladi.
+  const note = `Mijoz tomonidan bekor qilindi. Sababi: ${reason}`;
+  await prisma.$transaction(async (tx) => {
+    const claimed = await tx.order.updateMany({
+      where: { id: orderId, status: "NEW", stockDeducted: order.stockDeducted },
+      data: {
+        status: "CANCELED",
+        stockDeducted: false,
+        managerNote: order.managerNote ? `${order.managerNote}\n${note}` : note,
+      },
+    });
+    if (claimed.count === 0) {
+      throw new HttpError(409, "Buyurtma holati o'zgargan. Sahifani yangilab, qayta ko'ring.");
+    }
+    if (order.stockDeducted) {
+      const items = await tx.orderItem.findMany({ where: { orderId }, select: { productId: true, quantity: true } });
+      for (const it of items) {
+        if (!it.productId) continue;
+        const prod = await tx.product.findUnique({ where: { id: it.productId }, select: { stock: true, isActive: true } });
+        if (!prod) continue;
+        await tx.product.update({
+          where: { id: it.productId },
+          data: { stock: { increment: it.quantity }, ...(prod.stock === 0 && !prod.isActive ? { isActive: true } : {}) },
+        });
+      }
+    }
   });
 
-  res.json({ ok: true, order: { id: updated.id, code: updated.code, status: updated.status } });
+  res.json({ ok: true, order: { id: order.id, code: order.code, status: "CANCELED" } });
 });
 
 // 7. Mobil ilova Push Tokenini saqlash
