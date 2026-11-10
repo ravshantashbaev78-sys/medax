@@ -1,7 +1,15 @@
+# Konteyner loglari cheksiz o'sib diskni to'ldirmasin: har biri 10 MB x 3 fayl
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   db:
     image: postgres:16-alpine
     container_name: medax_postgres
+    logging: *default-logging
     restart: always
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-medax_user}
@@ -22,6 +30,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     container_name: medax_backend
+    logging: *default-logging
     restart: always
     depends_on:
       db:
@@ -60,6 +69,7 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     container_name: medax_frontend
+    logging: *default-logging
     restart: always
     depends_on:
       - backend
