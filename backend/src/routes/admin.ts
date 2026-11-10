@@ -254,16 +254,44 @@ adminRouter.post("/products/bulk-status", requireAdmin, async (req, res) => {
 });
 
 // Tanlangan mahsulotlarni xavfsiz o'chirish (buyurtmada qatnashgan bo'lsa yashiriladi)
+/** Mahsulot bilan avtomatik yaratiladigan, faqat shu mahsulotga tegishli qoldiq hujjatlari */
+const AUTO_STOCK_NOTES = ["Boshlang'ich qoldiq", "Mahsulot kartasida qoldiq o'zgartirildi", "Qoldiqni qo'lda tuzatish", "Excel import"];
+
+/**
+ * O'chirishga tayyorlaydi: buyurtmada yoki haqiqiy ERP hujjatida (savdo, kirim, reviziya) qatnashgan
+ * mahsulot o'chirilmaydi (tarix buzilmasin), faqat yashiriladi. Faqat avtomatik qoldiq hujjatlari bo'lsa,
+ * o'sha hujjatlar o'chiriladi va mahsulotni butunlay o'chirish mumkin bo'ladi.
+ * Qaytaradi: butunlay o'chirib bo'ladigan ID lar.
+ */
+async function purgeableProductIds(ids: number[]): Promise<number[]> {
+  if (!ids.length) return [];
+  const [orderRows, docItems] = await Promise.all([
+    prisma.orderItem.findMany({ where: { productId: { in: ids } }, select: { productId: true }, distinct: ["productId"] }),
+    prisma.erpDocumentItem.findMany({
+      where: { productId: { in: ids } },
+      select: { productId: true, documentId: true, document: { select: { notes: true, _count: { select: { items: true } } } } },
+    }),
+  ]);
+  const inOrders = new Set(orderRows.map((r) => r.productId));
+  const autoDocs = new Map<number, number[]>();
+  const blocked = new Set<number>();
+  for (const it of docItems) {
+    const note = it.document.notes || "";
+    const isAuto = it.document._count.items === 1 && AUTO_STOCK_NOTES.some((n) => note.startsWith(n));
+    if (!isAuto) blocked.add(it.productId);
+    else autoDocs.set(it.productId, [...(autoDocs.get(it.productId) || []), it.documentId]);
+  }
+  const ok = ids.filter((id) => !inOrders.has(id) && !blocked.has(id));
+  const docIds = ok.flatMap((id) => autoDocs.get(id) || []);
+  if (docIds.length) await prisma.erpDocument.deleteMany({ where: { id: { in: docIds } } });
+  return ok;
+}
+
 const handleBulkDelete = async (ids: number[]) => {
-  // 1. OrderItem da qatnashgan mahsulotlarni aniqlash
-  const orderProducts = await prisma.orderItem.findMany({
-    where: { productId: { in: ids } },
-    select: { productId: true },
-    distinct: ["productId"],
-  });
-  const protectedIds = new Set(orderProducts.map((op) => op.productId));
-  const toSoftDelete = ids.filter((pid) => protectedIds.has(pid));
-  const toHardDelete = ids.filter((pid) => !protectedIds.has(pid));
+  // 1. Buyurtma yoki haqiqiy ERP hujjati bor mahsulotlar yashiriladi, qolganlari o'chiriladi
+  const purgeable = new Set(await purgeableProductIds(ids));
+  const toSoftDelete = ids.filter((pid) => !purgeable.has(pid));
+  const toHardDelete = ids.filter((pid) => purgeable.has(pid));
 
   let hiddenCount = 0;
   if (toSoftDelete.length > 0) {
@@ -343,13 +371,13 @@ adminRouter.put("/products/:id", async (req, res) => {
 
 adminRouter.delete("/products/:id", requireAdmin, async (req, res) => {
   const pid = id(req.params.id);
-  if (await prisma.orderItem.count({ where: { productId: pid } })) {
-    // Buyurtma tarixi saqlanishi uchun o'chirmaymiz, yashiramiz
+  const p = await prisma.product.findUnique({ where: { id: pid }, include: { images: true, documents: true } });
+  if (!p) throw new HttpError(404, "Mahsulot topilmadi");
+  if (!(await purgeableProductIds([pid])).length) {
+    // Buyurtma yoki ombor tarixi saqlanishi uchun o'chirmaymiz, yashiramiz
     await prisma.product.update({ where: { id: pid }, data: { isActive: false } });
     return void res.json({ ok: true, hidden: true });
   }
-  const p = await prisma.product.findUnique({ where: { id: pid }, include: { images: true, documents: true } });
-  if (!p) throw new HttpError(404, "Mahsulot topilmadi");
   await prisma.product.delete({ where: { id: pid } });
   await Promise.all([...p.images.flatMap((i) => [removeFile(i.url), removeFile(i.thumbUrl)]), ...p.documents.map((d) => removeFile(d.url))]);
   res.json({ ok: true });
