@@ -42,7 +42,7 @@ export function FloatingContactHub() {
         <div className="floating-hub-header">
           <div className="floating-hub-status">
             <span className="hub-live-dot" />
-            <span className="hub-status-text">Online · 24/7</span>
+            <span className="hub-status-text">Du–Sha · 09:00–18:00</span>
           </div>
           <h4 className="floating-hub-title">{t("float_hub_title")}</h4>
           <p className="floating-hub-sub">{t("float_hub_sub")}</p>

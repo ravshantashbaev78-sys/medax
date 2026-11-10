@@ -250,7 +250,7 @@ export default function Contact() {
                     {SITE_CONFIG.phone}
                   </a>
                   <span className="contact-card-hint">
-                    {lang === "ru" ? "Инженерные консультации и онлайн поддержка 24/7" : lang === "en" ? "Engineering consultations & 24/7 online support" : "Muhandislik maslahati va 24/7 qo'llab-quvvatlash"}
+                    {lang === "ru" ? "Консультации инженеров: Пн–Сб, 09:00–18:00" : lang === "en" ? "Engineering consultations: Mon–Sat, 9:00–18:00" : "Muhandislik maslahati: Du–Sha, 09:00–18:00"}
                   </span>
                 </div>
               </div>

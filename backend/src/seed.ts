@@ -13,10 +13,11 @@ export const TARGET_CATEGORIES = [
 export async function syncCategories(): Promise<Record<string, number>> {
   const catMap: Record<string, number> = {};
   for (const c of TARGET_CATEGORIES) {
+    // Faqat yo'q bo'lsa yaratiladi: admin qayta nomlagan toifa har deployda eski nomiga qaytmasin
     const row = await prisma.category.upsert({
       where: { slug: c.slug },
       create: { name: c.name, slug: c.slug, sortOrder: c.sortOrder },
-      update: { name: c.name, sortOrder: c.sortOrder },
+      update: {},
     });
     catMap[c.slug] = row.id;
     catMap[c.name] = row.id;
@@ -50,8 +51,9 @@ export async function seedDatabase() {
     console.log(`[Seed] Birlamchi admin yaratildi: ${primaryEmail}`);
   }
 
-  // 2. Kategoriyalarni faqat mavjudligini ta'minlaymiz (mavjud toifalarni yoki tovarlarni o'chirmaydi!)
-  await syncCategories();
+  // 2. Boshlang'ich toifalar va brendlar faqat birinchi o'rnatishda (jadval bo'sh bo'lsa) yaratiladi.
+  // Har deployda qayta yaratilsa, admin o'chirgan brend qaytib kelar, o'zgartirilgan nomlar eskisiga qaytardi.
+  if ((await prisma.category.count()) === 0) await syncCategories();
 
   // 3. Brendlar ro'yxatini shakllantirish
   const brands: [string, string][] = [
@@ -70,26 +72,15 @@ export async function seedDatabase() {
     ["Nihon Kohden", "Yaponiya"],
   ];
 
-  for (const [name, country] of brands) {
-    const slug = slugify(name);
-    await prisma.brand.upsert({
-      where: { slug },
-      create: { name, slug, country },
-      update: { name, country },
-    });
-  }
-
-  // 4. Mahsulotlar ID ketma-ketligini (Sequence) sozlash:
-  // Agar bazada 0 ta mahsulot bo'lsa, keyingi qo'shiladigan mahsulot 1-ID dan boshlanadi.
-  const productCount = await prisma.product.count();
-  if (productCount === 0) {
-    try {
-      await prisma.$executeRawUnsafe(`ALTER SEQUENCE "Product_id_seq" RESTART WITH 1;`);
-      console.log("[Seed] Mahsulotlar ID hisoblagichi 1 ga qaytarildi (restart with 1).");
-    } catch (e: any) {
-      console.warn("[Seed] Sequence qayta sozlashda e'tibor:", e?.message);
+  if ((await prisma.brand.count()) === 0) {
+    for (const [name, country] of brands) {
+      const slug = slugify(name);
+      await prisma.brand.upsert({ where: { slug }, create: { name, slug, country }, update: {} });
     }
   }
+
+  // Mahsulot ID hisoblagichi qayta boshlanmaydi: mijoz savatida (brauzer/ilova) eski ID saqlanib qolgan
+  // bo'lsa, u boshqa yangi mahsulotga tegishli bo'lib qolardi.
 
   // Mahsulotlar 0 ta saqlanadi: do'kon egasi o'zi admin panel orqali 0 dan kiritadi
   console.log("[Seed] Tizim tayyor: Mahsulotlar to'liq do'kon egasi tomonidan boshqariladi.");

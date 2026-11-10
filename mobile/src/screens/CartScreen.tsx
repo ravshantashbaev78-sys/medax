@@ -53,8 +53,26 @@ export function CartScreen({ navigation }: any) {
   const { lang, t } = useI18n();
   const { colors } = useTheme();
   const c = L[lang] || L.uz;
-  const { items, updateQuantity, removeFromCart, clearCart, totalPrice, totalItems } = useCart();
+  const { items, updateQuantity, removeFromCart, clearCart, totalPrice, totalItems, refresh } = useCart();
   const { customer, token, logout } = useAuth();
+
+  // Savat ochilganda narx va qoldiq serverdan yangilanadi; sotuvdan olingan mahsulotlar haqida ogohlantiramiz
+  useEffect(() => {
+    const unsub = navigation.addListener("focus", () => {
+      refresh()
+        .then((removed) => {
+          if (removed.length) {
+            Alert.alert(
+              lang === "ru" ? "Корзина обновлена" : lang === "en" ? "Cart updated" : "Savat yangilandi",
+              (lang === "ru" ? "Нет в наличии и удалено: " : lang === "en" ? "No longer available and removed: " : "Sotuvda yo'q, olib tashlandi: ") + removed.join(", ")
+            );
+          }
+        })
+        .catch(() => {});
+    });
+    return unsub;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, lang]);
 
   const [customerName, setCustomerName] = useState(customer?.name || "");
   const [phone, setPhone] = useState(customer?.phone || "+998 ");

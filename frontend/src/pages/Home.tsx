@@ -76,7 +76,7 @@ export const HERO_SLIDES: HeroSlide[] = [
     },
     badges: [
       { type: "original", label: { uz: "Original", ru: "Оригинал", en: "Original" } },
-      { type: "warranty", label: { uz: "24/7 servis", ru: "Сервис 24/7", en: "24/7 Service" } },
+      { type: "warranty", label: { uz: "Servis va kafolat", ru: "Сервис и гарантия", en: "Service & warranty" } },
     ],
     img: "/banners/medical-surgery.jpg",
     alt: "Reanimatsiya va IVL jihozlari",

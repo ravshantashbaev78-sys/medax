@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "../context/I18nContext";
 import { api, Product, Category, money } from "../api";
+import { DeviceIcon } from "./Shell";
 
 interface UzumSearchBarProps {
   isOpen?: boolean;
@@ -242,7 +243,7 @@ export function UzumSearchBar({ isOpen: controlledIsOpen, onOpenChange }: UzumSe
                           {img ? (
                             <img src={img} alt={localizedName} className="uz-popular-thumb" loading="lazy" />
                           ) : (
-                            <span style={{ fontSize: 26, opacity: 0.6 }}>🩺</span>
+                            <span style={{ width: 28, height: 28, opacity: 0.6, display: "inline-grid" }}><DeviceIcon /></span>
                           )}
                         </div>
                         <div className="uz-popular-info">
@@ -362,7 +363,7 @@ export function UzumSearchBar({ isOpen: controlledIsOpen, onOpenChange }: UzumSe
                                 loading="lazy"
                               />
                             ) : (
-                              <span style={{ fontSize: 26, opacity: 0.6 }}>🩺</span>
+                              <span style={{ width: 28, height: 28, opacity: 0.6, display: "inline-grid" }}><DeviceIcon /></span>
                             )}
                           </div>
                           <div className="uz-popular-info">

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Product } from "../api";
+import { fetchProductsByIds, Product } from "../api";
 
 export interface CartItem {
   product: Product;
@@ -15,6 +15,8 @@ interface CartContextType {
   clearCart: () => void;
   totalItems: number;
   totalPrice: number;
+  /** Narx va qoldiqni serverdan yangilaydi; sotuvdan olingan yoki tugagan mahsulotlar nomlarini qaytaradi */
+  refresh: () => Promise<string[]>;
 }
 
 const CartContext = createContext<CartContextType | null>(null);
@@ -91,6 +93,38 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     setItems([]);
   };
 
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
+  const refresh = async (): Promise<string[]> => {
+    const ids = itemsRef.current.map((i) => i.product.id);
+    const fresh = await fetchProductsByIds(ids);
+    if (!fresh) return []; // oflayn: savatni o'zgartirmaymiz
+    const byId = new Map(fresh.map((p) => [p.id, p]));
+    const removed: string[] = [];
+    setItems((prev) =>
+      prev.flatMap((it) => {
+        const p = byId.get(it.product.id);
+        if (!p || (typeof p.stock === "number" && p.stock <= 0)) {
+          removed.push(it.product.name);
+          return [];
+        }
+        // Rasm kabi qo'shimcha maydonlarni saqlab, narx va qoldiqni yangilaymiz
+        const product = { ...it.product, ...p };
+        return [{ product, quantity: Math.max(1, clampQty(product, it.quantity)) }];
+      })
+    );
+    return removed;
+  };
+
+  useEffect(() => {
+    // Ilova ochilganda saqlangan savat bir marta yangilanadi
+    const t = setTimeout(() => {
+      if (itemsRef.current.length) refresh().catch(() => {});
+    }, 800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalPrice = items.reduce((sum, i) => {
     const price = typeof i.product.priceFrom === "number" ? i.product.priceFrom : parseFloat(String(i.product.priceFrom || 0));
@@ -107,6 +141,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         clearCart,
         totalItems,
         totalPrice,
+        refresh,
       }}
     >
       {children}

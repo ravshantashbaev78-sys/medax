@@ -92,6 +92,19 @@ export default function CustomerAccount() {
   const [cancelReasonText, setCancelReasonText] = useState("");
   const [cancelBusy, setCancelBusy] = useState(false);
 
+  // Hisobni o'chirish
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletePassword, setDeletePassword] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const tr = (uz: string, ru: string, en: string) => (lang === "ru" ? ru : lang === "en" ? en : uz);
+  useEffect(() => {
+    // Maxfiylik sahifasidagi havola: /account?tab=profile#delete-account
+    if (tab === "profile" && window.location.hash === "#delete-account") {
+      setDeleteOpen(true);
+      window.setTimeout(() => document.getElementById("delete-account")?.scrollIntoView({ behavior: "smooth", block: "center" }), 200);
+    }
+  }, [tab]);
+
   // Avatar upload state
   const [avatarUploading, setAvatarUploading] = useState(false);
 
@@ -482,7 +495,7 @@ export default function CustomerAccount() {
                   {o.status === "CANCELED" && (
                     <div style={{ background: "rgba(239, 68, 68, 0.08)", border: "1px solid rgba(239, 68, 68, 0.2)", borderRadius: 10, padding: "10px 14px", marginTop: 10 }}>
                       <strong style={{ color: "#ef4444", display: "block", fontSize: 13, marginBottom: 3 }}>
-                        ❌ {t("acc_order_canceled_badge")}
+                        {t("acc_order_canceled_badge")}
                       </strong>
                       <span style={{ fontSize: 13, color: "var(--ink)" }}>
                         <b>{t("acc_order_cancel_reason")}:</b> {o.cancelReason || "Menejer tomonidan ko'rib chiqilib bekor qilindi"}
@@ -827,6 +840,64 @@ export default function CustomerAccount() {
               </svg>
               <span>{t("acc_logout")}</span>
             </button>
+          </div>
+
+          {/* Hisobni o'chirish: Google Play talabi bo'yicha saytda ham bo'lishi shart */}
+          <div className="profile-edit-card acc-delete-card" id="delete-account">
+            <div>
+              <h3>{tr("Hisobni o'chirish", "Удаление аккаунта", "Delete account")}</h3>
+              <p className="muted">
+                {tr(
+                  "Ism, telefon, rasm va kirish ma'lumotlaringiz o'chiriladi. Buxgalteriya hujjatlari bo'lsa, ular nomsiz holda saqlanadi. Buni qaytarib bo'lmaydi.",
+                  "Имя, телефон, фото и данные входа будут удалены. Бухгалтерские документы сохранятся без персональных данных. Это необратимо.",
+                  "Your name, phone, photo and login data will be deleted. Accounting records are kept without personal data. This cannot be undone."
+                )}
+              </p>
+            </div>
+            {deleteOpen ? (
+              <form
+                className="acc-delete-form"
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  setDeleteBusy(true);
+                  try {
+                    const res = await fetch("/api/customer/auth/account", {
+                      method: "DELETE",
+                      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token || ""}` },
+                      body: JSON.stringify({ password: deletePassword }),
+                    });
+                    const data = await res.json().catch(() => ({}));
+                    if (!res.ok) throw new Error(data.error || "Xatolik");
+                    toast.success(tr("Hisobingiz o'chirildi", "Аккаунт удалён", "Your account has been deleted"));
+                    logout();
+                    nav("/");
+                  } catch (err: any) {
+                    toast.error(err.message);
+                  } finally {
+                    setDeleteBusy(false);
+                  }
+                }}
+              >
+                {customer?.hasPassword !== false && (
+                  <label>
+                    <span>{tr("Tasdiqlash uchun parolingiz", "Пароль для подтверждения", "Your password to confirm")}</span>
+                    <input type="password" autoComplete="current-password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} required />
+                  </label>
+                )}
+                <div className="acc-delete-actions">
+                  <button type="button" className="btn ghost" onClick={() => { setDeleteOpen(false); setDeletePassword(""); }} disabled={deleteBusy}>
+                    {tr("Bekor qilish", "Отмена", "Cancel")}
+                  </button>
+                  <button type="submit" className="btn danger" disabled={deleteBusy}>
+                    {deleteBusy ? "..." : tr("Butunlay o'chirish", "Удалить навсегда", "Delete permanently")}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <button type="button" className="btn ghost acc-delete-open" onClick={() => setDeleteOpen(true)}>
+                {tr("Hisobni o'chirish", "Удалить аккаунт", "Delete account")}
+              </button>
+            )}
           </div>
         </section>
       )}

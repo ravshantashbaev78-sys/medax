@@ -1,8 +1,10 @@
 import { Link } from "react-router-dom";
 import { useI18n } from "../context/I18nContext";
+import { SITE_CONFIG } from "../siteConfig";
 
 export default function Privacy() {
   const { lang } = useI18n();
+  const L: string = lang;
 
   return (
     <div className="container" style={{ maxWidth: 860, margin: "40px auto", padding: "0 20px", color: "var(--ink, #0f172a)" }}>
@@ -69,7 +71,17 @@ export default function Privacy() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>5. Удаление данных и контакты</h2>
             <p>
-              Пользователь имеет право в любой момент запросить удаление своего аккаунта и всех связанных данных. Для этого отправьте запрос на электронную почту: <strong>info@medax.uz</strong> или свяжитесь с нами по телефону: <strong>+998 91 186 66 61</strong>.
+              Пользователь имеет право в любой момент запросить удаление своего аккаунта и всех связанных данных. Для этого отправьте запрос на электронную почту: <strong>{SITE_CONFIG.email}</strong> или свяжитесь с нами по телефону: <strong>{SITE_CONFIG.phone}</strong>.
+            </p>
+            <p>
+              <Link to="/account?tab=profile#delete-account">
+                {L === "ru" ? "Удалить аккаунт самостоятельно" : L === "en" ? "Delete your account yourself" : "Hisobni o'zingiz o'chirish"}
+              </Link>
+              {L === "ru"
+                ? " — войдите в аккаунт, откройте «Профиль» и нажмите «Удалить аккаунт». То же самое доступно в мобильном приложении Medax."
+                : L === "en"
+                ? " — sign in, open Profile and choose Delete account. The same option is available in the Medax mobile app."
+                : " — hisobingizga kiring, \"Profil\" bo'limida \"Hisobni o'chirish\" tugmasini bosing. Xuddi shu imkoniyat Medax mobil ilovasida ham bor."}
             </p>
           </section>
         </article>
@@ -113,7 +125,17 @@ export default function Privacy() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>5. Account Deletion and Contact Information</h2>
             <p>
-              Users have the right to request the permanent deletion of their account and all associated personal data at any time. To submit a deletion request, please email us at: <strong>info@medax.uz</strong> or contact us by phone: <strong>+998 91 186 66 61</strong>.
+              Users have the right to request the permanent deletion of their account and all associated personal data at any time. To submit a deletion request, please email us at: <strong>{SITE_CONFIG.email}</strong> or contact us by phone: <strong>{SITE_CONFIG.phone}</strong>.
+            </p>
+            <p>
+              <Link to="/account?tab=profile#delete-account">
+                {L === "ru" ? "Удалить аккаунт самостоятельно" : L === "en" ? "Delete your account yourself" : "Hisobni o'zingiz o'chirish"}
+              </Link>
+              {L === "ru"
+                ? " — войдите в аккаунт, откройте «Профиль» и нажмите «Удалить аккаунт». То же самое доступно в мобильном приложении Medax."
+                : L === "en"
+                ? " — sign in, open Profile and choose Delete account. The same option is available in the Medax mobile app."
+                : " — hisobingizga kiring, \"Profil\" bo'limida \"Hisobni o'chirish\" tugmasini bosing. Xuddi shu imkoniyat Medax mobil ilovasida ham bor."}
             </p>
           </section>
         </article>
@@ -157,7 +179,11 @@ export default function Privacy() {
           <section style={{ marginBottom: 28 }}>
             <h2 style={{ fontSize: 20, fontWeight: 800, marginBottom: 12 }}>5. Hisobni oʻchirish va aloqa</h2>
             <p>
-              Foydalanuvchi istalgan vaqtda oʻz hisobi va shaxsiy maʼlumotlarini butunlay oʻchirib tashlashni soʻrash huquqiga ega. Buning uchun <strong>info@medax.uz</strong> elektron pochtasiga xat yuborishingiz yoki <strong>+998 91 186 66 61</strong> raqamiga murojaat qilishingiz mumkin.
+              Foydalanuvchi istalgan vaqtda oʻz hisobi va shaxsiy maʼlumotlarini butunlay oʻchirib tashlashni soʻrash huquqiga ega. Buning uchun <strong>{SITE_CONFIG.email}</strong> elektron pochtasiga xat yuborishingiz yoki <strong>{SITE_CONFIG.phone}</strong> raqamiga murojaat qilishingiz mumkin.
+            </p>
+            <p>
+              <Link to="/account?tab=profile#delete-account">Hisobni o'zingiz o'chirish</Link> — hisobingizga kiring, "Profil" bo'limida "Hisobni o'chirish"
+              tugmasini bosing. Xuddi shu imkoniyat Medax mobil ilovasida ham bor.
             </p>
           </section>
         </article>

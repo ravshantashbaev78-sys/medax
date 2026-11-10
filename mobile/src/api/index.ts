@@ -79,6 +79,19 @@ export interface ProductPage {
 }
 
 /** Katalog uchun sahifalab yuklash (server bir so'rovda ko'pi bilan 48 ta mahsulot beradi) */
+/** Savatdagi mahsulotlarning joriy narxi va qoldig'i (sotuvdan olinganlari javobda bo'lmaydi). null — tarmoq xatosi */
+export async function fetchProductsByIds(ids: number[]): Promise<Product[] | null> {
+  if (!ids.length) return [];
+  try {
+    const res = await fetch(`${API_BASE}/products/lookup?ids=${ids.slice(0, 40).join(",")}`);
+    if (!res.ok) return null;
+    const data = await readJson(res);
+    return Array.isArray(data.items) ? data.items : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchProductsPage(
   params: { categoryId?: number; search?: string; page?: number; limit?: number } = {}
 ): Promise<ProductPage> {

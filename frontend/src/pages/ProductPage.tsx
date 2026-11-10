@@ -34,11 +34,19 @@ export default function ProductPage() {
     api<Product>(`/products/${slug}`)
       .then((d) => {
         setP(d);
-        document.title = `${localizeProductName(d.name, lang)} — Medax`;
+        document.title = `${localizeProductName(d, lang)} — Medax`;
       })
       .catch((e: ApiError) => setError(e.status === 404 ? (lang === "ru" ? "Товар не найден." : lang === "en" ? "Product not found." : "Mahsulot topilmadi.") : e.message));
     window.scrollTo({ top: 0 });
   }, [slug, lang]);
+
+  // Sahifadan chiqilganda brauzer yorlig'ida mahsulot nomi qolib ketmasin
+  useEffect(() => {
+    const initial = document.title;
+    return () => {
+      document.title = initial.includes(" — Medax") ? "Medax — Tibbiy uskunalar markazi" : initial;
+    };
+  }, []);
 
   if (error) return <main className="wrap"><p className="err" style={{ marginTop: 32 }}>{error} <Link to="/catalog">{lang === "ru" ? "В каталог" : lang === "en" ? "Back to catalog" : "Katalogga qaytish"}</Link></p></main>;
   if (!p) return <main className="wrap"><p className="muted" style={{ padding: 40 }}>{lang === "ru" ? "Загрузка..." : lang === "en" ? "Loading..." : "Yuklanmoqda…"}</p></main>;
@@ -138,8 +146,8 @@ export default function ProductPage() {
           </div>
 
           {p.stock !== undefined && p.stock <= 0 ? (
-            <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 12, padding: "14px 18px", margin: "14px 0", color: "#991b1b", fontWeight: 700 }}>
-              ❌ {lang === "ru" ? "Данный товар временно закончился на складе." : lang === "en" ? "This product is temporarily out of stock." : "Ushbu mahsulot omborda tugagan."}
+            <div className="auth-error-banner" role="status" style={{ margin: "14px 0" }}>
+              {lang === "ru" ? "Данный товар временно закончился на складе." : lang === "en" ? "This product is temporarily out of stock." : "Ushbu mahsulot omborda tugagan."}
             </div>
           ) : (
             <div className="buy">

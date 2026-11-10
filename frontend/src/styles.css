@@ -9255,3 +9255,14 @@ table.tbl {
   .ct-chips { gap: 6px; margin-bottom: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .ct-sheet, .ct-scrim, .ct-skel span { animation: none; } }
+
+/* Kabinet: hisobni o'chirish */
+.acc-delete-card { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 14px; border-color: color-mix(in srgb, #dc2626 35%, var(--line)) !important; }
+.acc-delete-card h3 { margin: 0 0 4px; color: #b91c1c; }
+[data-theme="dark"] .acc-delete-card h3 { color: #fca5a5; }
+.acc-delete-card p { margin: 0; max-width: 60ch; }
+.acc-delete-open { color: #b91c1c !important; border-color: color-mix(in srgb, #dc2626 45%, var(--line)) !important; }
+.acc-delete-form { display: grid; gap: 10px; width: 100%; max-width: 420px; }
+.acc-delete-form label { display: grid; gap: 4px; font-size: 13.5px; font-weight: 600; }
+.acc-delete-form input { height: 42px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
+.acc-delete-actions { display: flex; gap: 8px; flex-wrap: wrap; }
