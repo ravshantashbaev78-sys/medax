@@ -32,8 +32,8 @@ async function ensure(sub: string) {
 // Mahsulot rasmlari boshqa saytlarga ko'chirilmasligi uchun markazga xira Medax logotipi tushiriladi.
 // O'chirish: .env da PRODUCT_WATERMARK=off
 const WATERMARK_PATH = path.resolve(__dirname, "../assets/watermark.png");
-const WATERMARK_OPACITY = 0.09;
-const WATERMARK_WIDTH_RATIO = 0.52;
+const WATERMARK_OPACITY = 0.06;
+const WATERMARK_WIDTH_RATIO = 0.4;
 let watermarkSrc: Promise<Buffer | null> | null = null;
 
 function loadWatermark(): Promise<Buffer | null> {

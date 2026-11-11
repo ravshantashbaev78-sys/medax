@@ -9266,3 +9266,11 @@ table.tbl {
 .acc-delete-form label { display: grid; gap: 4px; font-size: 13.5px; font-weight: 600; }
 .acc-delete-form input { height: 42px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--ink); font: inherit; }
 .acc-delete-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* Mahsulot sahifasi galereyasi: rasm ramkaga to'liq sig'adi (avval height:100% ishlamay, rasm qirqilardi) */
+.gal .main { position: relative; aspect-ratio: 1 / 1; max-height: 640px; margin-inline: auto; width: 100%; }
+.gal .main img { position: absolute; inset: 0; width: 100%; height: 100%; padding: 4%; box-sizing: border-box; object-fit: contain; }
+[data-theme="dark"] .gal .main { background: #fff; }
+@media (max-width: 768px) {
+  .pd .gal .main { max-height: none; aspect-ratio: 1 / 1; }
+}

@@ -88,7 +88,10 @@ export default function ProductPage() {
               {p.stock !== undefined && p.stock !== null ? (
                 p.stock > 0 ? (
                   <>
-                    {lang === "ru" ? `В наличии: ${p.stock} шт` : lang === "en" ? `In stock: ${p.stock} pcs` : `Omborda: ${p.stock} dona mavjud`}
+                    {/* Aniq son faqat kam qolganda ko'rsatiladi (kartochka bilan bir xil); katta sonlar xaridorga kerak emas */}
+                    {p.stock <= 10
+                      ? lang === "ru" ? `Осталось ${p.stock} шт` : lang === "en" ? `Only ${p.stock} left` : `Omborda ${p.stock} dona qoldi`
+                      : lang === "ru" ? "В наличии" : lang === "en" ? "In stock" : "Omborda bor"}
                   </>
                 ) : (
                   <span style={{ color: "#dc2626", fontWeight: 700 }}>
