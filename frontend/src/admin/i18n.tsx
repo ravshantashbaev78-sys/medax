@@ -236,9 +236,9 @@ export const ADMIN_TEXTS = {
   // Import Page
   import_title: { uz: "Excel orqali yuklash", ru: "Загрузка через Excel", en: "Import via Excel" },
   import_desc: {
-    uz: "Yuzlab mahsulotni bir marta kiriting. Ustunlar: Nomi, Toifa, Brend, Davlat, Narx, Artikul, Tavsif. Yo'q toifa va brendlar avtomatik yaratiladi. Artikuli mavjud mahsulot yangilanadi, qolganlari yangi qo'shiladi.",
-    ru: "Массовая загрузка товаров. Колонки: Название, Категория, Бренд, Страна, Цена, Артикул, Описание. Недостающие категории и бренды создаются автоматически. Товары с существующим артикулом обновляются.",
-    en: "Bulk import products. Columns: Name, Category, Brand, Country, Price, SKU, Description. Missing categories and brands are created automatically.",
+    uz: "Ko'p mahsulotni bir marta kiriting. Shablonni yuklab oling: Nomi, Nomi (ruscha), Nomi (inglizcha), Kategoriya, Brend, Davlat, Narx, Soni (Qoldiq), Artikul, Tavsif. Kategoriya shablonning \"Kategoriyalar\" varag'idagi nom bilan aynan yozilishi kerak. Yangi brend avtomatik qo'shiladi. Artikuli mavjud mahsulot yangilanadi, bo'sh katakchalar eski ma'lumotni o'chirmaydi.",
+    ru: "Массовая загрузка товаров. Скачайте шаблон: Название, Название (рус.), Название (англ.), Категория, Бренд, Страна, Цена, Количество, Артикул, Описание. Категорию пишите точно как на листе «Kategoriyalar». Новые бренды создаются автоматически. Товар с существующим артикулом обновляется, пустые ячейки не стирают данные.",
+    en: "Bulk import products. Download the template: Name, Name (RU), Name (EN), Category, Brand, Country, Price, Quantity, SKU, Description. Write the category exactly as listed on the \"Kategoriyalar\" sheet. New brands are created automatically. A product with an existing SKU is updated; empty cells keep existing data.",
   },
   btn_download_template: { uz: "Shablonni yuklab olish", ru: "Скачать шаблон", en: "Download template" },
   btn_upload: { uz: "Yuklash", ru: "Загрузить", en: "Upload" },

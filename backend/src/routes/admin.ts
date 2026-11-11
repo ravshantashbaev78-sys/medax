@@ -198,6 +198,8 @@ adminRouter.get("/products/import/template", async (_req, res) => {
   const ws = wb.addWorksheet("Mahsulotlar");
   ws.columns = [
     { header: "Nomi", key: "name", width: 40 },
+    { header: "Nomi (ruscha)", key: "nameRu", width: 40 },
+    { header: "Nomi (inglizcha)", key: "nameEn", width: 32 },
     { header: "Kategoriya", key: "category", width: 28 },
     { header: "Brend", key: "brand", width: 20 },
     { header: "Davlat", key: "country", width: 16 },
@@ -206,7 +208,24 @@ adminRouter.get("/products/import/template", async (_req, res) => {
     { header: "Artikul", key: "sku", width: 16 },
     { header: "Tavsif", key: "description", width: 50 },
   ];
-  ws.addRow({ name: "Bemor monitori BeneVision N17", category: "Reanimatsiya", brand: "Mindray", country: "Xitoy", price: 3800000, stock: 50, sku: "MR-N17", description: "17 dyuymli monitor" });
+  const catNames = (await prisma.category.findMany({ orderBy: { sortOrder: "asc" } })).map((c) => c.name);
+  ws.addRow({
+    name: "Nogironlar aravachasi, yig'iladigan",
+    nameRu: "Инвалидная коляска складная",
+    nameEn: "Folding wheelchair",
+    category: catNames.find((n) => /ortoped/i.test(n)) || catNames[0] || "",
+    brand: "",
+    country: "Xitoy",
+    price: 2450000,
+    stock: 5,
+    sku: "WC-001",
+    description: "Namuna qator: o'chirib, o'z mahsulotlaringizni yozing",
+  });
+  // Kategoriya aynan mavjud nom bilan yozilishi kerak: ro'yxat alohida varaqda
+  const ref = wb.addWorksheet("Kategoriyalar");
+  ref.columns = [{ header: "Mavjud kategoriyalar (aynan shunday yozing)", key: "n", width: 48 }];
+  catNames.forEach((n) => ref.addRow({ n }));
+  ref.getRow(1).font = { bold: true };
   ws.getRow(1).font = { bold: true };
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", 'attachment; filename="mahsulotlar-shablon.xlsx"');
@@ -448,20 +467,26 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
     throw new HttpError(400, "Bitta faylda ko'pi bilan 1000 ta mahsulot yuklash mumkin.");
   }
 
+  // Sarlavhalar: kichik harf, apostrof va ortiqcha bo'shliqlarsiz ("Soni (Qoldiq)" -> "soni (qoldiq)")
+  const norm = (t: string) => t.toLowerCase().replace(/[\u02bb\u02bc\u2018\u2019'`]/g, "").replace(/\s+/g, " ").trim();
   const head: Record<string, number> = {};
-  ws.getRow(1).eachCell((c, col) => (head[c.text.trim().toLowerCase()] = col));
-  const col = (...names: string[]) => names.map((n) => head[n]).find(Boolean);
-  const cName = col("nomi", "name", "nom");
+  ws.getRow(1).eachCell((c, col) => (head[norm(c.text)] = col));
+  const col = (...names: string[]) => names.map((n) => head[norm(n)]).find(Boolean);
+  const cName = col("nomi", "name", "nom", "nomi (ozbekcha)");
+  const cNameRu = col("nomi (ruscha)", "ruscha nomi", "name_ru", "nameru", "название");
+  const cNameEn = col("nomi (inglizcha)", "inglizcha nomi", "name_en", "nameen");
   const cCat = col("kategoriya", "category");
   if (!cName || !cCat) throw new HttpError(400, "Ustunlar: Nomi va Kategoriya majburiy (shablonni yuklab oling)");
   const cBrand = col("brend", "brand");
   const cCountry = col("davlat", "country");
-  const cPrice = col("narx", "price");
-  const cStock = col("soni", "qoldiq", "stock", "miqdor");
+  const cPrice = col("narx", "narxi", "narx (som)", "price");
+  const cStock = col("soni (qoldiq)", "soni", "qoldiq", "stock", "miqdor", "qoldiq (soni)");
   const cSku = col("artikul", "sku");
   const cDesc = col("tavsif", "description");
 
-  const cats = new Map((await prisma.category.findMany()).map((c) => [c.name.toLowerCase(), c.id]));
+  const allCats = await prisma.category.findMany({ orderBy: { sortOrder: "asc" } });
+  const cats = new Map(allCats.map((c) => [c.name.toLowerCase(), c.id]));
+  const catsByName = new Map(allCats.map((c) => [c.id, c.name]));
   const brands = new Map((await prisma.brand.findMany()).map((b) => [b.name.toLowerCase(), b.id]));
   const text = (row: ExcelJS.Row, c?: number) => (c ? row.getCell(c).text.trim() : "");
 
@@ -475,10 +500,10 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
     try {
       const catName = text(row, cCat);
       if (!catName) throw new Error("Kategoriya bo'sh");
-      let categoryId = cats.get(catName.toLowerCase());
+      const categoryId = cats.get(catName.toLowerCase());
       if (!categoryId) {
-        categoryId = (await prisma.category.create({ data: { name: catName, slug: await uniqueSlug("category", catName) } })).id;
-        cats.set(catName.toLowerCase(), categoryId);
+        // Xato yozilgan nom yangi keraksiz toifa ochmasin
+        throw new Error(`Kategoriya topilmadi: "${catName}". Mavjudlari: ${[...catsByName.values()].join(", ")}`);
       }
       let brandId: number | null = null;
       const brandName = text(row, cBrand);
@@ -489,7 +514,8 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
           brands.set(brandName.toLowerCase(), brandId);
         }
       }
-      const priceRaw = text(row, cPrice).replace(/[\s,]/g, "");
+      // "2 450 000 so'm" kabi yozuvlar ham qabul qilinadi
+      const priceRaw = text(row, cPrice).replace(/[^\d.]/g, "");
       const price = priceRaw ? Number(priceRaw) : null;
       if (price !== null && Number.isNaN(price)) throw new Error("Narx raqam emas");
       const stockRaw = text(row, cStock).replace(/[\s,]/g, "");
@@ -498,6 +524,8 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
       const sku = text(row, cSku) || null;
       const country = text(row, cCountry);
       const description = text(row, cDesc);
+      const nameRu = text(row, cNameRu);
+      const nameEn = text(row, cNameEn);
 
       const existing = sku ? await prisma.product.findUnique({ where: { sku } }) : null;
       await withUniqueRetry(() => prisma.$transaction(async (tx) => {
@@ -507,6 +535,8 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
             where: { id: existing.id },
             data: {
               name,
+              ...(nameRu ? { nameRu } : {}),
+              ...(nameEn ? { nameEn } : {}),
               categoryId,
               brandId: brandId ?? undefined,
               ...(country ? { country } : {}),
@@ -519,6 +549,8 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
           const createdP = await tx.product.create({
             data: {
               name,
+              nameRu: nameRu || null,
+              nameEn: nameEn || null,
               categoryId,
               brandId,
               country: country || null,
