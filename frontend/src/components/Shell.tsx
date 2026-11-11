@@ -15,7 +15,7 @@ import { UzumSearchBar, useAnimatedPresence } from "./UzumSearchBar";
 import { UzumCatalogModal } from "./UzumCatalogModal";
 import { MobileBottomNav } from "./MobileBottomNav";
 import { SITE_CONFIG } from "../siteConfig";
-import { localizeProductName, localizeUnit } from "../utils/localize";
+import { localizeProductName, localizeUnit, localizeCategory } from "../utils/localize";
 
 export function Layout() {
   const { count } = useCart();
@@ -591,7 +591,11 @@ export function ProductCard({ p }: { p: Product }) {
       </Link>
 
       <div className="pc-body">
-        <span className="pc-meta">{p.brand?.name || p.category?.name || "\u00a0"}</span>
+        <span className="pc-meta">
+          {p.brand?.name ||
+            (p.category ? (lang === "uz" ? p.category.name : localizeCategory(p.category.slug || p.category.name, lang)) : "") ||
+            "\u00a0"}
+        </span>
         <h3 className="pc-title">
           <Link to={`/product/${p.slug}`} title={name}>
             {name}
