@@ -19,3 +19,6 @@ Thumbs.db
 .vercel
 .expo/
 */.expo/
+
+# Mahsulot yuklash uchun ish fayllari (Excel, rasmlar)
+mahsulotlar-yuklash/

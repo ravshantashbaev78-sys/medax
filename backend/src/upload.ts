@@ -28,6 +28,39 @@ async function ensure(sub: string) {
 }
 
 /** Rasmni WebP ga oʻtkazadi: asl (max 1600px) va kichik (max 480px) */
+/* ------------------------------ Suv belgisi ------------------------------ */
+// Mahsulot rasmlari boshqa saytlarga ko'chirilmasligi uchun markazga xira Medax logotipi tushiriladi.
+// O'chirish: .env da PRODUCT_WATERMARK=off
+const WATERMARK_PATH = path.resolve(__dirname, "../assets/watermark.png");
+const WATERMARK_OPACITY = 0.09;
+const WATERMARK_WIDTH_RATIO = 0.52;
+let watermarkSrc: Promise<Buffer | null> | null = null;
+
+function loadWatermark(): Promise<Buffer | null> {
+  if (process.env.PRODUCT_WATERMARK === "off") return Promise.resolve(null);
+  if (!watermarkSrc) watermarkSrc = fs.readFile(WATERMARK_PATH).catch(() => null);
+  return watermarkSrc;
+}
+
+/** Berilgan o'lchamdagi rasm uchun xira logotip qatlami (PNG) */
+async function watermarkLayer(width: number, height: number): Promise<Buffer | null> {
+  const src = await loadWatermark();
+  if (!src) return null;
+  const w = Math.max(40, Math.round(Math.min(width, height) * WATERMARK_WIDTH_RATIO));
+  const { data, info } = await sharp(src).resize({ width: w }).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 3; i < data.length; i += 4) data[i] = Math.round(data[i] * WATERMARK_OPACITY);
+  return sharp(data, { raw: { width: info.width, height: info.height, channels: 4 } }).png().toBuffer();
+}
+
+/** Tayyor rasm buferiga markazda xira logotip qo'yadi; logotip bo'lmasa, rasmni o'zgarishsiz qaytaradi */
+async function withWatermark(img: sharp.Sharp): Promise<sharp.Sharp> {
+  const buf = await img.png().toBuffer();
+  const meta = await sharp(buf).metadata();
+  const layer = await watermarkLayer(meta.width || 0, meta.height || 0);
+  if (!layer) return sharp(buf);
+  return sharp(buf).composite([{ input: layer, gravity: "center" }]);
+}
+
 /** Kartochka miniatyurasi o'lchami (kvadrat) va mahsulot atrofidagi bo'sh joy */
 const THUMB_SIZE = 640;
 const THUMB_PAD = 28;
@@ -43,11 +76,8 @@ export async function saveImage(buf: Buffer): Promise<{ url: string; thumbUrl: s
   const id = crypto.randomUUID();
   try {
     const base = sharp(buf, { failOn: "error", limitInputPixels: MAX_INPUT_PIXELS }).rotate().flatten({ background: "#ffffff" });
-    await base
-      .clone()
-      .resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true })
-      .webp({ quality: 82 })
-      .toFile(path.join(dir, `${id}.webp`));
+    const main = base.clone().resize({ width: 1600, height: 1600, fit: "inside", withoutEnlargement: true });
+    await (await withWatermark(main)).webp({ quality: 82 }).toFile(path.join(dir, `${id}.webp`));
 
     // Oq yoki bir xil fonli chetlarni kesamiz (studiya suratlari). Kesish imkonsiz bo'lsa, rasm o'zi olinadi.
     let subject: Buffer;
@@ -57,11 +87,10 @@ export async function saveImage(buf: Buffer): Promise<{ url: string; thumbUrl: s
       subject = await base.clone().png().toBuffer();
     }
     const inner = THUMB_SIZE - THUMB_PAD * 2;
-    await sharp(subject)
+    const thumb = sharp(subject)
       .resize({ width: inner, height: inner, fit: "contain", background: "#ffffff" })
-      .extend({ top: THUMB_PAD, bottom: THUMB_PAD, left: THUMB_PAD, right: THUMB_PAD, background: "#ffffff" })
-      .webp({ quality: 80 })
-      .toFile(path.join(dir, `${id}-t.webp`));
+      .extend({ top: THUMB_PAD, bottom: THUMB_PAD, left: THUMB_PAD, right: THUMB_PAD, background: "#ffffff" });
+    await (await withWatermark(thumb)).webp({ quality: 80 }).toFile(path.join(dir, `${id}-t.webp`));
   } catch {
     throw new HttpError(400, "Rasm fayli yaroqsiz");
   }
