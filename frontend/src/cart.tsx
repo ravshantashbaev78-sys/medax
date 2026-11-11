@@ -86,7 +86,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return;
         }
         if (existing && existing.quantity >= cap) {
-          notify.info(ru ? `В корзине уже максимум: ${cap} шт` : `Savatda allaqachon ${cap} dona bor (ombordagi maksimum)`);
+          notify.info(ru ? "В корзине уже всё доступное количество" : "Savatda allaqachon mavjud miqdorning hammasi bor");
           return;
         }
         if (!existing && items.length >= 20) {

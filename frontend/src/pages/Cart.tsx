@@ -365,7 +365,7 @@ export default function Cart() {
     const p = itemProblem(i);
     if (p === "unavailable") return tr("Sotuvda yo'q. Savatdan olib tashlang.", "Нет в продаже. Удалите из корзины.", "No longer available. Remove it.");
     if (p === "out") return tr("Omborda qolmagan. Savatdan olib tashlang.", "Нет на складе. Удалите из корзины.", "Out of stock. Remove it.");
-    if (p === "short") return tr(`Omborda faqat ${i.stock} dona bor`, `На складе только ${i.stock} шт`, `Only ${i.stock} in stock`);
+    if (p === "short") return tr("Bu miqdorda mavjud emas, sonini kamaytiring", "Нет в таком количестве, уменьшите", "Not available in this quantity, reduce it");
     return "";
   };
 
@@ -423,8 +423,6 @@ export default function Cart() {
                         </div>
                         {problem ? (
                           <div className="co-item-warn" role="alert">{problemText(i)}</div>
-                        ) : i.stock !== undefined && i.stock !== null && i.stock <= 5 ? (
-                          <div className="co-item-stock">{tr(`Omborda ${i.stock} dona qoldi`, `Осталось ${i.stock} шт`, `${i.stock} left in stock`)}</div>
                         ) : null}
                       </div>
 

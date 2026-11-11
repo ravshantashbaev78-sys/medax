@@ -58,7 +58,7 @@ const translations: Record<Language, Record<string, string>> = {
     contact_address: "Namangan viloyati, Namangan sh., Ozod MFY, Abu Rayhon Beruniy ko'chasi, 2-uy",
     contact_privacy: "Maxfiylik siyosati",
     view_on_map: "Xaritada ko'rish ↗",
-    stock_in: "Omborda: {n} dona",
+    stock_in: "Mahsulot mavjud",
     stock_out: "Tugagan",
     stock_cart_empty: "Omborda qolmagan",
 
@@ -209,7 +209,7 @@ const translations: Record<Language, Record<string, string>> = {
     contact_address: "Наманганская область, г. Наманган, сгм Озод, улица Абу Райхона Беруни, дом 2",
     contact_privacy: "Политика конфиденциальности",
     view_on_map: "Посмотреть на карте ↗",
-    stock_in: "В наличии: {n} шт.",
+    stock_in: "Товар в наличии",
     stock_out: "Нет в наличии",
     stock_cart_empty: "Нет в наличии",
 
@@ -360,7 +360,7 @@ const translations: Record<Language, Record<string, string>> = {
     contact_address: "Namangan region, Namangan city, Ozod MCC, Abu Rayhon Beruniy street, 2",
     contact_privacy: "Privacy Policy",
     view_on_map: "View on map ↗",
-    stock_in: "In stock: {n}",
+    stock_in: "In stock",
     stock_out: "Out of stock",
     stock_cart_empty: "Out of stock",
 

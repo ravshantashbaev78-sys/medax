@@ -164,7 +164,7 @@ export default function Catalog() {
     const b = brands.find((x) => x.slug === slug);
     chips.push({ key: `b-${slug}`, label: b?.name || slug, clear: () => toggleBrand(slug) });
   });
-  if (inStock) chips.push({ key: "stock", label: tr("Omborda bor", "В наличии", "In stock"), clear: () => set({ inStock: "" }) });
+  if (inStock) chips.push({ key: "stock", label: tr("Mahsulot mavjud", "В наличии", "In stock"), clear: () => set({ inStock: "" }) });
   if (flag) chips.push({ key: "flag", label: flags.find((f) => f.v === flag)?.label || flag, clear: () => set({ flag: "" }) });
   if (priceLabel) chips.push({ key: "price", label: priceLabel, clear: () => set({ minPrice: "", maxPrice: "" }) });
   const filterCount = chips.filter((c) => c.key !== "q").length;
@@ -207,7 +207,7 @@ export default function Catalog() {
 
       <Section>
         <label className="ct-switch">
-          <span>{tr("Faqat omborda borlari", "Только в наличии", "In stock only")}</span>
+          <span>{tr("Faqat mavjud mahsulotlar", "Только в наличии", "In stock only")}</span>
           <input type="checkbox" checked={inStock} onChange={(e) => set({ inStock: e.target.checked ? "1" : "" })} />
           <span className="ct-switch-track" aria-hidden="true">
             <span />

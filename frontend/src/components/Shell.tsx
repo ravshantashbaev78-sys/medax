@@ -547,7 +547,6 @@ export function ProductCard({ p }: { p: Product }) {
 
   const stock = p.stock ?? null;
   const soldOut = stock !== null && stock <= 0;
-  const lowStock = stock !== null && stock > 0 && stock <= 5;
 
   const price = p.priceFrom ? Number(p.priceFrom) : null;
   const hasDiscount = Boolean(p.oldPrice && price && Number(p.oldPrice) > price);
@@ -599,13 +598,9 @@ export function ProductCard({ p }: { p: Product }) {
           </Link>
         </h3>
 
-        <span className={`pc-stock${soldOut ? " out" : lowStock ? " low" : ""}`}>
+        <span className={`pc-stock${soldOut ? " out" : ""}`}>
           <i aria-hidden="true" />
-          {soldOut
-            ? tr("Tugagan", "Нет в наличии", "Out of stock")
-            : lowStock
-            ? tr(`Faqat ${stock} ta qoldi`, `Осталось ${stock} шт`, `Only ${stock} left`)
-            : tr("Mavjud", "В наличии", "In stock")}
+          {soldOut ? tr("Tugagan", "Нет в наличии", "Out of stock") : tr("Mahsulot mavjud", "В наличии", "In stock")}
         </span>
 
         <div className="pc-price">

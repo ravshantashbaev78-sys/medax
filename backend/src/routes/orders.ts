@@ -175,7 +175,7 @@ ordersRouter.post("/", orderIpLimiter, optionalCustomerAuth, async (req, res) =>
       } else {
         throw new HttpError(
           400,
-          `"${prod.name}" mahsulotidan omborda faqat ${prod.stock} dona mavjud. Iltimos, buyurtma miqdorini kamaytiring.`
+          `"${prod.name}" mahsuloti bu miqdorda mavjud emas. Iltimos, buyurtma miqdorini kamaytiring.`
         );
       }
     }

@@ -1470,7 +1470,7 @@ export function ProductForm() {
                   <input
                     id="sku"
                     type="text"
-                    placeholder="Masalan: DC-70 yoki MDX-001"
+                    placeholder="Bo'sh qoldiring: avtomatik MDX-001, MDX-002..."
                     value={f.sku}
                     onChange={(e) => set("sku", e.target.value)}
                   />

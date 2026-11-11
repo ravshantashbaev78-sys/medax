@@ -242,12 +242,25 @@ adminRouter.get("/products/:id", async (req, res) => {
   res.json(p);
 });
 
+/** Keyingi avtomatik artikul: MDX-001, MDX-002, ... (mavjud eng katta MDX-raqamdan keyingisi) */
+async function nextSku(tx: Prisma.TransactionClient | typeof prisma = prisma): Promise<string> {
+  const rows = await tx.product.findMany({ where: { sku: { startsWith: "MDX-" } }, select: { sku: true } });
+  let max = 0;
+  for (const r of rows) {
+    const m = /^MDX-(\d+)$/.exec(r.sku || "");
+    if (m) max = Math.max(max, Number(m[1]));
+  }
+  return `MDX-${String(max + 1).padStart(3, "0")}`;
+}
+
 adminRouter.post("/products", async (req, res) => {
   const d = productSchema.parse(req.body);
   const slug = await uniqueSlug("product", d.name);
   // Boshlang'ich qoldiq "Kirim" hujjati bilan yoziladi, shunda hisobotlarda tovar qayerdan kelgani ko'rinadi
   const p = await withUniqueRetry(() => prisma.$transaction(async (tx) => {
-    const created = await tx.product.create({ data: { ...productData({ ...d, stock: 0 }), slug } });
+    // Artikul bo'sh bo'lsa, avtomatik beriladi (bir vaqtda ikkita qo'shilsa, unique xatosida qayta uriniladi)
+    const sku = d.sku?.trim() || (await nextSku(tx));
+    const created = await tx.product.create({ data: { ...productData({ ...d, stock: 0 }), sku, slug } });
     if (d.stock > 0) {
       await applyStockChanges(tx, [{ productId: created.id, to: d.stock }], "Boshlang'ich qoldiq");
       return tx.product.update({ where: { id: created.id }, data: { isActive: d.isActive } });
@@ -548,6 +561,7 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
         } else {
           const createdP = await tx.product.create({
             data: {
+              sku: sku || (await nextSku(tx)),
               name,
               nameRu: nameRu || null,
               nameEn: nameEn || null,
@@ -557,7 +571,6 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
               priceFrom: price,
               stock: 0,
               isActive: false,
-              sku,
               description,
               slug: await uniqueSlug("product", name),
             },

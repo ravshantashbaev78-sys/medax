@@ -125,7 +125,11 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
   }
 
   const code = (err as any)?.code;
-  if (code === "P2002") return void res.status(409).json({ error: "Bunday yozuv allaqachon mavjud" });
+  if (code === "P2002") return void res.status(409).json({ error: "Bunday yozuv allaqachon mavjud (masalan, shu artikul boshqa mahsulotda bor)" });
+  // Raqam ustunga sig'magan (juda katta narx yoki qoldiq): 500 o'rniga tushunarli xabar
+  if (code === "P2020" || /numeric field overflow|out of range/i.test(String((err as any)?.message || ""))) {
+    return void res.status(400).json({ error: "Kiritilgan son juda katta. Narx va qoldiqni tekshiring." });
+  }
   if (code === "P2025") return void res.status(404).json({ error: "Yozuv topilmadi" });
 
   if ((err as any)?.name === "MulterError") {
