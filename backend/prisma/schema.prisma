@@ -48,12 +48,12 @@ enum PaymentType {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  email        String   @unique
-  name         String
-  passwordHash String
-  role         Role     @default(MANAGER)
-  createdAt    DateTime @default(now())
+  id                Int       @id @default(autoincrement())
+  email             String    @unique
+  name              String
+  passwordHash      String
+  role              Role      @default(MANAGER)
+  createdAt         DateTime  @default(now())
   // Shu vaqtdan oldin berilgan tokenlar yaroqsiz (parol almashtirilganda eski sessiyalar yopiladi)
   passwordChangedAt DateTime?
 }
@@ -75,17 +75,17 @@ model Brand {
 }
 
 model Product {
-  id            Int               @id @default(autoincrement())
-  slug          String            @unique
-  sku           String?           @unique
-  name          String
-  nameRu        String?
-  nameEn        String?
-  description   String            @default("")
-  descriptionRu String?
-  descriptionEn String?
-  specs         Json              @default("[]")
-  country       String?
+  id              Int               @id @default(autoincrement())
+  slug            String            @unique
+  sku             String?           @unique
+  name            String
+  nameRu          String?
+  nameEn          String?
+  description     String            @default("")
+  descriptionRu   String?
+  descriptionEn   String?
+  specs           Json              @default("[]")
+  country         String?
   priceFrom       Decimal?          @db.Decimal(20, 2)
   oldPrice        Decimal?          @db.Decimal(20, 2)
   discountPercent Int?
@@ -259,7 +259,7 @@ model ContactMessage {
 
 model Warehouse {
   id        Int           @id @default(autoincrement())
-  name      String        // e.g. "Asosiy ombor", "Namangan do'koni", "Toshkent filiali"
+  name      String // e.g. "Asosiy ombor", "Namangan do'koni", "Toshkent filiali"
   address   String?
   isDefault Boolean       @default(false)
   products  Product[]
@@ -270,10 +270,10 @@ model Warehouse {
 
 model Supplier {
   id          Int           @id @default(autoincrement())
-  name        String        // e.g. "Юсуфхон ака", "INTERMED INNOVATION"
+  name        String // e.g. "Юсуфхон ака", "INTERMED INNOVATION"
   company     String?
   phone       String?
-  inn         String?       // STIR
+  inn         String? // STIR
   address     String?
   balance     Decimal       @default(0) @db.Decimal(20, 2)
   notes       String?
@@ -300,8 +300,11 @@ model ErpDocument {
   clientName        String?
   totalAmount       Decimal           @default(0) @db.Decimal(20, 2)
   paidAmount        Decimal           @default(0) @db.Decimal(20, 2)
-  status            String            @default("CONFIRMED") // DRAFT, CONFIRMED
+  status            String            @default("CONFIRMED") // DRAFT, CONFIRMED, CANCELED
   notes             String?
+  // Hujjatni kim o'tkazgan (xodim ismi) va bekor qilingan bo'lsa, qachon
+  createdBy         String?
+  canceledAt        DateTime?
   items             ErpDocumentItem[]
   cashEntries       CashEntry[]
   createdAt         DateTime          @default(now())
@@ -332,7 +335,7 @@ model CashEntry {
   id          Int          @id @default(autoincrement())
   entryNumber String       @unique // e.g. "KAS-2026-0001"
   type        CashType
-  category    String       // "MIJOZ_TOLOV", "TAMINOTCHI_TOLOV", "IJARA", "TRANSPORT", "OYLIK", "BOSHQA"
+  category    String // "MIJOZ_TOLOV", "TAMINOTCHI_TOLOV", "IJARA", "TRANSPORT", "OYLIK", "BOSHQA"
   amount      Decimal      @db.Decimal(20, 2)
   paymentType PaymentType  @default(CASH)
   date        DateTime     @default(now())
@@ -345,6 +348,10 @@ model CashEntry {
   document    ErpDocument? @relation(fields: [documentId], references: [id], onDelete: SetNull)
   orderId     Int?
   order       Order?       @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  // Orderni kim yozgan; bekor qilingan bo'lsa qachon; storno (qaytaruvchi) order qaysi orderni bekor qiladi
+  createdBy   String?
+  canceledAt  DateTime?
+  stornoOfId  Int?
   createdAt   DateTime     @default(now())
 
   @@index([type, date])

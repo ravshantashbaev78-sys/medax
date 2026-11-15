@@ -142,13 +142,52 @@ const SPEC_KEY_MAP: Record<string, Record<Lang, string>> = {
   "kanallar soni": { uz: "Kanallar soni", ru: "Количество каналов", en: "Number of Channels" },
 };
 
-export function localizeSpecName(name: string, lang: Lang): string {
+type SpecLike = { name: string; value: string; nameRu?: string | null; valueRu?: string | null; nameEn?: string | null; valueEn?: string | null };
+
+export function localizeSpecName(spec: SpecLike | string, lang: Lang): string {
+  const name = typeof spec === "string" ? spec : spec.name;
   if (lang === "uz") return name;
+  // Bazada saqlangan tarjima (AI yoki admin kiritgan) birinchi o'rinda
+  if (typeof spec === "object") {
+    const stored = lang === "ru" ? spec.nameRu : spec.nameEn;
+    if (stored && stored.trim()) return stored.trim();
+  }
   const key = name.toLowerCase().trim();
   if (SPEC_KEY_MAP[key]) {
     return SPEC_KEY_MAP[key][lang];
   }
   return name;
+}
+
+// ============================================================================
+// 3a. Muddatlar: "3 oy", "2 yil", "18 oy rasmiy kafolat", "10 kun" — to'g'ri ko'plik shakli bilan
+// ============================================================================
+function ruPlural(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
+const DURATION_UNITS: Record<string, { ru: [string, string, string]; en: [string, string] }> = {
+  oy: { ru: ["месяц", "месяца", "месяцев"], en: ["month", "months"] },
+  yil: { ru: ["год", "года", "лет"], en: ["year", "years"] },
+  kun: { ru: ["день", "дня", "дней"], en: ["day", "days"] },
+  hafta: { ru: ["неделя", "недели", "недель"], en: ["week", "weeks"] },
+  soat: { ru: ["час", "часа", "часов"], en: ["hour", "hours"] },
+};
+
+/** "12 oy" -> "12 месяцев" / "12 months"; "2 yil" -> "2 года" / "2 years" */
+function localizeDurations(text: string, lang: Lang): string {
+  return text.replace(/(\d+(?:[.,]\d+)?)\s*(oy|yil|kun|hafta|soat)\b/gi, (_m, num: string, unit: string) => {
+    const u = DURATION_UNITS[unit.toLowerCase()];
+    if (!u) return _m;
+    const n = Number(num.replace(",", "."));
+    if (lang === "ru") return `${num} ${ruPlural(Number.isInteger(n) ? n : 5, u.ru[0], u.ru[1], u.ru[2])}`;
+    return `${num} ${n === 1 ? u.en[0] : u.en[1]}`;
+  });
 }
 
 // ============================================================================
@@ -165,6 +204,8 @@ const SPEC_VALUE_MAP: Record<string, Record<Lang, string>> = {
     ru: "Новый (заводской)",
     en: "Brand new",
   },
+  "steril": { uz: "Steril", ru: "Стерильный", en: "Sterile" },
+  "nosteril": { uz: "Nosteril", ru: "Нестерильный", en: "Non-sterile" },
   "12 oy rasmiy kafolat": {
     uz: "12 oy rasmiy kafolat",
     ru: "12 месяцев официальной гарантии",
@@ -207,20 +248,27 @@ const SPEC_VALUE_MAP: Record<string, Record<Lang, string>> = {
   },
 };
 
-export function localizeSpecValue(value: string, lang: Lang): string {
+export function localizeSpecValue(spec: SpecLike | string, lang: Lang): string {
+  const value = typeof spec === "string" ? spec : spec.value;
   if (lang === "uz" || !value) return value;
+  if (typeof spec === "object") {
+    const stored = lang === "ru" ? spec.valueRu : spec.valueEn;
+    if (stored && stored.trim()) return stored.trim();
+  }
   const key = value.toLowerCase().trim();
   if (SPEC_VALUE_MAP[key]) {
     return SPEC_VALUE_MAP[key][lang];
   }
   // Common phrase replacement
-  let res = value;
+  let res = localizeDurations(value, lang);
   if (lang === "ru") {
     res = res
       .replace(/12 oy rasmiy kafolat/gi, "12 месяцев официальной гарантии")
       .replace(/24 oy rasmiy kafolat/gi, "24 месяца официальной гарантии")
       .replace(/36 oy rasmiy kafolat/gi, "36 месяцев официальной гарантии")
       .replace(/oy rasmiy kafolat/gi, "мес. официальной гарантии")
+      .replace(/rasmiy kafolat/gi, "официальной гарантии")
+      .replace(/\bkafolat(i|siz)?\b/gi, (m) => (/siz$/i.test(m) ? "без гарантии" : "гарантии"))
       .replace(/Omborda mavjud/gi, "В наличии на складе")
       .replace(/Yangi/gi, "Новый")
       .replace(/Germaniya/gi, "Германия")
@@ -244,6 +292,8 @@ export function localizeSpecValue(value: string, lang: Lang): string {
       .replace(/24 oy rasmiy kafolat/gi, "24 months official warranty")
       .replace(/36 oy rasmiy kafolat/gi, "36 months official warranty")
       .replace(/oy rasmiy kafolat/gi, "months official warranty")
+      .replace(/rasmiy kafolat/gi, "official warranty")
+      .replace(/\bkafolat(i|siz)?\b/gi, (m) => (/siz$/i.test(m) ? "no warranty" : "warranty"))
       .replace(/Omborda mavjud/gi, "In stock")
       .replace(/Yangi/gi, "Brand new")
       .replace(/Germaniya/gi, "Germany")

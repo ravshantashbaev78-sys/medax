@@ -1,7 +1,7 @@
 import { ChangeEvent, FormEvent, useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "../components/Toaster";
-import { api, ApiError, Brand, Category, Paged, Product, money } from "../api";
+import { api, ApiError, Brand, Category, Paged, Product, ProductSpec, money } from "../api";
 import { Pager } from "../components/Shell";
 import { useAdminI18n } from "./i18n";
 
@@ -623,8 +623,54 @@ const empty = {
   isActive: true,
   categoryId: "" as string | number,
   brandId: "" as string | number,
-  specs: [] as { name: string; value: string }[],
+  specs: [] as ProductSpec[],
 };
+
+/** Kafolat maydoni uchun tayyor variantlar (sayt ularni RU/EN ga o'zi tarjima qiladi) */
+const WARRANTY_SUGGESTIONS = [
+  "6 oy kafolat",
+  "12 oy rasmiy kafolat",
+  "18 oy rasmiy kafolat",
+  "24 oy rasmiy kafolat",
+  "36 oy rasmiy kafolat",
+  "1 yil kafolat",
+  "2 yil kafolat",
+  "3 yil kafolat",
+];
+
+/** AI yordamchisi qaytaradigan qoralama (backend /admin/products/ai-draft) */
+interface AiDraft {
+  name: string | null;
+  nameRu: string | null;
+  nameEn: string | null;
+  description: string | null;
+  descriptionRu: string | null;
+  descriptionEn: string | null;
+  categoryId: number | null;
+  categorySlug: string | null;
+  brandId: number | null;
+  brandName: string | null;
+  country: string | null;
+  unit: string | null;
+  packageQty: number | null;
+  priceFrom: number | null;
+  costPrice: number | null;
+  stock: number | null;
+  sku: string | null;
+  batchNumber: string | null;
+  mfdDate: string | null;
+  expDate: string | null;
+  warranty: { uz: string | null; ru: string | null; en: string | null } | null;
+  specs: { name: string; value: string; nameRu: string | null; valueRu: string | null; nameEn: string | null; valueEn: string | null }[];
+}
+interface AiDraftResponse {
+  ok: boolean;
+  provider?: string;
+  model: string;
+  notes: string;
+  usage: { inputTokens: number; outputTokens: number };
+  draft: AiDraft;
+}
 
 // ============================================================================
 // 2. MAHSULOT QO'SHISH VA TAHRIRLASH FORMASI (ProductForm)
@@ -637,7 +683,19 @@ export function ProductForm() {
 
   const [f, setF] = useState(empty);
   const [warranty, setWarranty] = useState("");
+  const [warrantyRu, setWarrantyRu] = useState("");
+  const [warrantyEn, setWarrantyEn] = useState("");
   const [isNegotiable, setIsNegotiable] = useState(false);
+  // Qaysi texnik parametr qatorida RU/EN tarjima maydonlari ochiq
+  const [specLangOpen, setSpecLangOpen] = useState<Record<number, boolean>>({});
+
+  // AI yordamchi
+  const [aiStatus, setAiStatus] = useState<{ enabled: boolean; model: string; provider?: string; keyEnv?: string } | null>(null);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiUseImages, setAiUseImages] = useState(true);
+  const [aiBusy, setAiBusy] = useState<"" | "fill" | "translate">("");
+  const [aiNotes, setAiNotes] = useState("");
+  const [aiFilled, setAiFilled] = useState<string[]>([]);
   const [cats, setCats] = useState<Category[]>([]);
   const [brands, setBrands] = useState<Brand[]>([]);
   const [suppliers, setSuppliers] = useState<{ id: number; name: string }[]>([]);
@@ -668,12 +726,20 @@ export function ProductForm() {
     api<{ warehouses: { id: number; name: string }[] }>("/admin/erp/warehouses", { admin: true })
       .then((r) => setWarehouses(r.warehouses || []))
       .catch(() => {});
+    api<{ enabled: boolean; model: string; provider?: string; keyEnv?: string }>("/admin/ai/status", { admin: true })
+      .then(setAiStatus)
+      .catch(() => setAiStatus({ enabled: false, model: "" }));
   }, []);
 
   useEffect(() => {
     if (isNew) {
       setF(empty);
       setWarranty("");
+      setWarrantyRu("");
+      setWarrantyEn("");
+      setSpecLangOpen({});
+      setAiNotes("");
+      setAiFilled([]);
       setIsNegotiable(false);
       setImages([]);
       setDocs([]);
@@ -712,8 +778,10 @@ export function ProductForm() {
           specs: p.specs || [],
         });
         setIsNegotiable(!p.priceFrom);
-        const warSpec = p.specs?.find((s) => s.name === "Kafolat")?.value || "";
-        setWarranty(warSpec);
+        const warSpec = p.specs?.find((s) => s.name === "Kafolat");
+        setWarranty(warSpec?.value || "");
+        setWarrantyRu(warSpec?.valueRu || "");
+        setWarrantyEn(warSpec?.valueEn || "");
         setImages(p.images);
         setDocs(p.documents || []);
         setStockBefore(p.stock ?? 0);
@@ -807,9 +875,25 @@ export function ProductForm() {
     setError("");
     setMsg("");
 
-    const otherSpecs = f.specs.filter((s) => s.name.trim() && s.value.trim() && s.name !== "Kafolat");
+    const otherSpecs: ProductSpec[] = f.specs
+      .filter((s) => s.name.trim() && s.value.trim() && s.name !== "Kafolat")
+      .map((s) => ({
+        name: s.name.trim(),
+        value: s.value.trim(),
+        nameRu: s.nameRu?.trim() || undefined,
+        valueRu: s.valueRu?.trim() || undefined,
+        nameEn: s.nameEn?.trim() || undefined,
+        valueEn: s.valueEn?.trim() || undefined,
+      }));
     if (warranty.trim()) {
-      otherSpecs.unshift({ name: "Kafolat", value: warranty.trim() });
+      otherSpecs.unshift({
+        name: "Kafolat",
+        value: warranty.trim(),
+        nameRu: "Гарантия",
+        nameEn: "Warranty",
+        valueRu: warrantyRu.trim() || undefined,
+        valueEn: warrantyEn.trim() || undefined,
+      });
     }
 
     const calculatedPrice = isNegotiable ? null : f.priceFrom === "" ? null : Number(f.priceFrom);
@@ -883,6 +967,135 @@ export function ProductForm() {
       return new File([blob], file.name.replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" });
     } catch {
       return file;
+    }
+  };
+
+  /** AI qoralamasini formaga qo'yadi: bo'sh yoki o'zgargan maydonlar to'ldiriladi, admin keyin tekshiradi */
+  const applyAiDraft = (d: AiDraft, mode: "fill" | "translate") => {
+    const filled: string[] = [];
+    const next = { ...f, specs: f.specs.map((s) => ({ ...s })) };
+    const put = (k: keyof typeof empty, v: unknown, label: string) => {
+      if (v === null || v === undefined || v === "") return;
+      if (String((next as Record<string, unknown>)[k] ?? "") === String(v)) return;
+      (next as Record<string, unknown>)[k] = v;
+      filled.push(label);
+    };
+
+    if (mode === "fill") {
+      put("name", d.name, "Nomi");
+      put("description", d.description, "Tavsif");
+      if (d.categoryId) put("categoryId", d.categoryId, "Kategoriya");
+      if (d.brandId) put("brandId", d.brandId, "Brend");
+      put("country", d.country, "Davlat");
+      put("sku", d.sku, "Artikul");
+      put("batchNumber", d.batchNumber, "Partiya");
+      put("mfdDate", d.mfdDate, "Ishlab chiqarilgan sana");
+      put("expDate", d.expDate, "Yaroqlilik muddati");
+      if (d.packageQty && d.packageQty > 1) put("packageQty", d.packageQty, "Qutidagi soni");
+      if (d.stock !== null) put("stock", d.stock, "Qoldiq");
+      if (d.costPrice !== null) put("costPrice", d.costPrice, "Tannarx");
+      if (d.priceFrom !== null) {
+        put("priceFrom", d.priceFrom, "Sotuv narxi");
+        setIsNegotiable(false);
+      }
+      const cost = Number(next.costPrice);
+      const sell = Number(next.priceFrom);
+      if (cost > 0 && sell > 0) next.markupPercent = Math.round(((sell - cost) / cost) * 100);
+
+      // Birlik: tanlangan kategoriya qoidasiga mos bo'lsa olinadi
+      const chosen = cats.find((c) => String(c.id) === String(next.categoryId));
+      const rule = chosen ? CATEGORY_RULES[chosen.slug] || DEFAULT_CATEGORY_RULE : DEFAULT_CATEGORY_RULE;
+      if (d.unit && rule.allowedUnits.some((u) => u.value === d.unit)) put("unit", d.unit, "Birlik");
+      else if (!rule.allowedUnits.some((u) => u.value === next.unit)) next.unit = rule.defaultUnit;
+      if (!rule.showPackageQty) next.packageQty = 1;
+    }
+
+    put("nameRu", d.nameRu, "Nomi (RU)");
+    put("nameEn", d.nameEn, "Nomi (EN)");
+    put("descriptionRu", d.descriptionRu, "Tavsif (RU)");
+    put("descriptionEn", d.descriptionEn, "Tavsif (EN)");
+
+    // Texnik parametrlar: nomi bo'yicha birlashtiriladi, yangilari qo'shiladi
+    if (d.specs.length) {
+      let changed = false;
+      for (const s of d.specs) {
+        if (!s.name || !s.value || s.name.toLowerCase() === "kafolat") continue;
+        const idx = next.specs.findIndex((x) => x.name.trim().toLowerCase() === s.name.trim().toLowerCase());
+        const merged: ProductSpec = {
+          name: s.name,
+          value: mode === "translate" && idx >= 0 ? next.specs[idx].value : s.value,
+          nameRu: s.nameRu || undefined,
+          valueRu: s.valueRu || undefined,
+          nameEn: s.nameEn || undefined,
+          valueEn: s.valueEn || undefined,
+        };
+        if (idx >= 0) next.specs[idx] = { ...next.specs[idx], ...merged };
+        else if (mode === "fill") next.specs.push(merged);
+        else continue;
+        changed = true;
+      }
+      if (changed) filled.push("Texnik parametrlar");
+    }
+
+    if (d.warranty) {
+      if (mode === "fill" && d.warranty.uz) setWarranty(d.warranty.uz);
+      if (d.warranty.ru) setWarrantyRu(d.warranty.ru);
+      if (d.warranty.en) setWarrantyEn(d.warranty.en);
+      filled.push("Kafolat");
+    }
+
+    setF(next);
+    setAiFilled(filled);
+    if (filled.some((l) => l.includes("(RU)") || l.includes("(EN)"))) setShowOtherLangs(true);
+    setShowExtraDetails(true);
+    if (d.brandName && !d.brandId) {
+      setMsg(`Brend "${d.brandName}" ro'yxatda yo'q: Brendlar bo'limida qo'shib, keyin shu yerda tanlang.`);
+    }
+  };
+
+  const aiImageCount = Math.min(3, newFiles.length + images.length);
+
+  /** Buyruq + rasmlar + joriy forma -> serverdagi AI -> forma qoralamasi */
+  const runAi = async (mode: "fill" | "translate") => {
+    if (aiBusy) return;
+    const hasImages = aiUseImages && aiImageCount > 0;
+    if (mode === "fill" && !aiPrompt.trim() && !hasImages && !f.name.trim()) {
+      toast.error("AI uchun buyruq yozing yoki mahsulot rasmini qo'shing");
+      return;
+    }
+    if (mode === "translate" && !f.name.trim() && !f.description.trim()) {
+      toast.error("Tarjima uchun avval o'zbekcha nom yoki tavsifni kiriting");
+      return;
+    }
+    setAiBusy(mode);
+    setAiNotes("");
+    setAiFilled([]);
+    setError("");
+    try {
+      const fd = new FormData();
+      fd.append("prompt", aiPrompt.trim());
+      fd.append("mode", mode);
+      fd.append("current", JSON.stringify({ ...f, warranty, warrantyRu, warrantyEn }));
+      if (hasImages) {
+        let n = 0;
+        for (const x of newFiles) {
+          if (n >= 3) break;
+          fd.append("images", await shrinkImage(x.file));
+          n++;
+        }
+        const urls = images.slice(0, Math.max(0, 3 - n)).map((im) => im.url);
+        if (urls.length) fd.append("imageUrls", JSON.stringify(urls));
+      }
+      const r = await api<AiDraftResponse>("/admin/products/ai-draft", { form: fd, admin: true });
+      applyAiDraft(r.draft, mode);
+      setAiNotes(r.notes || "");
+      toast.success(mode === "translate" ? "Tarjimalar to'ldirildi" : "Karta to'ldirildi. Tekshirib, saqlang.");
+    } catch (err) {
+      const m = (err as ApiError).message || "AI xatosi";
+      setError(m);
+      toast.error(m);
+    } finally {
+      setAiBusy("");
     }
   };
 
@@ -991,6 +1204,62 @@ export function ProductForm() {
       )}
 
       <form onSubmit={save} style={{ maxWidth: 860, width: "100%" }}>
+        {/* ============================================================== */}
+        {/* 0. AI YORDAMCHI: buyruq + rasm -> to'ldirilgan karta qoralamasi  */}
+        {/* ============================================================== */}
+        <div className="ai-panel">
+          <div className="ai-panel-head">
+            <strong>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z" />
+                <path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z" />
+              </svg>
+              AI yordamchi
+            </strong>
+            <span>
+              Oddiy tilda yozing: nima, qancha, narxi, qoldig'i, muddati. Rasm tashlang — qutidagi nom, LOT va
+              yaroqlilik muddatini ham o'qiydi. Nom va tavsif UZ/RU/EN, kategoriya, birlik, kafolat va texnik
+              parametrlar avtomatik to'ldiriladi. Saqlashdan oldin tekshiring.
+            </span>
+          </div>
+          {aiStatus && !aiStatus.enabled && (
+            <p className="ai-panel-warn">AI hali sozlanmagan: serverdagi .env fayliga {aiStatus.keyEnv || "GEMINI_API_KEY"} kiritilishi kerak.</p>
+          )}
+          <textarea
+            value={aiPrompt}
+            onChange={(e) => setAiPrompt(e.target.value)}
+            disabled={Boolean(aiBusy)}
+            rows={3}
+            placeholder="Masalan: Steril shprits 5 ml, 100 talik quti, Xitoy, narxi 1200 so'm, 500 dona bor, yaroqlilik 2027-05. Ruscha va inglizcha nom ham kerak."
+            aria-label="AI uchun buyruq"
+          />
+          <div className="ai-panel-actions">
+            <button
+              type="button"
+              className="btn sm"
+              disabled={Boolean(aiBusy) || aiStatus?.enabled === false}
+              onClick={() => runAi("fill")}
+            >
+              {aiBusy === "fill" ? "AI ishlamoqda…" : "AI bilan to'ldirish"}
+            </button>
+            <button
+              type="button"
+              className="btn ghost sm"
+              disabled={Boolean(aiBusy) || aiStatus?.enabled === false}
+              onClick={() => runAi("translate")}
+              title="Faqat ruscha va inglizcha nom, tavsif, kafolat va parametr tarjimalarini to'ldiradi"
+            >
+              {aiBusy === "translate" ? "Tarjima qilinmoqda…" : "Faqat RU/EN tarjima"}
+            </button>
+            <label className="ai-panel-check">
+              <input type="checkbox" checked={aiUseImages} onChange={(e) => setAiUseImages(e.target.checked)} />
+              Rasmlardan foydalanish ({aiImageCount} ta)
+            </label>
+          </div>
+          {aiNotes && <p className="ai-panel-notes">AI izohi: {aiNotes}</p>}
+          {aiFilled.length > 0 && <p className="ai-panel-filled">To'ldirildi: {aiFilled.join(", ")}</p>}
+        </div>
+
         {/* ============================================================== */}
         {/* 1. ASOSIY MA'LUMOTLAR (Doim ko'rinadigan qulay blok)             */}
         {/* ============================================================== */}
@@ -1561,10 +1830,35 @@ export function ProductForm() {
                   <input
                     id="war"
                     type="text"
-                    placeholder="Masalan: 12 oy yoki 2 yil rasmiy kafolat"
+                    list="warranty-options"
+                    placeholder="Masalan: 3 oy, 12 oy rasmiy kafolat, 2 yil"
                     value={warranty}
                     onChange={(e) => setWarranty(e.target.value)}
                   />
+                  <datalist id="warranty-options">
+                    {WARRANTY_SUGGESTIONS.map((w) => (
+                      <option key={w} value={w} />
+                    ))}
+                  </datalist>
+                  {warranty.trim() && (
+                    <div className="warranty-i18n">
+                      <input
+                        type="text"
+                        placeholder="RU: 3 месяца гарантии"
+                        value={warrantyRu}
+                        onChange={(e) => setWarrantyRu(e.target.value)}
+                        aria-label="Kafolat (ruscha)"
+                      />
+                      <input
+                        type="text"
+                        placeholder="EN: 3 months warranty"
+                        value={warrantyEn}
+                        onChange={(e) => setWarrantyEn(e.target.value)}
+                        aria-label="Kafolat (inglizcha)"
+                      />
+                      <small>RU/EN bo'sh qolsa, sayt o'zi tarjima qiladi: "3 oy kafolat" → "3 месяца гарантии" / "3 months warranty".</small>
+                    </div>
+                  )}
                 </div>
 
                 <div className="check" style={{ alignSelf: "end", display: "flex", gap: 14, flexWrap: "wrap", paddingBottom: 6 }}>
@@ -1616,32 +1910,55 @@ export function ProductForm() {
                   </div>
                 )}
 
-                {f.specs.map((s, i) => (
-                  <div className="specrow" key={i} style={{ marginBottom: 8 }}>
-                    <input
-                      type="text"
-                      placeholder="Xususiyat nomi (masalan, Ekran)"
-                      value={s.name}
-                      onChange={(e) => set("specs", f.specs.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
-                      aria-label="Xususiyat nomi"
-                    />
-                    <input
-                      type="text"
-                      placeholder={catRule.specPlaceholders[s.name] || "Qiymati"}
-                      value={s.value}
-                      onChange={(e) => set("specs", f.specs.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
-                      aria-label="Xususiyat qiymati"
-                    />
-                    <button
-                      type="button"
-                      className="btn ghost sm"
-                      onClick={() => set("specs", f.specs.filter((_, j) => j !== i))}
-                      style={{ color: "var(--red)" }}
-                    >
-                      ✕
-                    </button>
-                  </div>
-                ))}
+                {f.specs.map((s, i) => {
+                  const hasI18n = Boolean(s.nameRu || s.valueRu || s.nameEn || s.valueEn);
+                  const patch = (p: Partial<ProductSpec>) => set("specs", f.specs.map((x, j) => (j === i ? { ...x, ...p } : x)));
+                  return (
+                    <div key={i} style={{ marginBottom: 8 }}>
+                      <div className="specrow">
+                        <input
+                          type="text"
+                          placeholder="Xususiyat nomi (masalan, Ekran)"
+                          value={s.name}
+                          onChange={(e) => patch({ name: e.target.value })}
+                          aria-label="Xususiyat nomi"
+                        />
+                        <input
+                          type="text"
+                          placeholder={catRule.specPlaceholders[s.name] || "Qiymati"}
+                          value={s.value}
+                          onChange={(e) => patch({ value: e.target.value })}
+                          aria-label="Xususiyat qiymati"
+                        />
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          onClick={() => setSpecLangOpen((o) => ({ ...o, [i]: !o[i] }))}
+                          title="Ruscha va inglizcha tarjimasi"
+                          style={{ color: hasI18n ? "var(--teal)" : undefined, fontWeight: hasI18n ? 700 : undefined }}
+                        >
+                          RU/EN
+                        </button>
+                        <button
+                          type="button"
+                          className="btn ghost sm"
+                          onClick={() => set("specs", f.specs.filter((_, j) => j !== i))}
+                          style={{ color: "var(--red)" }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+                      {specLangOpen[i] && (
+                        <div className="spec-i18n">
+                          <input type="text" placeholder="Название (RU)" value={s.nameRu || ""} onChange={(e) => patch({ nameRu: e.target.value })} aria-label="Nomi (ruscha)" />
+                          <input type="text" placeholder="Значение (RU)" value={s.valueRu || ""} onChange={(e) => patch({ valueRu: e.target.value })} aria-label="Qiymati (ruscha)" />
+                          <input type="text" placeholder="Name (EN)" value={s.nameEn || ""} onChange={(e) => patch({ nameEn: e.target.value })} aria-label="Nomi (inglizcha)" />
+                          <input type="text" placeholder="Value (EN)" value={s.valueEn || ""} onChange={(e) => patch({ valueEn: e.target.value })} aria-label="Qiymati (inglizcha)" />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
 
                 <button
                   type="button"

@@ -11,6 +11,11 @@ import { requireAdmin, requireAuth } from "../auth";
 import { applyFakeStrike, normalizePhone } from "../antispam";
 import { memoryUpload, removeFile, saveImage, savePdf } from "../upload";
 import { uniqueSlug } from "../utils";
+import rateLimit from "express-rate-limit";
+import path from "path";
+import fs from "fs/promises";
+import { getClientIp } from "../ip";
+import { AI_UNITS, activeProvider, aiKeyEnvName, aiModelName, generateProductDraft, isAiConfigured } from "../ai";
 import { sendSms } from "../sms";
 import { notifyOrderConfirmed, notifyOrderReady, notifyOrderCanceled, notifyOrderDone } from "../notifications";
 import { applyStockChanges, erpRouter, nextCashNumber, withUniqueRetry } from "./erp";
@@ -97,7 +102,20 @@ const productSchema = z.object({
   description: z.string().max(20000).default(""),
   descriptionRu: z.string().max(20000).nullish(),
   descriptionEn: z.string().max(20000).nullish(),
-  specs: z.array(z.object({ name: z.string().trim().min(1).max(100), value: z.string().trim().min(1).max(300) })).max(60).default([]),
+  specs: z
+    .array(
+      z.object({
+        name: z.string().trim().min(1).max(100),
+        value: z.string().trim().min(1).max(300),
+        // Ixtiyoriy tarjimalar (AI yoki admin kiritadi). Bo'sh bo'lsa sayt lug'at bo'yicha tarjima qilishga urinadi.
+        nameRu: z.string().trim().max(100).nullish(),
+        valueRu: z.string().trim().max(300).nullish(),
+        nameEn: z.string().trim().max(100).nullish(),
+        valueEn: z.string().trim().max(300).nullish(),
+      })
+    )
+    .max(60)
+    .default([]),
   country: z.string().trim().max(60).nullish(),
   priceFrom: z.coerce.number().nonnegative().nullish(),
   oldPrice: z.coerce.number().nonnegative().nullish(),
@@ -144,7 +162,12 @@ function productData(d: z.infer<typeof productSchema>) {
     description: d.description,
     descriptionRu: d.descriptionRu || null,
     descriptionEn: d.descriptionEn || null,
-    specs: d.specs as Prisma.InputJsonValue,
+    // Bo'sh tarjima maydonlari JSON'da saqlanmaydi
+    specs: d.specs.map((s) => {
+      const o: Record<string, string> = { name: s.name, value: s.value };
+      for (const k of ["nameRu", "valueRu", "nameEn", "valueEn"] as const) if (s[k]) o[k] = s[k] as string;
+      return o;
+    }) as Prisma.InputJsonValue,
     country: d.country || null,
     priceFrom: finalSellPrice,
     costPrice: d.costPrice ?? null,
@@ -231,6 +254,176 @@ adminRouter.get("/products/import/template", async (_req, res) => {
   res.setHeader("Content-Disposition", 'attachment; filename="mahsulotlar-shablon.xlsx"');
   await wb.xlsx.write(res);
   res.end();
+});
+
+/* ------------------------ Sun'iy intellekt yordamchisi ------------------------ */
+
+adminRouter.get("/ai/status", (_req, res) => {
+  res.json({ enabled: isAiConfigured(), provider: activeProvider(), model: aiModelName(), keyEnv: aiKeyEnvName() });
+});
+
+// Har bir xodim uchun soatlik limit: AI so'rovlari pullik, tasodifiy yoki ommaviy bosishdan himoya
+const aiDraftLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: config.ai.hourlyLimitPerUser,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai:${req.user?.id ?? getClientIp(req)}`,
+  message: { error: "AI so'rovlarining soatlik limiti tugadi. Birozdan keyin urinib ko'ring." },
+});
+
+const AI_CURRENT_KEYS = [
+  "name", "nameRu", "nameEn", "description", "descriptionRu", "descriptionEn", "country", "unit", "packageQty",
+  "priceFrom", "costPrice", "stock", "sku", "batchNumber", "mfdDate", "expDate", "warranty", "warrantyRu", "warrantyEn",
+] as const;
+
+/** Mavjud mahsulot rasmini diskdan o'qiydi (faqat /uploads/products/ ichidagi fayllar) */
+async function readUploadedImage(url: string): Promise<Buffer | null> {
+  if (!url.startsWith("/uploads/products/")) return null;
+  const rel = url.replace("/uploads/", "");
+  if (rel.includes("..") || rel.includes("\\") || rel.includes("\0")) return null;
+  const root = path.resolve(config.uploadDir);
+  const target = path.resolve(root, rel);
+  if (!target.startsWith(root + path.sep)) return null;
+  return fs.readFile(target).catch(() => null);
+}
+
+/**
+ * Admin buyrug'i + rasmlar + joriy forma qiymatlaridan mahsulot kartasi qoralamasini tuzadi.
+ * Javob faqat qoralama: hech narsa bazaga yozilmaydi, admin formada ko'rib saqlaydi.
+ */
+adminRouter.post("/products/ai-draft", aiDraftLimiter, memoryUpload.array("images", 3), async (req, res) => {
+  if (!isAiConfigured()) {
+    throw new HttpError(503, `Sun'iy intellekt sozlanmagan: serverda ${aiKeyEnvName()} kiritilmagan.`);
+  }
+  const body = z
+    .object({
+      prompt: z.string().trim().max(4000).default(""),
+      mode: z.enum(["fill", "translate"]).default("fill"),
+      current: z.string().max(80000).optional(),
+      imageUrls: z.string().max(4000).optional(),
+    })
+    .parse(req.body || {});
+
+  // Joriy forma qiymatlari: faqat ma'lum kalitlar, satrlar cheklangan uzunlikda
+  let rawCurrent: Record<string, unknown> = {};
+  try {
+    const parsed = body.current ? JSON.parse(body.current) : {};
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) rawCurrent = parsed;
+  } catch {
+    throw new HttpError(400, "Forma ma'lumotlari noto'g'ri formatda");
+  }
+  const current: Record<string, unknown> = {};
+  for (const k of AI_CURRENT_KEYS) {
+    const v = rawCurrent[k];
+    if (v === undefined || v === null || v === "") continue;
+    current[k] = typeof v === "string" ? v.slice(0, 20000) : typeof v === "number" || typeof v === "boolean" ? v : String(v).slice(0, 500);
+  }
+  if (Array.isArray(rawCurrent.specs)) {
+    current.specs = (rawCurrent.specs as unknown[])
+      .slice(0, 60)
+      .map((s: any) => (s && typeof s === "object" ? { name: String(s.name || "").slice(0, 100), value: String(s.value || "").slice(0, 300) } : null))
+      .filter((s) => s && s.name && s.value);
+  }
+
+  const [categories, brands] = await Promise.all([
+    prisma.category.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true, slug: true } }),
+    prisma.brand.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true, country: true } }),
+  ]);
+  const curCat = categories.find((c) => c.id === Number(rawCurrent.categoryId));
+  const curBrand = brands.find((b) => b.id === Number(rawCurrent.brandId));
+  if (curCat) current.categorySlug = curCat.slug;
+  if (curBrand) current.brandName = curBrand.name;
+
+  // Rasmlar: yangi yuklanganlar (fayl) + mahsulotda allaqachon bor rasmlar (URL bo'yicha diskdan)
+  const images: Buffer[] = ((req.files as Express.Multer.File[]) || []).map((f) => f.buffer);
+  if (body.imageUrls && images.length < 3) {
+    let urls: unknown = [];
+    try {
+      urls = JSON.parse(body.imageUrls);
+    } catch {
+      urls = [];
+    }
+    if (Array.isArray(urls)) {
+      for (const u of urls.slice(0, 3)) {
+        if (images.length >= 3) break;
+        if (typeof u !== "string") continue;
+        const buf = await readUploadedImage(u);
+        if (buf) images.push(buf);
+      }
+    }
+  }
+
+  if (body.mode === "fill" && !body.prompt && !images.length && !current.name) {
+    throw new HttpError(400, "AI uchun buyruq yozing yoki mahsulot rasmini yuklang.");
+  }
+  if (body.mode === "translate" && !current.name && !current.description) {
+    throw new HttpError(400, "Tarjima uchun avval o'zbekcha nom yoki tavsifni kiriting.");
+  }
+
+  const result = await generateProductDraft({
+    prompt: body.prompt,
+    mode: body.mode,
+    current,
+    categories: categories.map((c) => ({ slug: c.slug, name: c.name })),
+    brands: brands.map((b) => ({ name: b.name, country: b.country })),
+    images,
+  });
+
+  // Model javobini forma uchun xavfsiz ko'rinishga keltiramiz
+  const d = result.draft;
+  const str = (v: string | null | undefined, max = 200) => (v && v.trim() ? v.trim().slice(0, max) : null);
+  const money = (v: number | null, max = 1e11) => (v !== null && Number.isFinite(v) && v >= 0 && v <= max ? Math.round(v) : null);
+  const whole = (v: number | null, max = 1_000_000) => (v !== null && Number.isFinite(v) && v >= 0 && v <= max ? Math.floor(v) : null);
+  const isoDate = (v: string | null) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(v)) ? v : null);
+  const cat = d.categorySlug ? categories.find((c) => c.slug === d.categorySlug) : undefined;
+  const brandName = str(d.brandName, 100);
+  const brand = brandName ? brands.find((b) => b.name.toLowerCase() === brandName.toLowerCase()) : undefined;
+  const unitRaw = (d.unit || "").trim().toLowerCase();
+  const unit = (AI_UNITS as readonly string[]).includes(unitRaw) ? unitRaw : null;
+  const specs = d.specs
+    .slice(0, 20)
+    .map((s) => ({
+      name: str(s.name, 100),
+      value: str(s.value, 300),
+      nameRu: str(s.nameRu, 100),
+      valueRu: str(s.valueRu, 300),
+      nameEn: str(s.nameEn, 100),
+      valueEn: str(s.valueEn, 300),
+    }))
+    .filter((s) => s.name && s.value);
+
+  res.json({
+    ok: true,
+    provider: result.provider,
+    model: result.model,
+    usage: result.usage,
+    notes: str(d.notes, 600) || "",
+    draft: {
+      name: str(d.name),
+      nameRu: str(d.nameRu),
+      nameEn: str(d.nameEn),
+      description: str(d.description, 20000),
+      descriptionRu: str(d.descriptionRu, 20000),
+      descriptionEn: str(d.descriptionEn, 20000),
+      categoryId: cat?.id ?? null,
+      categorySlug: cat?.slug ?? null,
+      brandId: brand?.id ?? null,
+      brandName,
+      country: str(d.country, 60),
+      unit,
+      packageQty: whole(d.packageQty, 100000),
+      priceFrom: money(d.priceFrom),
+      costPrice: money(d.costPrice),
+      stock: whole(d.stock),
+      sku: str(d.sku, 60),
+      batchNumber: str(d.batchNumber, 100),
+      mfdDate: isoDate(d.mfdDate),
+      expDate: isoDate(d.expDate),
+      warranty: d.warranty ? { uz: str(d.warranty.uz, 120), ru: str(d.warranty.ru, 120), en: str(d.warranty.en, 120) } : null,
+      specs,
+    },
+  });
 });
 
 adminRouter.get("/products/:id", async (req, res) => {
@@ -717,6 +910,8 @@ adminRouter.patch("/orders/:id", async (req, res) => {
             paymentType: paymentType || (prevOrder.paymentMethod?.includes("Shartnoma") ? "BANK_TRANSFER" : "CASH"),
             description: `Buyurtma ${prevOrder.code} to'lovi`,
             customerId: prevOrder.customerId,
+            orderId: prevOrder.id,
+            createdBy: req.user?.name || null,
           },
         });
       }
@@ -744,6 +939,8 @@ adminRouter.patch("/orders/:id", async (req, res) => {
             paymentType: paymentType || "CASH",
             description: `Buyurtma ${prevOrder.code} bo'yicha pul qaytarildi`,
             customerId: prevOrder.customerId,
+            orderId: prevOrder.id,
+            createdBy: req.user?.name || null,
           },
         });
       }
@@ -929,6 +1126,8 @@ adminRouter.get("/customers", async (req, res) => {
     .object({
       search: z.string().trim().optional(),
       page,
+      // ERP ro'yxatlari (hujjat, kassa, sverka) hamma mijozni ko'rishi kerak
+      limit: z.coerce.number().int().min(1).max(500).default(30),
     })
     .parse(req.query);
 
@@ -946,20 +1145,22 @@ adminRouter.get("/customers", async (req, res) => {
     prisma.customer.findMany({
       where,
       orderBy: { createdAt: "desc" },
-      skip: (q.page - 1) * 30,
-      take: 30,
+      skip: (q.page - 1) * q.limit,
+      take: q.limit,
       select: {
         id: true,
         name: true,
         phone: true,
         organization: true,
+        inn: true,
+        balance: true,
         createdAt: true,
         _count: { select: { orders: true } },
       },
     }),
   ]);
 
-  res.json({ items, total, page: q.page, pages: Math.max(1, Math.ceil(total / 30)) });
+  res.json({ items, total, page: q.page, pages: Math.max(1, Math.ceil(total / q.limit)) });
 });
 
 /* --------------------------- Admin o'z parolini o'zgartirishi --------------------------- */

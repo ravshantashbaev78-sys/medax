@@ -985,6 +985,36 @@ a.dash-kpi:hover {
 .adm .pimg-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin-bottom: 10px; }
 .adm .pimg-head label { font-size: 13px; font-weight: 700; color: var(--a-text); }
 .adm .pimg-hint { font-size: 12px; color: var(--a-text-3); }
+
+/* AI yordamchi paneli (mahsulot formasi) */
+.adm .ai-panel {
+  background: var(--a-primary-soft);
+  border: 1px solid var(--a-border);
+  border-radius: 14px;
+  padding: 16px 20px;
+  margin-bottom: 16px;
+  display: grid;
+  gap: 10px;
+}
+.adm .ai-panel-head { display: grid; gap: 4px; }
+.adm .ai-panel-head strong { display: inline-flex; align-items: center; gap: 6px; font-size: 15px; color: var(--a-primary-text); }
+.adm .ai-panel-head span { font-size: 12.5px; line-height: 1.5; color: var(--a-text-2); }
+.adm .ai-panel textarea { min-height: 72px; resize: vertical; background: var(--a-surface); }
+.adm .ai-panel-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.adm .ai-panel-check { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--a-text-2); cursor: pointer; }
+.adm .ai-panel-warn { margin: 0; font-size: 13px; font-weight: 600; color: var(--a-warn); }
+.adm .ai-panel-notes { margin: 0; font-size: 13px; color: var(--a-text); background: var(--a-surface); border: 1px dashed var(--a-border-strong); border-radius: 10px; padding: 8px 12px; }
+.adm .ai-panel-filled { margin: 0; font-size: 12px; color: var(--a-success); }
+
+/* Texnik parametr va kafolat tarjima qatorlari */
+.adm .spec-i18n { display: grid; grid-template-columns: 1fr 1.4fr 1fr 1.4fr; gap: 8px; margin-top: 6px; padding-left: 10px; border-left: 2px solid var(--a-primary-soft); }
+.adm .spec-i18n input { font-size: 13px; }
+.adm .warranty-i18n { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+.adm .warranty-i18n small { grid-column: 1 / -1; font-size: 11.5px; color: var(--a-text-3); }
+@media (max-width: 720px) {
+  .adm .spec-i18n { grid-template-columns: 1fr 1fr; }
+  .adm .warranty-i18n { grid-template-columns: 1fr; }
+}
 .adm .pimg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; padding: 4px; border-radius: 12px; border: 1px dashed transparent; transition: border-color .15s, background .15s; }
 .adm .pimg-grid.drag { border-color: var(--a-primary); background: var(--a-primary-soft); }
 .adm .pimg-item { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden; background: #fff; border: 1px solid var(--a-border); }

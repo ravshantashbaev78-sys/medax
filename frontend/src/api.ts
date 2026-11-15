@@ -65,6 +65,15 @@ export async function api<T = any>(path: string, opts: Opts = {}): Promise<T> {
 /* ------------------------------- Types -------------------------------- */
 
 export interface Img { id?: number; url: string; thumbUrl: string }
+/** Texnik xususiyat: o'zbekcha majburiy, ruscha/inglizcha tarjimalar ixtiyoriy (AI yoki admin kiritadi) */
+export interface ProductSpec {
+  name: string;
+  value: string;
+  nameRu?: string | null;
+  valueRu?: string | null;
+  nameEn?: string | null;
+  valueEn?: string | null;
+}
 export interface Product {
   id: number;
   slug: string;
@@ -75,7 +84,7 @@ export interface Product {
   description: string;
   descriptionRu?: string | null;
   descriptionEn?: string | null;
-  specs: { name: string; value: string }[];
+  specs: ProductSpec[];
   country?: string | null;
   priceFrom?: string | null;
   oldPrice?: string | null;

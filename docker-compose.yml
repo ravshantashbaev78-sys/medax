@@ -59,6 +59,14 @@ services:
       EMAILJS_PUBLIC_KEY: ${EMAILJS_PUBLIC_KEY:-kfwGWpE7XBQH2_06B}
       EMAILJS_PRIVATE_KEY: ${EMAILJS_PRIVATE_KEY:-}
       GMAIL_DESTINATION: ${GMAIL_DESTINATION:-medaxuz@gmail.com}
+      # Sun'iy intellekt (admin paneldagi mahsulot kartasi yordamchisi): standart — Google Gemini
+      AI_PROVIDER: ${AI_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-4-hydrogen}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-opus-5-5}
+      AI_EFFORT: ${AI_EFFORT:-medium}
+      AI_HOURLY_LIMIT: ${AI_HOURLY_LIMIT:-60}
     volumes:
       - uploads_data:/app/uploads
     ports:

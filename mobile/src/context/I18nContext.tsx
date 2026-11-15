@@ -611,6 +611,110 @@ export function localizeProductName(
   return productOrName;
 }
 
+// ----------------------------------------------------------------------------
+// Texnik xususiyatlar: bazadagi tarjima (AI/admin) birinchi, keyin lug'at va muddat qoidalari
+// ----------------------------------------------------------------------------
+export interface ProductSpecLike {
+  name?: string;
+  key?: string;
+  value?: string;
+  nameRu?: string | null;
+  valueRu?: string | null;
+  nameEn?: string | null;
+  valueEn?: string | null;
+}
+
+const SPEC_NAME_TRANSLATIONS: Record<string, { ru: string; en: string }> = {
+  turi: { ru: "Тип", en: "Type" },
+  kafolat: { ru: "Гарантия", en: "Warranty" },
+  "kafolat muddati": { ru: "Срок гарантии", en: "Warranty period" },
+  mavjudligi: { ru: "Наличие", en: "Availability" },
+  holati: { ru: "Состояние", en: "Condition" },
+  "ishlab chiqaruvchi": { ru: "Производитель", en: "Manufacturer" },
+  hajmi: { ru: "Объём", en: "Volume" },
+  qadoq: { ru: "Упаковка", en: "Packaging" },
+  "qadoqdagi soni": { ru: "Количество в упаковке", en: "Pieces per pack" },
+  ekran: { ru: "Дисплей", en: "Display" },
+  "o'lchami": { ru: "Размер", en: "Size" },
+  "o'lchamlari": { ru: "Размеры", en: "Dimensions" },
+  material: { ru: "Материал", en: "Material" },
+  sterillik: { ru: "Стерильность", en: "Sterility" },
+  "saqlash harorati": { ru: "Температура хранения", en: "Storage temperature" },
+  akkumulyator: { ru: "Аккумулятор", en: "Battery" },
+  "maksimal yuklama": { ru: "Максимальная нагрузка", en: "Max load" },
+  "og'irligi": { ru: "Вес", en: "Weight" },
+  "quvvat sarfi": { ru: "Энергопотребление", en: "Power consumption" },
+  "testlar soni": { ru: "Количество тестов", en: "Number of tests" },
+};
+
+const SPEC_VALUE_TRANSLATIONS: Record<string, { ru: string; en: string }> = {
+  steril: { ru: "Стерильный", en: "Sterile" },
+  nosteril: { ru: "Нестерильный", en: "Non-sterile" },
+  yangi: { ru: "Новый", en: "New" },
+  "omborda mavjud": { ru: "В наличии", en: "In stock" },
+  xitoy: { ru: "Китай", en: "China" },
+  germaniya: { ru: "Германия", en: "Germany" },
+  turkiya: { ru: "Турция", en: "Turkey" },
+  "janubiy koreya": { ru: "Южная Корея", en: "South Korea" },
+  yaponiya: { ru: "Япония", en: "Japan" },
+  rossiya: { ru: "Россия", en: "Russia" },
+  aqsh: { ru: "США", en: "USA" },
+  "o'zbekiston": { ru: "Узбекистан", en: "Uzbekistan" },
+};
+
+function ruPlural(n: number, one: string, few: string, many: string): string {
+  const abs = Math.abs(n) % 100;
+  const last = abs % 10;
+  if (abs > 10 && abs < 20) return many;
+  if (last === 1) return one;
+  if (last >= 2 && last <= 4) return few;
+  return many;
+}
+
+const DURATION_UNITS: Record<string, { ru: [string, string, string]; en: [string, string] }> = {
+  oy: { ru: ["месяц", "месяца", "месяцев"], en: ["month", "months"] },
+  yil: { ru: ["год", "года", "лет"], en: ["year", "years"] },
+  kun: { ru: ["день", "дня", "дней"], en: ["day", "days"] },
+  hafta: { ru: ["неделя", "недели", "недель"], en: ["week", "weeks"] },
+};
+
+/** "3 oy kafolat" -> "3 месяца гарантии" / "3 months warranty"; lug'atda bo'lmasa, asl matn qaytadi */
+function translateSpecText(text: string, lang: Language): string {
+  if (lang === "uz" || !text) return text;
+  const exact = SPEC_VALUE_TRANSLATIONS[text.toLowerCase().trim()];
+  if (exact) return exact[lang];
+  let out = text.replace(/(\d+(?:[.,]\d+)?)\s*(oy|yil|kun|hafta)\b/gi, (m, num: string, unit: string) => {
+    const u = DURATION_UNITS[unit.toLowerCase()];
+    if (!u) return m;
+    const n = Number(num.replace(",", "."));
+    if (lang === "ru") return `${num} ${ruPlural(Number.isInteger(n) ? n : 5, u.ru[0], u.ru[1], u.ru[2])}`;
+    return `${num} ${n === 1 ? u.en[0] : u.en[1]}`;
+  });
+  if (lang === "ru") {
+    out = out.replace(/rasmiy kafolat/gi, "официальной гарантии").replace(/\bkafolat(i|siz)?\b/gi, (m) => (/siz$/i.test(m) ? "без гарантии" : "гарантии"));
+  } else {
+    out = out.replace(/rasmiy kafolat/gi, "official warranty").replace(/\bkafolat(i|siz)?\b/gi, (m) => (/siz$/i.test(m) ? "no warranty" : "warranty"));
+  }
+  return out;
+}
+
+export function localizeSpecName(spec: ProductSpecLike, lang: Language): string {
+  const name = spec.name || spec.key || "";
+  if (lang === "uz") return name;
+  const stored = lang === "ru" ? spec.nameRu : spec.nameEn;
+  if (stored && stored.trim()) return stored.trim();
+  const hit = SPEC_NAME_TRANSLATIONS[name.toLowerCase().trim()];
+  return hit ? hit[lang] : name;
+}
+
+export function localizeSpecValue(spec: ProductSpecLike, lang: Language): string {
+  const value = spec.value || "";
+  if (lang === "uz") return value;
+  const stored = lang === "ru" ? spec.valueRu : spec.valueEn;
+  if (stored && stored.trim()) return stored.trim();
+  return translateSpecText(value, lang);
+}
+
 export function localizeProductDescription(
   productOrDesc: { description?: string | null; descriptionRu?: string | null; descriptionEn?: string | null } | string | undefined | null,
   lang: Language

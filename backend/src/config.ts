@@ -57,5 +57,19 @@ export const config = {
   dailySmsBudget: Number(process.env.DAILY_SMS_BUDGET || 250), // butun server bo'yicha kunlik max SMS
   dailyIpSmsLimit: Number(process.env.DAILY_IP_SMS_LIMIT || 8), // 1 ta IP dan kunlik max SMS
   hourlyPhoneOtpLimit: Number(process.env.HOURLY_PHONE_OTP_LIMIT || 4), // 1 ta raqamga soatlik max OTP
+
+  // Sun'iy intellekt: admin panelda mahsulot kartasini avtomatik to'ldirish.
+  // Standart provayder — Google Gemini (GEMINI_API_KEY, bepul tarif bor). AI_PROVIDER=claude bo'lsa, Claude ishlatiladi.
+  // Kalit berilmasa, AI tugmasi ishlamaydi, qolgan tizim odatdagidek ishlayveradi.
+  ai: {
+    provider: (process.env.AI_PROVIDER === "claude" ? "claude" : "gemini") as "gemini" | "claude",
+    geminiApiKey: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "",
+    geminiModel: process.env.GEMINI_MODEL || "gemini-4-hydrogen",
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY || "",
+    anthropicModel: process.env.ANTHROPIC_MODEL || "claude-opus-5-5",
+    // low — tezroq va arzonroq, medium — sifatliroq tavsif (standart)
+    effort: (["low", "medium", "high"].includes(process.env.AI_EFFORT || "") ? process.env.AI_EFFORT : "medium") as "low" | "medium" | "high",
+    hourlyLimitPerUser: Number(process.env.AI_HOURLY_LIMIT || 60),
+  },
 };
 

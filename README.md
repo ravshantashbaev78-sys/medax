@@ -54,6 +54,22 @@ Mijoz buyurtma bera olishi uchun quyidagi tekshiruvlardan o'tishi kerak:
 `backend/src/routes/orders.ts` dagi matn (`MedTex: tasdiqlash kodi ...`) ni Eskiz kabinetida shablon sifatida tasdiqlating.
 `SMS_PROVIDER=console` rejimida kod serverda chiqadi va sahifada ko'rsatiladi. Bu faqat test uchun, productionda ishlamaydi.
 
+## Sun'iy intellekt yordamchisi (mahsulot kiritish)
+
+Admin panel → Mahsulotlar → Yangi mahsulot sahifasida "AI yordamchi" bloki bor. Admin oddiy tilda buyruq yozadi
+(masalan: `Steril shprits 5 ml, 100 talik quti, narxi 1200, 500 dona bor, yaroqlilik 2027-05`), rasm tashlaydi
+va "AI bilan to'ldirish" tugmasini bosadi. Claude nom va tavsifni 3 tilda (UZ/RU/EN), kategoriya, brend, birlik,
+narx, qoldiq, yaroqlilik muddati, kafolat va texnik parametrlarni (tarjimalari bilan) qoralama sifatida to'ldiradi.
+Admin tekshirib, "Saqlash" ni bosadi — AI hech narsani o'zi saqlamaydi. Narx va qoldiq faqat buyruqda yozilgan
+yoki rasmda ko'ringan bo'lsa olinadi.
+
+Sozlash: standart provayder Google Gemini. https://aistudio.google.com da "Get API key" orqali kalit olib,
+`.env` ga `GEMINI_API_KEY` sifatida kiriting. Model `GEMINI_MODEL` bilan o'zgartiriladi (standart
+`gemini-4-hydrogen`: bepul tarifda ishlaydi, pullik tarifda 1 mln token uchun kirish $1.50, chiqish $7.50;
+bitta so'rov odatda 3-6 ming token). Bepul tarifda daqiqasiga so'rovlar soni cheklangan va Google bu
+ma'lumotlardan mahsulotlarini yaxshilashda foydalanishi mumkin; pullik tarifda yo'q. `AI_PROVIDER=claude` va
+`ANTHROPIC_API_KEY` bilan Claude'ga o'tish mumkin. `AI_HOURLY_LIMIT` bitta xodimning soatlik so'rovlar sonini cheklaydi.
+
 ## Imkoniyatlar
 
 **Sayt:** bosh sahifa, katalog (kategoriya, brend, tur bo'yicha filter, qidiruv, saralash, sahifalash), mahsulot sahifasi (galereya, xususiyatlar, PDF hujjatlar, o'xshash mahsulotlar), buyurtma ro'yxati va tasdiqlash.

@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { fetchProductDetail, getImageUrl, Product } from "../api";
 import { useCart } from "../context/CartContext";
 import { useTheme } from "../context/ThemeContext";
-import { useI18n, localizeCategoryName, localizeProductName, localizeProductDescription } from "../context/I18nContext";
+import { useI18n, localizeCategoryName, localizeProductName, localizeProductDescription, localizeSpecName, localizeSpecValue, ProductSpecLike } from "../context/I18nContext";
 import { priceLabel } from "../components/ProductCard";
 import { Button, IcBack, IcExternal, IcImage, IcMinus, IcPlus } from "../components/ui";
 
@@ -72,7 +72,7 @@ export function ProductDetailScreen({ route, navigation }: any) {
   const maxQty = Math.min(100, stock ?? 100);
   const name = localizeProductName(product, lang);
   const description = localizeProductDescription(product, lang);
-  const specs: { name?: string; key?: string; value?: string }[] = Array.isArray(product.specs) ? product.specs : [];
+  const specs: ProductSpecLike[] = Array.isArray(product.specs) ? product.specs : [];
 
   const onImageScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
     setImgIndex(Math.round(e.nativeEvent.contentOffset.x / width));
@@ -157,8 +157,8 @@ export function ProductDetailScreen({ route, navigation }: any) {
               <View style={[s.specs, { borderColor: colors.border }]}>
                 {specs.map((sp, i) => (
                   <View key={i} style={[s.specRow, i > 0 && { borderTopWidth: 1, borderTopColor: colors.border }]}>
-                    <Text style={[s.specKey, { color: colors.textMuted }]}>{sp.name || sp.key}</Text>
-                    <Text style={[s.specVal, { color: colors.text }]}>{sp.value}</Text>
+                    <Text style={[s.specKey, { color: colors.textMuted }]}>{localizeSpecName(sp, lang)}</Text>
+                    <Text style={[s.specVal, { color: colors.text }]}>{localizeSpecValue(sp, lang)}</Text>
                   </View>
                 ))}
               </View>

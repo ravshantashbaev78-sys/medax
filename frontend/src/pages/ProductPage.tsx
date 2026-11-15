@@ -205,8 +205,8 @@ export default function ProductPage() {
             <table className="specs"><tbody>
               {p.specs.map((s, i) => (
                 <tr key={i}>
-                  <td>{localizeSpecName(s.name, lang)}</td>
-                  <td>{localizeSpecValue(s.value, lang)}</td>
+                  <td>{localizeSpecName(s, lang)}</td>
+                  <td>{localizeSpecValue(s, lang)}</td>
                 </tr>
               ))}
             </tbody></table>

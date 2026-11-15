@@ -38,6 +38,67 @@ function maxSuffix(codes: string[], base: string): number {
   return max;
 }
 
+/**
+ * Yaroqlilik muddati matnini sanaga o'giradi: "2026-12-31", "2026-12", "31.12.2026", "12.2026", "12/2026".
+ * Faqat oy berilgan bo'lsa, oyning 28-kuni olinadi.
+ */
+export function parseExpDate(raw: string | null | undefined): Date | null {
+  if (!raw) return null;
+  const parts = raw.trim().split(/[-./]/);
+  let d: Date | null = null;
+  if (parts.length === 3) {
+    d = parts[0].length === 4 ? new Date(`${parts[0]}-${parts[1]}-${parts[2]}`) : new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+  } else if (parts.length === 2) {
+    d = parts[0].length === 4 ? new Date(`${parts[0]}-${parts[1]}-28`) : new Date(`${parts[1]}-${parts[0]}-28`);
+  }
+  return d && !Number.isNaN(d.getTime()) ? d : null;
+}
+
+/** Muddati berilgan kun ichida tugaydi (yoki allaqachon tugagan) */
+export function expiringWithin(raw: string | null | undefined, days: number): boolean {
+  const d = parseExpDate(raw);
+  if (!d) return false;
+  const limit = new Date();
+  limit.setDate(limit.getDate() + days);
+  return d <= limit;
+}
+
+/** ?from=YYYY-MM-DD&to=YYYY-MM-DD ko'rinishidagi sana parametri; to — kun oxirigacha */
+function dateParam(v: unknown, endOfDay = false): Date | undefined {
+  if (typeof v !== "string" || !v.trim()) return undefined;
+  const d = new Date(v.trim());
+  if (Number.isNaN(d.getTime())) return undefined;
+  if (endOfDay && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) d.setHours(23, 59, 59, 999);
+  return d;
+}
+
+/**
+ * Qo'lda yozilgan kassa orderining kontragent balansiga ta'siri.
+ * Mijoz balansi > 0 — mijoz bizga qarzdor; ta'minotchi balansi > 0 — biz unga qarzdormiz.
+ *  - mijozdan kirim: qarzi kamayadi; mijozga chiqim (pul qaytarish): qarzi oshadi (yoki avansi yopiladi)
+ *  - ta'minotchiga chiqim: qarzimiz kamayadi; ta'minotchidan kirim (pul qaytardi): qarzimiz oshadi
+ * direction = -1 bo'lsa, ta'sir teskari qo'llanadi (storno).
+ */
+async function applyCashBalance(
+  tx: Tx,
+  e: { type: "INCOME" | "EXPENSE"; amount: number; customerId?: number | null; supplierId?: number | null },
+  direction: 1 | -1 = 1
+) {
+  const amt = e.amount * direction;
+  if (e.customerId) {
+    await tx.customer.update({
+      where: { id: e.customerId },
+      data: { balance: e.type === "INCOME" ? { decrement: amt } : { increment: amt } },
+    });
+  }
+  if (e.supplierId) {
+    await tx.supplier.update({
+      where: { id: e.supplierId },
+      data: { balance: e.type === "EXPENSE" ? { decrement: amt } : { increment: amt } },
+    });
+  }
+}
+
 /** Parallel so'rovlarda raqam to'qnashsa (P2002), tranzaksiyani qayta urinadi */
 export async function withUniqueRetry<T>(fn: () => Promise<T>, attempts = 4): Promise<T> {
   for (let i = 0; ; i++) {
@@ -228,10 +289,6 @@ erpRouter.get("/overview", async (_req, res) => {
   let lowStockCount = 0;
   let expiringCount = 0;
 
-  const now = new Date();
-  const in90Days = new Date();
-  in90Days.setDate(in90Days.getDate() + 90);
-
   for (const p of products) {
     const qty = p.stock || 0;
     totalStockQty += qty;
@@ -245,21 +302,7 @@ erpRouter.get("/overview", async (_req, res) => {
       lowStockCount++;
     }
 
-    if (p.expDate) {
-      // Parse expDate if possible: e.g. "2026-12", "12.2026", "2026-12-31"
-      try {
-        const parts = p.expDate.trim().split(/[-.]/);
-        let expD: Date | null = null;
-        if (parts.length === 3) {
-          expD = parts[0].length === 4 ? new Date(p.expDate) : new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-        } else if (parts.length === 2) {
-          expD = parts[0].length === 4 ? new Date(`${parts[0]}-${parts[1]}-28`) : new Date(`${parts[1]}-${parts[0]}-28`);
-        }
-        if (expD && !isNaN(expD.getTime()) && expD <= in90Days) {
-          expingCount: expiringCount++;
-        }
-      } catch {}
-    }
+    if (expiringWithin(p.expDate, 90)) expiringCount++;
   }
 
   let totalCashIncome = 0;
@@ -310,9 +353,26 @@ erpRouter.get("/inventory", async (req, res) => {
   }
 
   if (status === "low") {
-    where.stock = { lte: 5 };
+    // Har bir tovarning o'z minimal qoldig'i bilan solishtiriladi (avval hamma uchun 5 edi)
+    where.stock = { lte: prisma.product.fields.minStock };
   } else if (status === "out") {
     where.stock = 0;
+  } else if (status === "expiring") {
+    where.expDate = { not: null };
+  }
+
+  const include = {
+    category: { select: { id: true, name: true } },
+    brand: { select: { id: true, name: true } },
+    supplier: { select: { id: true, name: true } },
+    warehouse: { select: { id: true, name: true } },
+  } as const;
+
+  if (status === "expiring") {
+    // Muddat matn sifatida saqlanadi, shuning uchun 90 kunlik filtr serverda hisoblanadi
+    const all = await prisma.product.findMany({ where, orderBy: [{ expDate: "asc" }, { name: "asc" }], include });
+    const filtered = all.filter((p) => expiringWithin(p.expDate, 90));
+    return void res.json({ items: filtered.slice((page - 1) * limit, page * limit), total: filtered.length, page, limit });
   }
 
   const [items, total] = await Promise.all([
@@ -321,12 +381,7 @@ erpRouter.get("/inventory", async (req, res) => {
       orderBy: [{ stock: "asc" }, { updatedAt: "desc" }],
       skip: (page - 1) * limit,
       take: limit,
-      include: {
-        category: { select: { id: true, name: true } },
-        brand: { select: { id: true, name: true } },
-        supplier: { select: { id: true, name: true } },
-        warehouse: { select: { id: true, name: true } },
-      },
+      include,
     }),
     prisma.product.count({ where }),
   ]);
@@ -402,9 +457,7 @@ erpRouter.post("/inventory/count", async (req, res) => {
 erpRouter.get("/alerts", async (_req, res) => {
   const [lowStock, allProducts] = await Promise.all([
     prisma.product.findMany({
-      where: {
-        stock: { lte: 5 },
-      },
+      where: { stock: { lte: prisma.product.fields.minStock } },
       orderBy: { stock: "asc" },
       take: 50,
       include: {
@@ -427,24 +480,7 @@ erpRouter.get("/alerts", async (_req, res) => {
     }),
   ]);
 
-  const in90Days = new Date();
-  in90Days.setDate(in90Days.getDate() + 90);
-
-  const expiring = allProducts.filter((p) => {
-    if (!p.expDate) return false;
-    try {
-      const parts = p.expDate.trim().split(/[-.]/);
-      let expD: Date | null = null;
-      if (parts.length === 3) {
-        expD = parts[0].length === 4 ? new Date(p.expDate) : new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      } else if (parts.length === 2) {
-        expD = parts[0].length === 4 ? new Date(`${parts[0]}-${parts[1]}-28`) : new Date(`${parts[1]}-${parts[0]}-28`);
-      }
-      return expD && !isNaN(expD.getTime()) && expD <= in90Days;
-    } catch {
-      return false;
-    }
-  });
+  const expiring = allProducts.filter((p) => expiringWithin(p.expDate, 90));
 
   res.json({
     lowStock: lowStock.map((p) => ({
@@ -474,37 +510,47 @@ erpRouter.get("/alerts", async (_req, res) => {
 erpRouter.get("/documents", async (req, res) => {
   const type = typeof req.query.type === "string" ? req.query.type : undefined;
   const search = typeof req.query.search === "string" ? req.query.search.trim() : "";
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+  const from = dateParam(req.query.from);
+  const to = dateParam(req.query.to, true);
 
   const where: Prisma.ErpDocumentWhereInput = {};
   if (type && type !== "ALL") {
     where.type = type as any;
   }
+  if (from || to) where.date = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
   if (search) {
     where.OR = [
       { docNumber: { contains: search, mode: "insensitive" } },
       { clientName: { contains: search, mode: "insensitive" } },
       { notes: { contains: search, mode: "insensitive" } },
       { supplier: { name: { contains: search, mode: "insensitive" } } },
+      { customer: { name: { contains: search, mode: "insensitive" } } },
     ];
   }
 
-  const docs = await prisma.erpDocument.findMany({
-    where,
-    orderBy: { date: "desc" },
-    take: 100,
-    include: {
-      supplier: { select: { id: true, name: true } },
-      customer: { select: { id: true, name: true, phone: true } },
-      warehouse: { select: { id: true, name: true } },
-      items: {
-        include: {
-          product: { select: { id: true, name: true, sku: true } },
+  const [docs, total] = await Promise.all([
+    prisma.erpDocument.findMany({
+      where,
+      orderBy: { date: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        supplier: { select: { id: true, name: true } },
+        customer: { select: { id: true, name: true, phone: true } },
+        warehouse: { select: { id: true, name: true } },
+        items: {
+          include: {
+            product: { select: { id: true, name: true, sku: true } },
+          },
         },
       },
-    },
-  });
+    }),
+    prisma.erpDocument.count({ where }),
+  ]);
 
-  res.json({ docs });
+  res.json({ docs, total, page, pages: Math.max(1, Math.ceil(total / limit)) });
 });
 
 erpRouter.get("/documents/:id", async (req, res) => {
@@ -641,6 +687,7 @@ erpRouter.post("/documents", async (req, res) => {
         totalAmount,
         paidAmount: body.paidAmount,
         notes: body.notes || null,
+        createdBy: req.user?.name || null,
         items: {
           create: itemsData.map((it) => ({
             productId: it.productId,
@@ -696,6 +743,7 @@ erpRouter.post("/documents", async (req, res) => {
             description: `Hujjat #${docNumber} bo'yicha ta'minotchiga to'lov`,
             supplierId: body.supplierId || null,
             documentId: doc.id,
+            createdBy: req.user?.name || null,
           },
         });
       }
@@ -719,6 +767,7 @@ erpRouter.post("/documents", async (req, res) => {
             description: `Hujjat #${docNumber} bo'yicha sotuv tushumi`,
             customerId: body.customerId || null,
             documentId: doc.id,
+            createdBy: req.user?.name || null,
           },
         });
       }
@@ -729,6 +778,13 @@ erpRouter.post("/documents", async (req, res) => {
           data: { balance: { increment: unpaid } },
         });
       }
+    } else if (body.type === "RETURN_CUSTOMER" && body.customerId) {
+      // Mijoz tovar qaytardi: qarzi shu summaga kamayadi. To'lab bo'lgan bo'lsa, balans manfiy bo'ladi
+      // (biz unga qarzdormiz) va Kassa bo'limida "Mijozga pul qaytarish" chiqimi bilan yopiladi.
+      await tx.customer.update({ where: { id: body.customerId }, data: { balance: { decrement: totalAmount } } });
+    } else if (body.type === "RETURN_SUPPLIER" && body.supplierId) {
+      // Ta'minotchiga qaytardik: unga qarzimiz shu summaga kamayadi (yoki u bizga qarzdor bo'lib qoladi)
+      await tx.supplier.update({ where: { id: body.supplierId }, data: { balance: { decrement: totalAmount } } });
     }
 
     return doc;
@@ -737,37 +793,122 @@ erpRouter.post("/documents", async (req, res) => {
   res.status(201).json({ ok: true, document: result });
 });
 
+/**
+ * Hujjatni bekor qilish (1C dagi "отмена проведения"): ombor harakati, kontragent qarzi va
+ * kassa orderlari teskari yoziladi, hujjat CANCELED holatiga o'tadi. Tarix o'chirilmaydi.
+ */
+erpRouter.post("/documents/:id/cancel", async (req, res) => {
+  const docId = Number(req.params.id);
+  if (!Number.isInteger(docId) || docId <= 0) throw new HttpError(400, "ID noto'g'ri");
+  const { reason } = z.object({ reason: z.string().trim().max(300).default("") }).parse(req.body || {});
+
+  const doc = await prisma.erpDocument.findUnique({ where: { id: docId }, include: { items: true, cashEntries: true } });
+  if (!doc) throw new HttpError(404, "Hujjat topilmadi");
+  if (doc.status === "CANCELED") throw new HttpError(400, "Hujjat allaqachon bekor qilingan");
+
+  const total = Number(doc.totalAmount) || 0;
+  const unpaid = total - (Number(doc.paidAmount) || 0);
+  // Qaytim hujjatlarining balansga ta'siri shu versiyadan boshlab yoziladi (createdBy bo'lganlarda)
+  const returnsTouchBalance = Boolean(doc.createdBy);
+
+  await withUniqueRetry(() =>
+    prisma.$transaction(async (tx) => {
+      // 1. Ombor: kirgan tovar qaytib chiqadi (sotilib ketgan bo'lsa, bekor qilib bo'lmaydi), chiqqan tovar qaytadi
+      for (const it of doc.items) {
+        if (doc.type === "INCOME" || doc.type === "RETURN_CUSTOMER") {
+          await decrementStockOrThrow(tx, it.productId, it.quantity, it.productName);
+        } else if (doc.type === "OUTCOME" || doc.type === "WRITE_OFF" || doc.type === "RETURN_SUPPLIER") {
+          await incrementStock(tx, it.productId, it.quantity);
+        }
+      }
+
+      // 2. Kontragent qarzi
+      if (doc.type === "INCOME" && unpaid > 0 && doc.supplierId) {
+        await tx.supplier.update({ where: { id: doc.supplierId }, data: { balance: { decrement: unpaid } } });
+      } else if (doc.type === "OUTCOME" && unpaid > 0 && doc.customerId) {
+        await tx.customer.update({ where: { id: doc.customerId }, data: { balance: { decrement: unpaid } } });
+      } else if (doc.type === "RETURN_CUSTOMER" && doc.customerId && returnsTouchBalance) {
+        await tx.customer.update({ where: { id: doc.customerId }, data: { balance: { increment: total } } });
+      } else if (doc.type === "RETURN_SUPPLIER" && doc.supplierId && returnsTouchBalance) {
+        await tx.supplier.update({ where: { id: doc.supplierId }, data: { balance: { increment: total } } });
+      }
+
+      // 3. Kassa: hujjat bilan kirgan/chiqqan pul storno orderi bilan qaytariladi
+      for (const ce of doc.cashEntries) {
+        if (ce.canceledAt || ce.stornoOfId) continue;
+        await tx.cashEntry.create({
+          data: {
+            entryNumber: await nextCashNumber(tx),
+            type: ce.type === "INCOME" ? "EXPENSE" : "INCOME",
+            category: ce.category,
+            amount: ce.amount,
+            paymentType: ce.paymentType,
+            description: `Storno ${ce.entryNumber}: hujjat ${doc.docNumber} bekor qilindi`,
+            customerId: ce.customerId,
+            supplierId: ce.supplierId,
+            documentId: doc.id,
+            stornoOfId: ce.id,
+            createdBy: req.user?.name || null,
+          },
+        });
+        await tx.cashEntry.update({ where: { id: ce.id }, data: { canceledAt: new Date() } });
+      }
+
+      const stamp = `Bekor qilindi ${new Date().toISOString().slice(0, 10)}${req.user?.name ? ` (${req.user.name})` : ""}${reason ? `: ${reason}` : ""}`;
+      await tx.erpDocument.update({
+        where: { id: doc.id },
+        data: { status: "CANCELED", canceledAt: new Date(), notes: doc.notes ? `${doc.notes}\n${stamp}` : stamp },
+      });
+    })
+  );
+
+  res.json({ ok: true });
+});
+
 /* -------------------------------------------------------------------------- */
 /* 5. Cash Desk / Kassa                                                       */
 /* -------------------------------------------------------------------------- */
 erpRouter.get("/cash", async (req, res) => {
-  const entries = await prisma.cashEntry.findMany({
-    orderBy: { date: "desc" },
-    take: 100,
-    include: {
-      customer: { select: { id: true, name: true, phone: true } },
-      supplier: { select: { id: true, name: true } },
-      document: { select: { id: true, docNumber: true } },
-    },
-  });
+  const page = Math.max(Number(req.query.page) || 1, 1);
+  const limit = Math.min(Math.max(Number(req.query.limit) || 100, 1), 500);
+  const from = dateParam(req.query.from);
+  const to = dateParam(req.query.to, true);
+  const where: Prisma.CashEntryWhereInput = {};
+  if (from || to) where.date = { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) };
 
-  const totals = await prisma.cashEntry.groupBy({
-    by: ["type"],
-    _sum: { amount: true },
-  });
+  const [entries, total, totals, periodTotals] = await Promise.all([
+    prisma.cashEntry.findMany({
+      where,
+      orderBy: { date: "desc" },
+      skip: (page - 1) * limit,
+      take: limit,
+      include: {
+        customer: { select: { id: true, name: true, phone: true } },
+        supplier: { select: { id: true, name: true } },
+        document: { select: { id: true, docNumber: true } },
+      },
+    }),
+    prisma.cashEntry.count({ where }),
+    // Kassa balansi doim butun tarix bo'yicha
+    prisma.cashEntry.groupBy({ by: ["type"], _sum: { amount: true } }),
+    from || to ? prisma.cashEntry.groupBy({ by: ["type"], where, _sum: { amount: true } }) : Promise.resolve(null),
+  ]);
 
-  let totalIncome = 0;
-  let totalExpense = 0;
-  for (const t of totals) {
-    if (t.type === "INCOME") totalIncome = Number(t._sum.amount) || 0;
-    if (t.type === "EXPENSE") totalExpense = Number(t._sum.amount) || 0;
-  }
+  const sum = (rows: { type: string; _sum: { amount: unknown } }[] | null, type: string) =>
+    Number(rows?.find((r) => r.type === type)?._sum.amount) || 0;
+  const totalIncome = sum(totals, "INCOME");
+  const totalExpense = sum(totals, "EXPENSE");
 
   res.json({
     entries,
+    total,
+    page,
+    pages: Math.max(1, Math.ceil(total / limit)),
     totalIncome,
     totalExpense,
     balance: totalIncome - totalExpense,
+    periodIncome: periodTotals ? sum(periodTotals, "INCOME") : null,
+    periodExpense: periodTotals ? sum(periodTotals, "EXPENSE") : null,
   });
 });
 
@@ -796,29 +937,64 @@ erpRouter.post("/cash", async (req, res) => {
         description: body.description || null,
         customerId: body.customerId || null,
         supplierId: body.supplierId || null,
+        createdBy: req.user?.name || null,
       },
     });
 
-    // If client paid -> reduce client's debt
-    if (body.type === "INCOME" && body.customerId) {
-      await tx.customer.update({
-        where: { id: body.customerId },
-        data: { balance: { decrement: body.amount } },
-      });
-    }
-
-    // If paid to supplier -> reduce supplier's balance (we owe less)
-    if (body.type === "EXPENSE" && body.supplierId) {
-      await tx.supplier.update({
-        where: { id: body.supplierId },
-        data: { balance: { decrement: body.amount } },
-      });
-    }
+    // Kontragent qarzi: mijozdan kirim / mijozga qaytarish, ta'minotchiga to'lov / ta'minotchidan qaytim
+    await applyCashBalance(tx, { type: body.type, amount: body.amount, customerId: body.customerId, supplierId: body.supplierId });
 
     return created;
   }));
 
   res.status(201).json({ ok: true, entry });
+});
+
+/**
+ * Kassa orderini bekor qilish: o'chirilmaydi, teskari (storno) order yoziladi va kontragent balansi tiklanadi.
+ * Hujjatga yoki sayt buyurtmasiga bog'langan orderlar o'z joyidan (hujjat / buyurtma) bekor qilinadi.
+ */
+erpRouter.post("/cash/:id/cancel", async (req, res) => {
+  const entryId = Number(req.params.id);
+  if (!Number.isInteger(entryId) || entryId <= 0) throw new HttpError(400, "ID noto'g'ri");
+  const { reason } = z.object({ reason: z.string().trim().max(300).default("") }).parse(req.body || {});
+
+  const entry = await prisma.cashEntry.findUnique({ where: { id: entryId } });
+  if (!entry) throw new HttpError(404, "Kassa orderi topilmadi");
+  if (entry.canceledAt) throw new HttpError(400, "Bu order allaqachon bekor qilingan");
+  if (entry.stornoOfId) throw new HttpError(400, "Storno orderini bekor qilib bo'lmaydi");
+  if (entry.documentId) throw new HttpError(400, "Bu order hujjatga bog'langan: Hujjatlar bo'limida hujjatning o'zini bekor qiling.");
+  if (entry.orderId || entry.category === "SAYT_BUYURTMA") {
+    throw new HttpError(400, "Sayt buyurtmasi to'lovi Buyurtmalar bo'limida boshqariladi (to'lov belgisini olib tashlang).");
+  }
+
+  const storno = await withUniqueRetry(() =>
+    prisma.$transaction(async (tx) => {
+      const created = await tx.cashEntry.create({
+        data: {
+          entryNumber: await nextCashNumber(tx),
+          type: entry.type === "INCOME" ? "EXPENSE" : "INCOME",
+          category: entry.category,
+          amount: entry.amount,
+          paymentType: entry.paymentType,
+          description: `Storno ${entry.entryNumber}${reason ? `: ${reason}` : ""}`,
+          customerId: entry.customerId,
+          supplierId: entry.supplierId,
+          stornoOfId: entry.id,
+          createdBy: req.user?.name || null,
+        },
+      });
+      await applyCashBalance(
+        tx,
+        { type: entry.type, amount: Number(entry.amount), customerId: entry.customerId, supplierId: entry.supplierId },
+        -1
+      );
+      await tx.cashEntry.update({ where: { id: entry.id }, data: { canceledAt: new Date() } });
+      return created;
+    })
+  );
+
+  res.status(201).json({ ok: true, entry: storno });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -1003,163 +1179,133 @@ erpRouter.get("/reports/turnover", async (req, res) => {
 });
 
 /* Reconciliation Statement (Акт сверки) */
-erpRouter.get("/reports/act-sverka", async (req, res) => {
-  const entityType = String(req.query.type || "customer"); // "customer" or "supplier"
-  const entityId = Number(req.query.id);
-  if (!entityId) throw new HttpError(400, "Kontragent tanlanmagan");
+interface SverkaLine {
+  date: string;
+  docNumber: string;
+  description: string;
+  debit: number;
+  credit: number;
+}
 
-  const dateFrom = req.query.from ? new Date(String(req.query.from)) : new Date(Date.now() - 60 * 24 * 3600 * 1000);
-  const dateTo = req.query.to ? new Date(String(req.query.to)) : new Date();
+/**
+ * Kontragent bilan o'zaro hisob-kitob jadvali (JSON hisobot va Excel eksport uchun bitta manba).
+ * Mijoz: Debet — mijoz qarzi oshadi (sotuv, sayt buyurtmasi, unga qaytarilgan pul);
+ *        Kredit — mijoz to'ladi yoki tovar qaytardi.
+ * Ta'minotchi: Debet — bizning foydamizga (to'lovimiz, qaytargan tovarimiz);
+ *              Kredit — ta'minotchi foydasiga (yetkazgan tovari, bizga qaytargan puli).
+ * Sayt buyurtmasi to'lovi faqat kassa orderi orqali hisoblanadi (avval buyurtma ham, kassa ham
+ * kredit sifatida yozilib, to'lov ikki marta ko'rinardi). Bekor qilingan hujjatlar kirmaydi.
+ */
+async function buildSverka(entityType: "customer" | "supplier", entityId: number, dateFrom: Date, dateTo: Date) {
+  const range = { gte: dateFrom, lte: dateTo };
+  const timeline: SverkaLine[] = [];
 
   if (entityType === "supplier") {
     const supplier = await prisma.supplier.findUnique({ where: { id: entityId } });
     if (!supplier) throw new HttpError(404, "Yetkazib beruvchi topilmadi");
-
     const [docs, cash] = await Promise.all([
-      prisma.erpDocument.findMany({
-        where: {
-          supplierId: entityId,
-          date: { gte: dateFrom, lte: dateTo },
-        },
-        orderBy: { date: "asc" },
-      }),
-      prisma.cashEntry.findMany({
-        where: {
-          supplierId: entityId,
-          date: { gte: dateFrom, lte: dateTo },
-        },
-        orderBy: { date: "asc" },
-      }),
+      prisma.erpDocument.findMany({ where: { supplierId: entityId, status: "CONFIRMED", date: range }, orderBy: { date: "asc" } }),
+      prisma.cashEntry.findMany({ where: { supplierId: entityId, date: range }, orderBy: { date: "asc" } }),
     ]);
-
-    // Build timeline
-    const timeline: {
-      date: string;
-      docNumber: string;
-      description: string;
-      debit: number; // to'lovlarimiz (we paid)
-      credit: number; // yetkazilgan tovarlar (they delivered)
-    }[] = [];
-
-    docs.forEach((d) => {
-      timeline.push({
-        date: d.date.toISOString(),
-        docNumber: d.docNumber,
-        description: `Tovar kirimi #${d.docNumber}`,
-        debit: 0,
-        credit: Number(d.totalAmount),
-      });
-    });
-
-    cash.forEach((c) => {
+    for (const d of docs) {
+      const total = Number(d.totalAmount) || 0;
+      if (d.type === "INCOME") {
+        timeline.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Tovar kirimi #${d.docNumber}`, debit: 0, credit: total });
+      } else if (d.type === "RETURN_SUPPLIER") {
+        timeline.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Ta'minotchiga qaytarish #${d.docNumber}`, debit: total, credit: 0 });
+      }
+    }
+    for (const c of cash) {
+      const amt = Number(c.amount) || 0;
       timeline.push({
         date: c.date.toISOString(),
         docNumber: c.entryNumber,
-        description: c.description || "Ta'minotchiga to'lov",
-        debit: Number(c.amount),
-        credit: 0,
+        description: c.description || (c.type === "EXPENSE" ? "Ta'minotchiga to'lov" : "Ta'minotchidan pul qaytdi"),
+        debit: c.type === "EXPENSE" ? amt : 0,
+        credit: c.type === "INCOME" ? amt : 0,
       });
-    });
-
+    }
     timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    res.json({
+    return {
       entity: {
-        type: "supplier",
+        type: "supplier" as const,
         id: supplier.id,
         name: supplier.name,
         company: supplier.company,
+        organization: supplier.company,
         phone: supplier.phone,
         inn: supplier.inn,
         balance: Number(supplier.balance),
       },
-      dateFrom: dateFrom.toISOString(),
-      dateTo: dateTo.toISOString(),
       timeline,
-    });
-  } else {
-    const customer = await prisma.customer.findUnique({ where: { id: entityId } });
-    if (!customer) throw new HttpError(404, "Mijoz topilmadi");
+    };
+  }
 
-    const [docs, cash, orders] = await Promise.all([
-      prisma.erpDocument.findMany({
-        where: {
-          customerId: entityId,
-          date: { gte: dateFrom, lte: dateTo },
-        },
-        orderBy: { date: "asc" },
-      }),
-      prisma.cashEntry.findMany({
-        where: {
-          customerId: entityId,
-          date: { gte: dateFrom, lte: dateTo },
-        },
-        orderBy: { date: "asc" },
-      }),
-      prisma.order.findMany({
-        where: {
-          customerId: entityId,
-          createdAt: { gte: dateFrom, lte: dateTo },
-          status: { in: ["CONFIRMED", "READY", "DONE"] },
-        },
-      }),
-    ]);
-
-    const timeline: {
-      date: string;
-      docNumber: string;
-      description: string;
-      debit: number; // tovar sotildi (client debt increased)
-      credit: number; // to'lov tushdi (client paid)
-    }[] = [];
-
-    docs.forEach((d) => {
-      timeline.push({
-        date: d.date.toISOString(),
-        docNumber: d.docNumber,
-        description: `Tovar sotuvi #${d.docNumber}`,
-        debit: Number(d.totalAmount),
-        credit: 0,
-      });
-    });
-
-    orders.forEach((o) => {
-      timeline.push({
-        date: o.createdAt.toISOString(),
-        docNumber: `#${o.code}`,
-        description: `Sayt buyurtmasi #${o.code}`,
-        debit: Number(o.totalAmount || 0),
-        credit: o.isPaid ? Number(o.totalAmount || 0) : 0,
-      });
-    });
-
-    cash.forEach((c) => {
-      timeline.push({
-        date: c.date.toISOString(),
-        docNumber: c.entryNumber,
-        description: c.description || "Mijozdan to'lov qabul qilindi",
-        debit: 0,
-        credit: Number(c.amount),
-      });
-    });
-
-    timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-
-    res.json({
-      entity: {
-        type: "customer",
-        id: customer.id,
-        name: customer.name,
-        organization: customer.organization,
-        phone: customer.phone,
-        inn: customer.inn,
-        balance: Number(customer.balance),
-      },
-      dateFrom: dateFrom.toISOString(),
-      dateTo: dateTo.toISOString(),
-      timeline,
+  const customer = await prisma.customer.findUnique({ where: { id: entityId } });
+  if (!customer) throw new HttpError(404, "Mijoz topilmadi");
+  const [docs, cash, orders] = await Promise.all([
+    prisma.erpDocument.findMany({ where: { customerId: entityId, status: "CONFIRMED", date: range }, orderBy: { date: "asc" } }),
+    prisma.cashEntry.findMany({ where: { customerId: entityId, date: range }, orderBy: { date: "asc" } }),
+    prisma.order.findMany({
+      where: { customerId: entityId, createdAt: range, status: { in: ["CONFIRMED", "READY", "DONE"] } },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+  for (const d of docs) {
+    const total = Number(d.totalAmount) || 0;
+    if (d.type === "OUTCOME") {
+      timeline.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Tovar sotuvi #${d.docNumber}`, debit: total, credit: 0 });
+    } else if (d.type === "RETURN_CUSTOMER") {
+      timeline.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Mijozdan qaytim #${d.docNumber}`, debit: 0, credit: total });
+    }
+  }
+  for (const o of orders) {
+    timeline.push({
+      date: o.createdAt.toISOString(),
+      docNumber: `#${o.code}`,
+      description: `Sayt buyurtmasi #${o.code}`,
+      debit: Number(o.totalAmount || 0),
+      credit: 0,
     });
   }
+  for (const c of cash) {
+    const amt = Number(c.amount) || 0;
+    timeline.push({
+      date: c.date.toISOString(),
+      docNumber: c.entryNumber,
+      description: c.description || (c.type === "INCOME" ? "Mijozdan to'lov qabul qilindi" : "Mijozga pul qaytarildi"),
+      debit: c.type === "EXPENSE" ? amt : 0,
+      credit: c.type === "INCOME" ? amt : 0,
+    });
+  }
+  timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return {
+    entity: {
+      type: "customer" as const,
+      id: customer.id,
+      name: customer.name,
+      company: customer.organization,
+      organization: customer.organization,
+      phone: customer.phone,
+      inn: customer.inn,
+      balance: Number(customer.balance),
+    },
+    timeline,
+  };
+}
+
+erpRouter.get("/reports/act-sverka", async (req, res) => {
+  const entityType = req.query.type === "supplier" ? "supplier" : "customer";
+  const entityId = Number(req.query.id);
+  if (!entityId) throw new HttpError(400, "Kontragent tanlanmagan");
+
+  const dateFrom = dateParam(req.query.from) || new Date(Date.now() - 60 * 24 * 3600 * 1000);
+  const dateTo = dateParam(req.query.to, true) || new Date();
+
+  const { entity, timeline } = await buildSverka(entityType, entityId, dateFrom, dateTo);
+  const totalDebit = timeline.reduce((s, l) => s + l.debit, 0);
+  const totalCredit = timeline.reduce((s, l) => s + l.credit, 0);
+  res.json({ entity, dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString(), timeline, totalDebit, totalCredit });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -1772,102 +1918,18 @@ erpRouter.get("/export/cash", async (_req, res) => {
 erpRouter.get("/export/act-sverka", async (req, res) => {
   const type = req.query.type === "customer" ? "customer" : "supplier";
   const entityId = Number(req.query.id);
-  const dateFrom = req.query.from ? new Date(String(req.query.from)) : new Date(Date.now() - 90 * 24 * 3600 * 1000);
-  const dateTo = req.query.to ? new Date(String(req.query.to)) : new Date();
+  const dateFrom = dateParam(req.query.from) || new Date(Date.now() - 90 * 24 * 3600 * 1000);
+  const dateTo = dateParam(req.query.to, true) || new Date();
 
   if (!entityId) {
     throw new HttpError(400, "Kontragent ID kiritilmadi");
   }
 
-  let entityName = "";
-  let entityInn = "";
-  let currentBalance = 0;
-
-  const timeline: {
-    date: string;
-    docNumber: string;
-    description: string;
-    debit: number;
-    credit: number;
-  }[] = [];
-
-  if (type === "supplier") {
-    const sup = await prisma.supplier.findUnique({ where: { id: entityId } });
-    if (!sup) throw new HttpError(404, "Yetkazib beruvchi topilmadi");
-    entityName = sup.name + (sup.company ? ` (${sup.company})` : "");
-    entityInn = sup.inn || "—";
-    currentBalance = Number(sup.balance);
-
-    const [docs, cash] = await Promise.all([
-      prisma.erpDocument.findMany({
-        where: { supplierId: entityId, date: { gte: dateFrom, lte: dateTo } },
-        orderBy: { date: "asc" },
-      }),
-      prisma.cashEntry.findMany({
-        where: { supplierId: entityId, date: { gte: dateFrom, lte: dateTo } },
-        orderBy: { date: "asc" },
-      }),
-    ]);
-
-    docs.forEach((d) => {
-      timeline.push({
-        date: d.date.toISOString().slice(0, 10),
-        docNumber: d.docNumber,
-        description: `Tovar kirimi #${d.docNumber}`,
-        debit: 0,
-        credit: Number(d.totalAmount),
-      });
-    });
-
-    cash.forEach((c) => {
-      timeline.push({
-        date: c.date.toISOString().slice(0, 10),
-        docNumber: c.entryNumber,
-        description: c.description || "Yetkazib beruvchiga to'lov",
-        debit: Number(c.amount),
-        credit: 0,
-      });
-    });
-  } else {
-    const cust = await prisma.customer.findUnique({ where: { id: entityId } });
-    if (!cust) throw new HttpError(404, "Mijoz topilmadi");
-    entityName = cust.name + (cust.organization ? ` (${cust.organization})` : "");
-    entityInn = cust.inn || "—";
-    currentBalance = Number(cust.balance);
-
-    const [docs, cash] = await Promise.all([
-      prisma.erpDocument.findMany({
-        where: { customerId: entityId, date: { gte: dateFrom, lte: dateTo } },
-        orderBy: { date: "asc" },
-      }),
-      prisma.cashEntry.findMany({
-        where: { customerId: entityId, date: { gte: dateFrom, lte: dateTo } },
-        orderBy: { date: "asc" },
-      }),
-    ]);
-
-    docs.forEach((d) => {
-      timeline.push({
-        date: d.date.toISOString().slice(0, 10),
-        docNumber: d.docNumber,
-        description: `Tovar sotuvi #${d.docNumber}`,
-        debit: Number(d.totalAmount),
-        credit: 0,
-      });
-    });
-
-    cash.forEach((c) => {
-      timeline.push({
-        date: c.date.toISOString().slice(0, 10),
-        docNumber: c.entryNumber,
-        description: c.description || "Mijozdan to'lov",
-        debit: 0,
-        credit: Number(c.amount),
-      });
-    });
-  }
-
-  timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const sv = await buildSverka(type, entityId, dateFrom, dateTo);
+  const entityName = sv.entity.name + (sv.entity.company ? ` (${sv.entity.company})` : "");
+  const entityInn = sv.entity.inn || "—";
+  const currentBalance = sv.entity.balance;
+  const timeline = sv.timeline.map((l) => ({ ...l, date: l.date.slice(0, 10) }));
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "MEDAX ERP";

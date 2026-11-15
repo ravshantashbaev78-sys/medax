@@ -157,6 +157,8 @@ const CASH_CATEGORIES: Record<string, string> = {
   KOMMUNAL: "Kommunal va internet",
   BOSHQA_CHIQIM: "Boshqa xarajat",
   SAYT_BUYURTMA: "Sayt buyurtmasi",
+  MIJOZGA_QAYTARISH: "Mijozga pul qaytarish",
+  TAMINOTCHI_QAYTIM: "Ta'minotchidan pul qaytdi",
 };
 const cashCategoryLabel = (c: string) => CASH_CATEGORIES[c] || c;
 
@@ -172,6 +174,8 @@ interface ErpDoc {
   paidAmount: number;
   clientName: string | null;
   notes: string | null;
+  status?: string;
+  createdBy?: string | null;
   supplier?: { id: number; name: string };
   customer?: { id: number; name: string; phone: string };
   warehouse?: { id: number; name: string };
@@ -187,6 +191,10 @@ interface CashEntry {
   paymentType: "CASH" | "CARD" | "BANK_TRANSFER";
   date: string;
   description: string | null;
+  canceledAt?: string | null;
+  stornoOfId?: number | null;
+  createdBy?: string | null;
+  document?: { id: number; docNumber: string } | null;
   customer?: { id: number; name: string; phone: string };
   supplier?: { id: number; name: string };
 }
@@ -234,6 +242,9 @@ export default function Erp() {
   const [docs, setDocs] = useState<ErpDoc[]>([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
   const [docTypeFilter, setDocTypeFilter] = useState<string>("ALL");
+  const [docsPage, setDocsPage] = useState(1);
+  const [docsPages, setDocsPages] = useState(1);
+  const [docCancel, setDocCancel] = useState<{ open: boolean; reason: string; busy: boolean }>({ open: false, reason: "", busy: false });
   const [showCreateDocModal, setShowCreateDocModal] = useState(false);
   const [selectedDocDetails, setSelectedDocDetails] = useState<ErpDoc | null>(null);
   const [docPrintFormat, setDocPrintFormat] = useState<"standard" | "nakladnaya">("nakladnaya");
@@ -246,6 +257,8 @@ export default function Erp() {
     balance: 0,
   });
   const [loadingCash, setLoadingCash] = useState(false);
+  const [cashPage, setCashPage] = useState(1);
+  const [cashPages, setCashPages] = useState(1);
   const [showCashModal, setShowCashModal] = useState(false);
   const [cashModalType, setCashModalType] = useState<"INCOME" | "EXPENSE">("INCOME");
   const [selectedCashReceipt, setSelectedCashReceipt] = useState<CashEntry | null>(null);
@@ -331,20 +344,66 @@ export default function Erp() {
       .finally(() => setLoadingProducts(false));
   };
 
-  const loadDocs = () => {
+  // Hujjatlar va kassa 100 tadan sahifalab yuklanadi: "Yana yuklash" eski yozuvlarni ham ochadi
+  const loadDocs = (page = 1) => {
     setLoadingDocs(true);
-    api<{ docs: ErpDoc[] }>(`/admin/erp/documents?type=${docTypeFilter}`, { admin: true })
-      .then((r) => setDocs(r.docs || []))
+    api<{ docs: ErpDoc[]; pages?: number }>(`/admin/erp/documents?type=${docTypeFilter}&page=${page}`, { admin: true })
+      .then((r) => {
+        setDocs((prev) => (page === 1 ? r.docs || [] : [...prev, ...(r.docs || [])]));
+        setDocsPage(page);
+        setDocsPages(r.pages || 1);
+      })
       .catch(() => {})
       .finally(() => setLoadingDocs(false));
   };
 
-  const loadCash = () => {
+  const loadCash = (page = 1) => {
     setLoadingCash(true);
-    api<{ entries: CashEntry[]; totalIncome: number; totalExpense: number; balance: number }>("/admin/erp/cash", { admin: true })
-      .then(setCashData)
+    api<{ entries: CashEntry[]; totalIncome: number; totalExpense: number; balance: number; pages?: number }>(`/admin/erp/cash?page=${page}`, { admin: true })
+      .then((r) => {
+        setCashData((prev) => ({ ...r, entries: page === 1 ? r.entries : [...prev.entries, ...r.entries] }));
+        setCashPage(page);
+        setCashPages(r.pages || 1);
+      })
       .catch(() => {})
       .finally(() => setLoadingCash(false));
+  };
+
+  /** Hujjatni bekor qilish: ombor, qarz va kassa teskari yoziladi (1C "отмена проведения") */
+  const cancelDocument = async () => {
+    if (!selectedDocDetails) return;
+    setDocCancel((s) => ({ ...s, busy: true }));
+    try {
+      await api(`/admin/erp/documents/${selectedDocDetails.id}/cancel`, { admin: true, json: { reason: docCancel.reason } });
+      toast.success(`Hujjat ${selectedDocDetails.docNumber} bekor qilindi`);
+      setSelectedDocDetails(null);
+      setDocCancel({ open: false, reason: "", busy: false });
+      loadDocs();
+      loadInventory();
+      loadOverview();
+      loadAlerts();
+      loadSuppliers();
+      loadCustomers();
+    } catch (err: any) {
+      toast.error(err?.message || "Hujjat bekor qilinmadi");
+      setDocCancel((s) => ({ ...s, busy: false }));
+    }
+  };
+
+  /** Kassa orderini storno qilish: o'chirilmaydi, teskari order yoziladi */
+  const cancelCashEntry = async (c: CashEntry) => {
+    const reason = window.prompt(`${c.entryNumber} orderi bekor qilinadi. Sababi (ixtiyoriy):`, "");
+    if (reason === null) return;
+    try {
+      await api(`/admin/erp/cash/${c.id}/cancel`, { admin: true, json: { reason } });
+      toast.success(`${c.entryNumber} bekor qilindi (storno yozildi)`);
+      loadCash();
+      loadOverview();
+      loadSuppliers();
+      loadCustomers();
+    } catch (err: any) {
+      toast.error(err?.message || "Bekor qilinmadi");
+    }
   };
 
   const loadSuppliers = () => {
@@ -356,7 +415,7 @@ export default function Erp() {
   };
 
   const loadCustomers = () => {
-    api<{ items: any[] }>("/admin/customers?limit=100", { admin: true })
+    api<{ items: any[] }>("/admin/customers?limit=500", { admin: true })
       .then((r) => setCustomersList(r.items || []))
       .catch(() => {});
   };
@@ -1180,8 +1239,17 @@ export default function Erp() {
                   </tr>
                 ) : docs.length > 0 ? (
                   docs.map((d) => (
-                    <tr key={d.id} className="row-click" onClick={() => { setSelectedDocDetails(d); setDocPrintFormat("standard"); }}>
-                      <td><strong className="mono">{d.docNumber}</strong></td>
+                    <tr
+                      key={d.id}
+                      className="row-click"
+                      style={d.status === "CANCELED" ? { opacity: 0.55, textDecoration: "line-through" } : undefined}
+                      onClick={() => { setSelectedDocDetails(d); setDocPrintFormat("standard"); setDocCancel({ open: false, reason: "", busy: false }); }}
+                    >
+                      <td>
+                        <strong className="mono">{d.docNumber}</strong>
+                        {d.status === "CANCELED" && <small style={{ display: "block", color: "var(--red, #ef4444)", fontWeight: 700 }}>Bekor qilingan</small>}
+                        {d.createdBy && <small className="cell-sku" style={{ display: "block" }}>{d.createdBy}</small>}
+                      </td>
                       <td>
                         <span className={`erp-doc-pill ${d.type}`}>{DOC_TYPES[d.type]?.label || d.type}</span>
                       </td>
@@ -1218,6 +1286,13 @@ export default function Erp() {
               </tbody>
             </table>
           </div>
+          {docsPage < docsPages && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+              <button type="button" className="btn btn-erp-secondary" disabled={loadingDocs} onClick={() => loadDocs(docsPage + 1)}>
+                Yana yuklash ({docsPage} / {docsPages})
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1249,6 +1324,7 @@ export default function Erp() {
                 className="btn btn-erp-primary"
                 onClick={() => {
                   setCashModalType("INCOME");
+                  setCashForm((p) => ({ ...p, category: "MIJOZ_TOLOV", customerId: "", supplierId: "" }));
                   setShowCashModal(true);
                 }}
               >
@@ -1259,6 +1335,7 @@ export default function Erp() {
                 className="btn btn-erp-secondary"
                 onClick={() => {
                   setCashModalType("EXPENSE");
+                  setCashForm((p) => ({ ...p, category: "TAMINOTCHI_TOLOV", customerId: "", supplierId: "" }));
                   setShowCashModal(true);
                 }}
               >
@@ -1297,8 +1374,13 @@ export default function Erp() {
                   </tr>
                 ) : cashData.entries.length > 0 ? (
                   cashData.entries.map((c) => (
-                    <tr key={c.id}>
-                      <td><strong>#{c.entryNumber}</strong></td>
+                    <tr key={c.id} style={c.canceledAt ? { opacity: 0.55, textDecoration: "line-through" } : undefined}>
+                      <td>
+                        <strong>#{c.entryNumber}</strong>
+                        {c.stornoOfId && <small style={{ display: "block", color: "var(--a-warn, #a16207)", fontWeight: 700 }}>Storno</small>}
+                        {c.canceledAt && <small style={{ display: "block", color: "var(--red, #ef4444)", fontWeight: 700 }}>Bekor qilingan</small>}
+                        {c.createdBy && <small className="cell-sku" style={{ display: "block" }}>{c.createdBy}</small>}
+                      </td>
                       <td>
                         <span className={`erp-doc-pill ${c.type}`}>
                           {c.type === "INCOME" ? "Kirim" : "Chiqim"}
@@ -1328,6 +1410,17 @@ export default function Erp() {
                         >
                           Kvitansiya
                         </button>
+                        {!c.canceledAt && !c.stornoOfId && !c.document && c.category !== "SAYT_BUYURTMA" && (
+                          <button
+                            type="button"
+                            className="btn-link"
+                            style={{ color: "var(--red, #ef4444)", marginLeft: 8 }}
+                            title="Orderni bekor qilish (teskari storno order yoziladi)"
+                            onClick={() => cancelCashEntry(c)}
+                          >
+                            Bekor
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))
@@ -1339,6 +1432,13 @@ export default function Erp() {
               </tbody>
             </table>
           </div>
+          {cashPage < cashPages && (
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 12 }}>
+              <button type="button" className="btn btn-erp-secondary" disabled={loadingCash} onClick={() => loadCash(cashPage + 1)}>
+                Yana yuklash ({cashPage} / {cashPages})
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -2109,11 +2209,13 @@ export default function Erp() {
                       <>
                         <option value="MIJOZ_TOLOV">Mijozdan to'lov (Qarz yopish / Avans)</option>
                         <option value="DOQON_SOTUV">Do'kondagi naqd sotuv</option>
+                        <option value="TAMINOTCHI_QAYTIM">Ta'minotchidan pul qaytdi (qaytarilgan tovar uchun)</option>
                         <option value="BOSHQA_KIRIM">Boshqa tushum</option>
                       </>
                     ) : (
                       <>
                         <option value="TAMINOTCHI_TOLOV">Yetkazib beruvchiga to'lov</option>
+                        <option value="MIJOZGA_QAYTARISH">Mijozga pul qaytarish (qaytim / ortiqcha to'lov)</option>
                         <option value="IJARA">Do'kon va ombor ijarasi</option>
                         <option value="OYLIK">Xodimlar oylik maoshi</option>
                         <option value="TRANSPORT">Yetkazib berish va transport xarajati</option>
@@ -2147,12 +2249,13 @@ export default function Erp() {
                   </select>
                 </div>
 
-                {cashModalType === "INCOME" ? (
+                {(cashModalType === "INCOME" && cashForm.category !== "TAMINOTCHI_QAYTIM") ||
+                (cashModalType === "EXPENSE" && cashForm.category === "MIJOZGA_QAYTARISH") ? (
                   <div className="field">
-                    <label>Mijoz (Qarzini kamaytirish uchun):</label>
+                    <label>{cashModalType === "INCOME" ? "Mijoz (Qarzini kamaytirish uchun):" : "Mijoz (pul qaytarilayotgan mijoz):"}</label>
                     <select
                       value={cashForm.customerId}
-                      onChange={(e) => setCashForm({ ...cashForm, customerId: Number(e.target.value) || "" })}
+                      onChange={(e) => setCashForm({ ...cashForm, customerId: Number(e.target.value) || "", supplierId: "" })}
                     >
                       <option value="">— Ixtiyoriy —</option>
                       {customersList.map((c) => (
@@ -2162,10 +2265,10 @@ export default function Erp() {
                   </div>
                 ) : (
                   <div className="field">
-                    <label>Yetkazib beruvchi (Bizning qarzimizni yopish):</label>
+                    <label>{cashModalType === "EXPENSE" ? "Yetkazib beruvchi (Bizning qarzimizni yopish):" : "Yetkazib beruvchi (pul qaytargan ta'minotchi):"}</label>
                     <select
                       value={cashForm.supplierId}
-                      onChange={(e) => setCashForm({ ...cashForm, supplierId: Number(e.target.value) || "" })}
+                      onChange={(e) => setCashForm({ ...cashForm, supplierId: Number(e.target.value) || "", customerId: "" })}
                     >
                       <option value="">— Ixtiyoriy —</option>
                       {suppliers.map((s) => (
@@ -2279,7 +2382,15 @@ export default function Erp() {
           <div className="erp-modal-window large" style={{ maxWidth: docPrintFormat === "nakladnaya" ? 920 : 760 }} onClick={(e) => e.stopPropagation()}>
             <div className="erp-modal-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
-                <h3 style={{ margin: 0 }}>Hujjat #{selectedDocDetails.docNumber}</h3>
+                <h3 style={{ margin: 0 }}>
+                  Hujjat #{selectedDocDetails.docNumber}
+                  {selectedDocDetails.status === "CANCELED" && (
+                    <span style={{ marginLeft: 10, fontSize: 12, color: "var(--red, #ef4444)", fontWeight: 800 }}>BEKOR QILINGAN</span>
+                  )}
+                </h3>
+                {selectedDocDetails.createdBy && (
+                  <small style={{ display: "block", marginTop: 2, color: "var(--ink2, #64748b)" }}>Mas'ul xodim: {selectedDocDetails.createdBy}</small>
+                )}
                 <div className="erp-view-toggle" style={{ display: "flex", gap: 6, marginTop: 8 }}>
                   <button
                     type="button"
@@ -2470,7 +2581,48 @@ export default function Erp() {
                 </div>
               )}
             </div>
+            {docCancel.open && selectedDocDetails.status !== "CANCELED" && (
+              <div className="erp-modal-body" style={{ paddingTop: 0 }}>
+                <div style={{ border: "1px solid var(--red, #ef4444)", borderRadius: 10, padding: "12px 14px", display: "grid", gap: 8 }}>
+                  <strong style={{ color: "var(--red, #ef4444)" }}>Hujjatni bekor qilish</strong>
+                  <small style={{ color: "var(--ink2, #64748b)" }}>
+                    Ombor qoldig'i, kontragent qarzi va kassa orderlari teskari yoziladi (storno). Hujjat tarixda "Bekor qilingan" bo'lib qoladi.
+                    Kirim hujjatidagi tovar allaqachon sotilgan bo'lsa, bekor qilib bo'lmaydi.
+                  </small>
+                  <input
+                    type="text"
+                    placeholder="Sababi (ixtiyoriy): masalan, noto'g'ri miqdor kiritilgan"
+                    value={docCancel.reason}
+                    onChange={(e) => setDocCancel((s) => ({ ...s, reason: e.target.value }))}
+                  />
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                    <button type="button" className="btn btn-erp-secondary" disabled={docCancel.busy} onClick={() => setDocCancel({ open: false, reason: "", busy: false })}>
+                      Qaytish
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-erp-primary"
+                      style={{ background: "var(--red, #ef4444)", borderColor: "var(--red, #ef4444)" }}
+                      disabled={docCancel.busy}
+                      onClick={cancelDocument}
+                    >
+                      {docCancel.busy ? "Bekor qilinmoqda…" : "Ha, hujjatni bekor qilish"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="erp-modal-footer">
+              {selectedDocDetails.status !== "CANCELED" && !docCancel.open && (
+                <button
+                  type="button"
+                  className="btn btn-erp-secondary"
+                  style={{ color: "var(--red, #ef4444)", marginRight: "auto" }}
+                  onClick={() => setDocCancel({ open: true, reason: "", busy: false })}
+                >
+                  Hujjatni bekor qilish
+                </button>
+              )}
               <button type="button" className="btn btn-erp-secondary" onClick={() => setSelectedDocDetails(null)}>
                 Yopish
               </button>
