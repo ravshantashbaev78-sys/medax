@@ -80,6 +80,35 @@ function AdminLayoutInner() {
   // Telefonda yon menyu chiqib-kiruvchi (drawer): sahifa almashganda yopiladi
   const [sideOpen, setSideOpen] = useState(false);
   useEffect(() => setSideOpen(false), [location.pathname, location.search]);
+
+  // Telefonda jadvallar kartochka bo'lib chiqadi: har bir katakka ustun sarlavhasi yozib qo'yiladi (CSS data-label ni ko'rsatadi)
+  useEffect(() => {
+    let raf = 0;
+    const label = () => {
+      raf = 0;
+      document.querySelectorAll<HTMLTableElement>(".adm table.tbl, .adm table.erp-table").forEach((table) => {
+        const heads = Array.from(table.querySelectorAll("thead th")).map((th) => (th.textContent || "").trim());
+        if (!heads.length) return;
+        table.querySelectorAll("tbody tr").forEach((tr) => {
+          Array.from(tr.children).forEach((td, i) => {
+            const cell = td as HTMLTableCellElement;
+            const text = cell.colSpan > 1 ? "" : heads[i] || "";
+            if (cell.dataset.label !== text) cell.dataset.label = text;
+          });
+        });
+      });
+    };
+    const schedule = () => {
+      if (!raf) raf = requestAnimationFrame(label);
+    };
+    schedule();
+    const obs = new MutationObserver(schedule);
+    obs.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      obs.disconnect();
+      if (raf) cancelAnimationFrame(raf);
+    };
+  }, []);
   const prevOrdersRef = useRef<number | null>(null);
 
   useEffect(() => {

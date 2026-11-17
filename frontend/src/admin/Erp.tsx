@@ -5,6 +5,7 @@ import { useAdminI18n } from "./i18n";
 import { numberToWordsUz, numberToWordsRu } from "./numberToWords";
 import { toast } from "../components/Toaster";
 import { enterToNextField } from "./formKeys";
+import { matchesSearch } from "./textSearch";
 
 /** Firma rekvizitlari: Hujjatlar sahifasidagi "Firma rekvizitlari" oynasida tahrirlanadi, bazada saqlanadi */
 interface CompanyInfo {
@@ -41,6 +42,9 @@ const COMPANY_FIELDS: { key: keyof CompanyInfo; label: string; placeholder?: str
   { key: "director", label: "Rahbar (F.I.Sh.)" },
   { key: "accountant", label: "Bosh hisobchi (F.I.Sh.)" },
 ];
+/** Brauzerlar o'zbekcha oy nomini "M11" deb chiqaradi, shuning uchun o'zimiz yozamiz */
+const UZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+
 /** Bo'sh rekvizit chop etilganda qo'lda yozish uchun chiziq */
 const rk = (v: string | null | undefined) => (v && v.trim() ? v : "________________");
 
@@ -62,10 +66,6 @@ function printDocument(fileTitle: string) {
 function formatMoney(n: number | string | null | undefined): string {
   if (n === null || n === undefined || isNaN(Number(n))) return "0";
   return Number(n).toLocaleString("ru-RU").replace(/,/g, " ");
-}
-
-function docOptionLabel(p: { name: string; sku: string | null; stock: number }): string {
-  return `${p.name}${p.sku ? ` [${p.sku}]` : ""} · qoldiq ${p.stock}`;
 }
 
 function formatDate(iso: string | null | undefined): string {
@@ -1960,32 +1960,19 @@ export default function Erp() {
                   <div className="erp-doc-items-head">
                     <strong>Tovarlar ({docForm.items.length})</strong>
                     <div className="doc-add-prod">
-                      <input
-                        type="search"
-                        list="doc-catalog-list"
-                        placeholder="Tovar nomi yoki SKU bo'yicha qidiring va tanlang"
-                        value={docSearch}
-                        aria-label="Tovar qo'shish"
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          const found = docCatalog.find((p) => docOptionLabel(p) === v);
-                          if (found) {
-                            if (docMeta.stock === "out" && found.stock <= 0) {
-                              setDocError(`"${found.name}" omborda yo'q`);
-                            } else {
-                              handleAddItemToDoc(found);
-                            }
-                            setDocSearch("");
+                      <ProductPicker
+                        catalog={docCatalog}
+                        query={docSearch}
+                        onQuery={setDocSearch}
+                        onPick={(found) => {
+                          if (docMeta.stock === "out" && found.stock <= 0) {
+                            setDocError(`"${found.name}" omborda yo'q`);
                           } else {
-                            setDocSearch(v);
+                            handleAddItemToDoc(found);
                           }
+                          setDocSearch("");
                         }}
                       />
-                      <datalist id="doc-catalog-list">
-                        {docCatalog.map((p) => (
-                          <option key={p.id} value={docOptionLabel(p)} />
-                        ))}
-                      </datalist>
                     </div>
                   </div>
 
@@ -2572,7 +2559,7 @@ export default function Erp() {
                         : `HISOBDAN CHIQARISH (СПИСАНИЕ) № ${selectedDocDetails.docNumber}`}
                     </h3>
                     <div className="invoice-doc-date">
-                      Sana: «{new Date(selectedDocDetails.date).getDate()}» {new Date(selectedDocDetails.date).toLocaleDateString("uz-UZ", { month: "long" })} {new Date(selectedDocDetails.date).getFullYear()} y.
+                      Sana: «{new Date(selectedDocDetails.date).getDate()}» {UZ_MONTHS[new Date(selectedDocDetails.date).getMonth()]} {new Date(selectedDocDetails.date).getFullYear()} y.
                     </div>
                   </div>
 
@@ -3237,6 +3224,101 @@ function CountPanel({ products, loading, onDone }: { products: ErpProduct[]; loa
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+
+/**
+ * Hujjatga tovar qo'shish uchun qidiruv: kirill/lotin va apostrof farqisiz, telefonda ham ishlaydi.
+ * Yozing — ro'yxat chiqadi; ↑/↓ bilan tanlang, Enter qo'shadi (tanlanmagan bo'lsa birinchisini), Esc yopadi.
+ */
+function ProductPicker({
+  catalog,
+  query,
+  onQuery,
+  onPick,
+}: {
+  catalog: ErpProduct[];
+  query: string;
+  onQuery: (v: string) => void;
+  onPick: (p: ErpProduct) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const results = useMemo(() => {
+    const q = query.trim();
+    const list = q ? catalog.filter((p) => matchesSearch(`${p.name} ${p.sku || ""}`, q)) : catalog;
+    return list.slice(0, 60);
+  }, [catalog, query]);
+
+  const pick = (p: ErpProduct | undefined) => {
+    if (!p) return;
+    onPick(p);
+    setActive(0);
+    setOpen(false);
+  };
+
+  return (
+    <div className="prod-picker">
+      <input
+        type="search"
+        value={query}
+        placeholder="Tovar nomi yoki SKU (kirill yoki lotin)"
+        aria-label="Tovar qo'shish"
+        autoComplete="off"
+        enterKeyHint="done"
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        onChange={(e) => {
+          onQuery(e.target.value);
+          setActive(0);
+          setOpen(true);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            setOpen(true);
+            setActive((a) => Math.min(a + 1, results.length - 1));
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            setActive((a) => Math.max(a - 1, 0));
+          } else if (e.key === "Enter") {
+            // Forma saqlanmasin va keyingi maydonga o'tilmasin: tovar qo'shiladi
+            e.preventDefault();
+            e.stopPropagation();
+            if (query.trim()) pick(results[active] || results[0]);
+          } else if (e.key === "Escape") {
+            setOpen(false);
+          }
+        }}
+      />
+      {open && (
+        <ul className="prod-picker-list" role="listbox">
+          {results.length === 0 ? (
+            <li className="prod-picker-empty">Topilmadi. Boshqacha yozib ko'ring yoki avval tovarni Mahsulotlar bo'limida yarating.</li>
+          ) : (
+            results.map((p, i) => (
+              <li
+                key={p.id}
+                role="option"
+                aria-selected={i === active}
+                className={i === active ? "active" : ""}
+                onMouseDown={(e) => {
+                  e.preventDefault();
+                  pick(p);
+                }}
+                onMouseEnter={() => setActive(i)}
+              >
+                <span className="pp-name">{p.name}</span>
+                <span className="pp-meta">
+                  {p.sku ? `${p.sku} · ` : ""}qoldiq {p.stock}
+                </span>
+              </li>
+            ))
+          )}
+        </ul>
+      )}
     </div>
   );
 }

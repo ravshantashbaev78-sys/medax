@@ -1183,3 +1183,97 @@ a.dash-kpi:hover {
 @media print {
   .adm .adm-burger, .adm .adm-side-backdrop { display: none !important; }
 }
+
+
+/* Hujjatga tovar qo'shish qidiruvi */
+.adm .prod-picker { position: relative; width: 100%; min-width: 280px; }
+.adm .prod-picker input { width: 100%; }
+.adm .prod-picker-list {
+  position: absolute; left: 0; right: 0; top: calc(100% + 4px); z-index: 30;
+  margin: 0; padding: 4px; list-style: none; max-height: 320px; overflow-y: auto;
+  background: var(--a-surface); border: 1px solid var(--a-border-strong); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+.adm .prod-picker-list li {
+  display: flex; justify-content: space-between; gap: 10px; align-items: baseline;
+  padding: 9px 10px; border-radius: 7px; cursor: pointer; font-size: 13.5px;
+}
+.adm .prod-picker-list li.active { background: var(--a-primary-soft); }
+.adm .prod-picker-list .pp-name { color: var(--a-text); font-weight: 550; }
+.adm .prod-picker-list .pp-meta { color: var(--a-text-3); font-size: 12px; white-space: nowrap; }
+.adm .prod-picker-list .prod-picker-empty { cursor: default; color: var(--a-text-3); }
+@media (max-width: 900px) {
+  .adm .prod-picker { min-width: 0; }
+  .adm .prod-picker-list li { padding: 12px 10px; }
+  .adm .erp-doc-items-head { flex-direction: column; align-items: stretch; gap: 8px; }
+}
+
+
+/* ==========================================================================
+   Telefon: jadvallar kartochka ko'rinishida (yonga surish shart emas)
+   ========================================================================== */
+@media (max-width: 700px) {
+  .adm .tbl-wrap, .adm .erp-card-table, .adm .doc-table-scroll {
+    overflow: visible; border: 0; background: transparent; box-shadow: none; border-radius: 0;
+  }
+  .adm table.tbl, .adm table.erp-table, .adm table.doc-create-table { display: block; min-width: 0 !important; width: 100%; }
+  .adm table.tbl thead, .adm table.erp-table thead { display: none; }
+  .adm table.tbl tbody, .adm table.erp-table tbody { display: block; }
+  .adm table.tbl tbody tr, .adm table.erp-table tbody tr {
+    display: block; margin: 0 0 10px; padding: 6px 12px;
+    background: var(--a-surface); border: 1px solid var(--a-border); border-radius: 12px;
+  }
+  .adm table.tbl tbody td, .adm table.erp-table tbody td {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 7px 0 !important; border: 0 !important; border-bottom: 1px dashed var(--a-border) !important;
+    text-align: right; white-space: normal !important; min-width: 0 !important; width: auto !important;
+    font-size: 14px; overflow-wrap: anywhere;
+  }
+  .adm table.tbl tbody td:last-child, .adm table.erp-table tbody td:last-child { border-bottom: 0 !important; }
+  .adm table.tbl tbody td::before, .adm table.erp-table tbody td::before {
+    content: attr(data-label); flex: 0 0 38%; max-width: 38%; text-align: left;
+    font-size: 12px; font-weight: 600; color: var(--a-text-3);
+  }
+  .adm table.tbl tbody td[data-label=""]::before, .adm table.erp-table tbody td[data-label=""]::before { display: none; }
+  .adm table.tbl tbody td[data-label=""], .adm table.erp-table tbody td[data-label=""] { justify-content: flex-end; flex-wrap: wrap; }
+  .adm table.tbl tbody td:empty, .adm table.erp-table tbody td:empty { display: none; }
+  .adm table tbody td.erp-empty-cell, .adm table tbody td[colspan] { justify-content: center; text-align: center; }
+  .adm table.tbl tbody td:first-child, .adm table.erp-table tbody td:first-child { font-weight: 600; }
+  .adm table.tbl tbody td > *, .adm table.erp-table tbody td > * { min-width: 0; }
+  .adm table.erp-table tbody td input, .adm table.erp-table tbody td select { max-width: 58%; min-height: 40px; text-align: right; }
+  .adm table.tbl tbody td small, .adm table.erp-table tbody td small { display: inline; margin-left: 6px; }
+  .adm .btn-link { padding: 6px 4px; min-height: 32px; }
+  .adm .erp-chip, .adm .doc-type-seg button { min-height: 36px; }
+}
+
+
+/* Chop etiladigan varaqlar doim oq qog'oz: qorong'i mavzuda ham sarlavhalar qora bo'lsin */
+.adm .erp-invoice-sheet, .adm .erp-act-sverka-sheet, .adm .erp-cash-voucher-sheet { color: #0f172a; }
+.adm .erp-invoice-sheet h2, .adm .erp-invoice-sheet h3, .adm .erp-invoice-sheet h4, .adm .erp-invoice-sheet h5,
+.adm .erp-act-sverka-sheet h2, .adm .erp-act-sverka-sheet h3, .adm .erp-act-sverka-sheet h4,
+.adm .erp-cash-voucher-sheet h3, .adm .erp-cash-voucher-sheet h4 { color: #0f172a; }
+.adm .erp-invoice-sheet .invoice-party-col h5 { color: #0f766e; }
+
+@media (max-width: 700px) {
+  /* Kartochkaning birinchi qatori — sarlavha (tovar nomi, hujjat raqami) to'liq kenglikda */
+  .adm table.tbl tbody td:first-child, .adm table.erp-table tbody td:first-child {
+    display: block; text-align: left; font-size: 15px; padding-top: 8px !important;
+  }
+  .adm table.tbl tbody td:first-child::before, .adm table.erp-table tbody td:first-child::before { display: none; }
+  /* Ko'p tugmali oyna pasti: ikki ustun, ekranni egallab olmasin */
+  .adm .erp-modal-footer .btn { flex: 1 1 calc(50% - 8px); min-width: 0; padding-left: 8px; padding-right: 8px; }
+}
+
+@media (max-width: 700px) {
+  /* Sarlavha + tugmalar bloklari ustma-ust */
+  .adm .erp-report-header, .adm .space-between { flex-direction: column; align-items: stretch !important; gap: 10px; }
+  .adm .erp-report-header > div { flex-wrap: wrap; min-width: 0; }
+  .adm .erp-report-header .btn { flex: 1 1 auto; justify-content: center; white-space: normal; }
+  .adm .erp-reports-box { padding: 14px 12px; }
+
+  /* Sarlavhasiz boshidagi kataklar (belgilash katagi, rasm) bir qatorda, ixcham */
+  .adm table.tbl tbody td[data-label=""]:not(:last-child), .adm table.erp-table tbody td[data-label=""]:not(:last-child) {
+    display: inline-flex !important; width: auto !important; border-bottom: 0 !important; padding: 6px 10px 2px 0 !important; vertical-align: middle;
+  }
+  .adm table.tbl tbody td:first-child[data-label=""] { font-size: inherit; }
+}
