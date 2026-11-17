@@ -358,3 +358,10 @@ model CashEntry {
   @@index([customerId])
   @@index([supplierId])
 }
+
+/// Tizim sozlamalari (kalit -> JSON qiymat): masalan "company" — nakladnoy va hisob-fakturadagi firma rekvizitlari
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}

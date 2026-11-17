@@ -1055,3 +1055,131 @@ a.dash-kpi:hover {
 .adm .count-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .adm .count-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--a-text-2); cursor: pointer; margin-right: 4px; }
 .adm .count-confirm-text { font-size: 13px; font-weight: 600; color: var(--a-warn); }
+
+
+/* ==========================================================================
+   Modal ichidagi forma: tana aylanadi, pastki tugmalar doim ko'rinadi
+   ========================================================================== */
+.adm .erp-modal-window > form {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.adm .erp-modal-body { min-height: 0; overscroll-behavior: contain; }
+.adm .erp-modal-header,
+.adm .erp-modal-footer { flex-shrink: 0; }
+.adm .erp-modal-footer { flex-wrap: wrap; }
+
+/* ==========================================================================
+   Telefon va planshet: yon menyu chiqib-kiruvchi, kontent to'liq kenglikda
+   ========================================================================== */
+.adm .adm-burger { display: none; }
+
+@media (max-width: 900px) {
+  .adm {
+    display: block;
+    height: auto;
+    min-height: 100vh;
+    max-height: none;
+    overflow: visible;
+  }
+  .adm .adm-side {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 264px;
+    max-width: 82vw;
+    height: 100dvh;
+    max-height: none;
+    overflow-y: auto;
+    z-index: 1200;
+    transform: translateX(-105%);
+    transition: transform 0.22s ease;
+    border-right: 1px solid var(--a-border);
+    border-bottom: 0;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.25);
+  }
+  .adm.side-open .adm-side { transform: translateX(0); }
+  .adm .adm-side-backdrop {
+    position: fixed;
+    inset: 0;
+    background: var(--a-overlay);
+    z-index: 1100;
+  }
+  .adm .adm-burger {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    margin-right: 6px;
+    border: 1px solid var(--a-border);
+    border-radius: 10px;
+    background: var(--a-surface);
+    color: var(--a-text);
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .adm .adm-main-wrap { height: auto; max-height: none; overflow: visible; min-width: 0; }
+  .adm .adm-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+    padding: 8px 12px;
+    gap: 8px;
+    min-height: 56px;
+    height: auto;
+  }
+  .adm .adm-topbar-left { display: flex; align-items: center; min-width: 0; }
+  .adm .adm-page-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 16px; }
+  .adm .adm-topbar-right { gap: 6px; }
+  .adm .adm-user-profile-chip .user-meta { display: none; }
+  .adm .adm-content-body { padding: 16px 12px 48px; overflow: visible; }
+  .adm .adm-content-body > h1, .adm h1 { font-size: 20px; }
+
+  /* Formalar bir ustunda, maydonlar barmoq bilan bosishga qulay */
+  .adm .formgrid { grid-template-columns: 1fr !important; }
+  .adm input, .adm select, .adm textarea { font-size: 16px; } /* iOS zoom qilmasin */
+  .adm .specrow { grid-template-columns: 1fr 1fr; }
+  .adm .specrow > button { justify-self: start; }
+
+  /* Jadvallar: gorizontal aylanadi, sahifa kengaymaydi */
+  .adm .tbl-wrap, .adm .erp-card-table, .adm .doc-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; max-width: 100%; }
+  .adm .tbl, .adm .erp-table { min-width: 640px; }
+
+  /* ERP */
+  .adm .erp-app-wrap { gap: 16px; }
+  .adm .erp-main-title { font-size: 20px; }
+  .adm .erp-nav-tabs { flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+  .adm .erp-tab-btn { flex-shrink: 0; padding: 8px 12px; }
+  .adm .erp-kpi-grid { grid-template-columns: 1fr 1fr !important; }
+  .adm .doc-type-seg { overflow-x: auto; flex-wrap: nowrap; }
+  .adm .doc-type-seg button { flex-shrink: 0; }
+
+  /* Modal oynalar telefonda to'liq ekran */
+  .adm .erp-modal-overlay { padding: 0; align-items: stretch; }
+  .adm .erp-modal-window,
+  .adm .erp-modal-window.large {
+    max-width: 100vw !important;
+    width: 100vw;
+    max-height: 100dvh;
+    height: 100dvh;
+    border-radius: 0;
+  }
+  .adm .erp-modal-body { padding: 14px 12px; }
+  .adm .erp-modal-footer { padding: 10px 12px; gap: 8px; }
+  .adm .erp-modal-footer .btn { flex: 1 1 auto; justify-content: center; }
+  .adm .modal > .box { max-width: calc(100vw - 24px) !important; }
+  .adm .erp-invoice-sheet, .adm .erp-act-sverka-sheet { overflow-x: auto; }
+}
+
+@media (max-width: 480px) {
+  .adm .erp-kpi-grid, .adm .dash-kpis, .adm .dash-strip { grid-template-columns: 1fr !important; }
+  .adm .adm-lang-picker { display: none; }
+}
+
+@media print {
+  .adm .adm-burger, .adm .adm-side-backdrop { display: none !important; }
+}

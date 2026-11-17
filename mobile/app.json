@@ -2,7 +2,7 @@
   "expo": {
     "name": "Medax",
     "slug": "medax-mobile",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -17,7 +17,6 @@
     },
     "android": {
       "package": "uz.medax.mobile",
-      "versionCode": 1,
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

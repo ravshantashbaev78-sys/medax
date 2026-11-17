@@ -4,6 +4,7 @@ import { toast } from "../components/Toaster";
 import { api, ApiError, Brand, Category, Paged, Product, ProductSpec, money } from "../api";
 import { Pager } from "../components/Shell";
 import { useAdminI18n } from "./i18n";
+import { enterToNextField } from "./formKeys";
 
 // ============================================================================
 // Tasdiqlash modal oynasi (confirm() o'rniga zamonaviy sayt uslubidagi modal)
@@ -1203,7 +1204,7 @@ export function ProductForm() {
         </div>
       )}
 
-      <form onSubmit={save} style={{ maxWidth: 860, width: "100%" }}>
+      <form onSubmit={save} onKeyDown={enterToNextField} style={{ maxWidth: 860, width: "100%" }}>
         {/* ============================================================== */}
         {/* 0. AI YORDAMCHI: buyruq + rasm -> to'ldirilgan karta qoralamasi  */}
         {/* ============================================================== */}

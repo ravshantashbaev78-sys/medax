@@ -4,8 +4,66 @@ import { z } from "zod";
 import ExcelJS from "exceljs";
 import { prisma } from "../db";
 import { HttpError } from "../errors";
+import { requireAdmin } from "../auth";
 
 export const erpRouter = Router();
+
+/* -------------------------------------------------------------------------- */
+/* Firma rekvizitlari (nakladnoy, hisob-faktura, akt sverka, kassa orderi)    */
+/* -------------------------------------------------------------------------- */
+const companySchema = z.object({
+  name: z.string().trim().max(150).default(""),
+  activity: z.string().trim().max(300).default(""),
+  address: z.string().trim().max(300).default(""),
+  phone: z.string().trim().max(120).default(""),
+  website: z.string().trim().max(120).default(""),
+  inn: z.string().trim().max(30).default(""),
+  oked: z.string().trim().max(30).default(""),
+  vatCode: z.string().trim().max(40).default(""),
+  bankName: z.string().trim().max(200).default(""),
+  mfo: z.string().trim().max(20).default(""),
+  account: z.string().trim().max(40).default(""),
+  director: z.string().trim().max(120).default(""),
+  accountant: z.string().trim().max(120).default(""),
+});
+export type CompanyInfo = z.infer<typeof companySchema>;
+
+const COMPANY_DEFAULTS: CompanyInfo = {
+  name: "«MEDAX» MCHJ",
+  activity: "Tibbiy asbob-uskunalar, laboratoriya reaktivlari va sarflov materiallari savdosi",
+  address: "Namangan viloyati, Namangan sh., Abu Rayhon Beruniy ko'chasi, 2-uy",
+  phone: "+998 91 186 66 61",
+  website: "medax.uz",
+  inn: "",
+  oked: "",
+  vatCode: "",
+  bankName: "",
+  mfo: "",
+  account: "",
+  director: "",
+  accountant: "",
+};
+
+export async function getCompany(): Promise<CompanyInfo> {
+  const row = await prisma.appSetting.findUnique({ where: { key: "company" } });
+  const parsed = companySchema.partial().safeParse(row?.value ?? {});
+  const saved = parsed.success ? Object.fromEntries(Object.entries(parsed.data).filter(([, v]) => v !== undefined)) : {};
+  return { ...COMPANY_DEFAULTS, ...saved };
+}
+
+erpRouter.get("/company", async (_req, res) => {
+  res.json({ company: await getCompany() });
+});
+
+erpRouter.put("/company", requireAdmin, async (req, res) => {
+  const data = companySchema.parse(req.body || {});
+  await prisma.appSetting.upsert({
+    where: { key: "company" },
+    create: { key: "company", value: data },
+    update: { value: data },
+  });
+  res.json({ ok: true, company: await getCompany() });
+});
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -1725,16 +1783,17 @@ erpRouter.get("/export/price-list", async (_req, res) => {
   wb.creator = "MEDAX";
   const ws = wb.addWorksheet("Prays-list", { views: [{ state: "frozen", ySplit: 5 }] });
 
+  const company = await getCompany();
   ws.mergeCells("A1:H1");
   const titleCell = ws.getCell("A1");
-  titleCell.value = "MEDAX MCHJ — TIBBIY ASBOBLAR VA REAKTIVLAR RASMIY PRAYS-LISTI";
+  titleCell.value = `${company.name} — TIBBIY ASBOBLAR VA REAKTIVLAR RASMIY PRAYS-LISTI`;
   titleCell.font = { name: "Segoe UI", size: 14, bold: true, color: { argb: "FF0F766E" } };
   titleCell.alignment = { vertical: "middle", horizontal: "left" };
   ws.getRow(1).height = 28;
 
   ws.mergeCells("A2:H2");
   const subCell = ws.getCell("A2");
-  subCell.value = `Sana: ${new Date().toLocaleDateString("ru-RU")} | Aloqa: +998 (71) 200-00-00, +998 (90) 123-45-67 | Veb-sayt: medax.uz`;
+  subCell.value = `Sana: ${new Date().toLocaleDateString("ru-RU")} | Aloqa: ${company.phone || "—"} | Veb-sayt: ${company.website || "medax.uz"}`;
   subCell.font = { name: "Segoe UI", size: 10, italic: true, color: { argb: "FF475569" } };
   ws.getRow(2).height = 20;
 
@@ -2013,3 +2072,126 @@ erpRouter.get("/export/act-sverka", async (req, res) => {
   res.end();
 });
 
+
+/* -------------------------------------------------------------------------- */
+/* 9.6: Bitta hujjatning nakladnoyi Excel'da (Накладная)                      */
+/* -------------------------------------------------------------------------- */
+const DOC_TITLES: Record<string, string> = {
+  INCOME: "TOVAR KIRIMI (ПРИХОДНАЯ НАКЛАДНАЯ)",
+  OUTCOME: "YUK XATI (РАСХОДНАЯ НАКЛАДНАЯ)",
+  TRANSFER: "OMBORLARARO KO'CHIRISH",
+  RETURN_CUSTOMER: "MIJOZDAN QAYTARISH DALOLATNOMASI",
+  RETURN_SUPPLIER: "TA'MINOTCHIGA QAYTARISH",
+  WRITE_OFF: "HISOBDAN CHIQARISH (СПИСАНИЕ)",
+};
+
+erpRouter.get("/export/document/:id", async (req, res) => {
+  const docId = Number(req.params.id);
+  if (!Number.isInteger(docId) || docId <= 0) throw new HttpError(400, "ID noto'g'ri");
+  const doc = await prisma.erpDocument.findUnique({
+    where: { id: docId },
+    include: { supplier: true, customer: true, warehouse: true, items: { include: { product: { select: { sku: true, unit: true } } } } },
+  });
+  if (!doc) throw new HttpError(404, "Hujjat topilmadi");
+  const company = await getCompany();
+  const costBasis = doc.type === "INCOME" || doc.type === "RETURN_SUPPLIER" || doc.type === "WRITE_OFF";
+  const blank = (v: string) => v || "________________";
+
+  const ourSide = [
+    company.name,
+    company.address,
+    company.phone ? `Tel: ${company.phone}` : "",
+    `STIR: ${blank(company.inn)}${company.oked ? `, OKED: ${company.oked}` : ""}`,
+    `H/r: ${blank(company.account)}`,
+    `Bank: ${blank(company.bankName)}, MFO: ${blank(company.mfo)}`,
+  ].filter(Boolean).join("\n");
+  const otherName =
+    doc.type === "INCOME" || doc.type === "RETURN_SUPPLIER"
+      ? [doc.supplier?.name, doc.supplier?.company].filter(Boolean).join(" / ") || "Ta'minotchi"
+      : doc.customer?.organization || doc.customer?.name || doc.clientName || "Xaridor";
+  const otherInn = doc.supplier?.inn || doc.customer?.inn || "";
+  const otherPhone = doc.supplier?.phone || doc.customer?.phone || "";
+  const otherAddr = doc.supplier?.address || "";
+  const otherSide = [otherName, otherAddr, otherInn ? `STIR: ${otherInn}` : "", otherPhone ? `Tel: ${otherPhone}` : ""].filter(Boolean).join("\n");
+  // Kirim va mijoz qaytimida tovar bizga keladi: jo'natuvchi — kontragent
+  const weSend = !(doc.type === "INCOME" || doc.type === "RETURN_CUSTOMER");
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "MEDAX ERP";
+  const ws = wb.addWorksheet("Nakladnoy", {
+    pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+  });
+  ws.columns = [{ width: 5 }, { width: 12 }, { width: 40 }, { width: 12 }, { width: 12 }, { width: 8 }, { width: 9 }, { width: 14 }, { width: 16 }];
+  const bold = { name: "Arial", size: 10, bold: true };
+  const normal = { name: "Arial", size: 10 };
+
+  ws.mergeCells("A1:I1");
+  ws.getCell("A1").value = `${DOC_TITLES[doc.type] || "HUJJAT"} № ${doc.docNumber}`;
+  ws.getCell("A1").font = { name: "Arial", size: 14, bold: true };
+  ws.getCell("A1").alignment = { horizontal: "center" };
+  ws.mergeCells("A2:I2");
+  ws.getCell("A2").value = `Sana: ${doc.date.toLocaleDateString("ru-RU")}${doc.status === "CANCELED" ? "   (BEKOR QILINGAN)" : ""}`;
+  ws.getCell("A2").alignment = { horizontal: "center" };
+  ws.getCell("A2").font = normal;
+
+  ws.mergeCells("A4:D4");
+  ws.getCell("A4").value = "Jo'natuvchi (Отправитель):";
+  ws.getCell("A4").font = bold;
+  ws.mergeCells("E4:I4");
+  ws.getCell("E4").value = "Qabul qiluvchi (Получатель):";
+  ws.getCell("E4").font = bold;
+  ws.mergeCells("A5:D10");
+  ws.getCell("A5").value = weSend ? ourSide : otherSide;
+  ws.mergeCells("E5:I10");
+  ws.getCell("E5").value = weSend ? otherSide : ourSide;
+  for (const c of ["A5", "E5"]) {
+    ws.getCell(c).alignment = { wrapText: true, vertical: "top" };
+    ws.getCell(c).font = normal;
+  }
+
+  const head = ws.getRow(12);
+  head.values = ["№", "Artikul", "Mahsulot nomi", "Partiya", "Muddat", "Birlik", "Miqdor", "Narx (so'm)", "Summa (so'm)"];
+  head.font = bold;
+  head.height = 22;
+  head.eachCell((c) => {
+    c.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    c.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
+  });
+
+  let total = 0;
+  doc.items.forEach((it, idx) => {
+    const price = costBasis ? Number(it.costPrice) || Number(it.sellPrice) || 0 : Number(it.sellPrice) || Number(it.costPrice) || 0;
+    const sum = Number(it.totalPrice) || price * it.quantity;
+    total += sum;
+    const r = ws.addRow([idx + 1, it.product?.sku || "", it.productName, it.batchNumber || "", it.expDate || "", it.product?.unit || "dona", it.quantity, price, sum]);
+    r.font = normal;
+    r.getCell(3).alignment = { wrapText: true, vertical: "middle" };
+    r.getCell(8).numFmt = "#,##0";
+    r.getCell(9).numFmt = "#,##0";
+  });
+  const totalRow = ws.addRow(["", "", "JAMI:", "", "", "", doc.items.reduce((s, i) => s + i.quantity, 0), "", total]);
+  totalRow.font = bold;
+  totalRow.getCell(9).numFmt = "#,##0";
+
+  for (let r = 12; r <= ws.rowCount; r++) {
+    for (let c = 1; c <= 9; c++) {
+      ws.getRow(r).getCell(c).border = { top: { style: "thin" }, left: { style: "thin" }, bottom: { style: "thin" }, right: { style: "thin" } };
+    }
+  }
+
+  ws.addRow([]);
+  if (doc.type === "INCOME" || doc.type === "OUTCOME") {
+    const paid = Number(doc.paidAmount) || 0;
+    ws.addRow(["", "", `To'langan: ${paid.toLocaleString("ru-RU")} so'm,  qoldiq qarz: ${(total - paid).toLocaleString("ru-RU")} so'm`]).font = normal;
+  }
+  if (doc.notes) ws.addRow(["", "", `Izoh: ${doc.notes}`]).font = normal;
+  ws.addRow([]);
+  ws.addRow(["", "", `Topshirdi: ____________________ ${weSend ? company.director : ""}`, "", "", "Qabul qildi: ____________________"]).font = normal;
+  ws.addRow(["", "", "M.O'.", "", "", "M.O'."]).font = normal;
+  if (company.accountant) ws.addRow(["", "", `Bosh hisobchi: ${company.accountant}`]).font = normal;
+
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+  res.setHeader("Content-Disposition", `attachment; filename="nakladnoy-${doc.docNumber}.xlsx"`);
+  await wb.xlsx.write(res);
+  res.end();
+});

@@ -77,6 +77,9 @@ function AdminLayoutInner() {
   const [newCount, setNewCount] = useState(0);
   const [unreadMsg, setUnreadMsg] = useState(0);
   const [showPwdModal, setShowPwdModal] = useState(false);
+  // Telefonda yon menyu chiqib-kiruvchi (drawer): sahifa almashganda yopiladi
+  const [sideOpen, setSideOpen] = useState(false);
+  useEffect(() => setSideOpen(false), [location.pathname, location.search]);
   const prevOrdersRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -127,7 +130,8 @@ function AdminLayoutInner() {
   const link = ({ isActive }: { isActive: boolean }) => (isActive ? "adm-nav-item on" : "adm-nav-item");
 
   return (
-    <div className={`adm ${theme === "dark" ? "theme-dark" : "theme-light"}`}>
+    <div className={`adm ${theme === "dark" ? "theme-dark" : "theme-light"}${sideOpen ? " side-open" : ""}`}>
+      {sideOpen && <div className="adm-side-backdrop" onClick={() => setSideOpen(false)} aria-hidden="true" />}
       {/* Modern Admin Sidebar */}
       <aside className="adm-side">
         <div className="adm-side-brand">
@@ -277,6 +281,17 @@ function AdminLayoutInner() {
       <div className="adm-main-wrap">
         <header className="adm-topbar">
           <div className="adm-topbar-left">
+            <button
+              type="button"
+              className="adm-burger"
+              aria-label="Menyu"
+              aria-expanded={sideOpen}
+              onClick={() => setSideOpen((v) => !v)}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
             <span className="adm-page-title">
               {t((PAGE_TITLE_KEYS.find(([p]) => location.pathname.startsWith(p))?.[1] || "dashboard") as any)}
             </span>

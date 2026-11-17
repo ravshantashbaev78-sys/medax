@@ -4,6 +4,57 @@ import { api, ApiError } from "../api";
 import { useAdminI18n } from "./i18n";
 import { numberToWordsUz, numberToWordsRu } from "./numberToWords";
 import { toast } from "../components/Toaster";
+import { enterToNextField } from "./formKeys";
+
+/** Firma rekvizitlari: Hujjatlar sahifasidagi "Firma rekvizitlari" oynasida tahrirlanadi, bazada saqlanadi */
+interface CompanyInfo {
+  name: string;
+  activity: string;
+  address: string;
+  phone: string;
+  website: string;
+  inn: string;
+  oked: string;
+  vatCode: string;
+  bankName: string;
+  mfo: string;
+  account: string;
+  director: string;
+  accountant: string;
+}
+const EMPTY_COMPANY: CompanyInfo = {
+  name: "«MEDAX» MCHJ", activity: "", address: "", phone: "", website: "", inn: "", oked: "", vatCode: "",
+  bankName: "", mfo: "", account: "", director: "", accountant: "",
+};
+const COMPANY_FIELDS: { key: keyof CompanyInfo; label: string; placeholder?: string; full?: boolean }[] = [
+  { key: "name", label: "Korxona nomi", placeholder: "«MEDAX» MCHJ", full: true },
+  { key: "activity", label: "Faoliyat turi", placeholder: "Tibbiy uskunalar savdosi", full: true },
+  { key: "address", label: "Yuridik manzil", full: true },
+  { key: "phone", label: "Telefon" },
+  { key: "website", label: "Sayt" },
+  { key: "inn", label: "STIR (INN)", placeholder: "9 xonali" },
+  { key: "oked", label: "OKED" },
+  { key: "vatCode", label: "QQS to'lovchi kodi", placeholder: "bo'lmasa bo'sh qoldiring" },
+  { key: "account", label: "Hisob raqami (h/r)", placeholder: "20 xonali" },
+  { key: "bankName", label: "Bank nomi", placeholder: "Masalan: \"Hamkorbank\" ATB Namangan filiali", full: true },
+  { key: "mfo", label: "Bank MFO", placeholder: "5 xonali" },
+  { key: "director", label: "Rahbar (F.I.Sh.)" },
+  { key: "accountant", label: "Bosh hisobchi (F.I.Sh.)" },
+];
+/** Bo'sh rekvizit chop etilganda qo'lda yozish uchun chiziq */
+const rk = (v: string | null | undefined) => (v && v.trim() ? v : "________________");
+
+/** Brauzerning chop etish oynasi: "PDF sifatida saqlash" tanlansa, fayl shu nom bilan saqlanadi */
+function printDocument(fileTitle: string) {
+  const prev = document.title;
+  document.title = fileTitle;
+  const restore = () => {
+    document.title = prev;
+    window.removeEventListener("afterprint", restore);
+  };
+  window.addEventListener("afterprint", restore);
+  setTimeout(() => window.print(), 80);
+}
 
 /* -------------------------------------------------------------------------- */
 /* Helpers                                                                    */
@@ -437,8 +488,34 @@ export default function Erp() {
       .finally(() => setLoadingSverka(false));
   };
 
+  // Firma rekvizitlari
+  const [company, setCompany] = useState<CompanyInfo>(EMPTY_COMPANY);
+  const [companyForm, setCompanyForm] = useState<CompanyInfo | null>(null);
+  const [companySaving, setCompanySaving] = useState(false);
+  const loadCompany = () => {
+    api<{ company: CompanyInfo }>("/admin/erp/company", { admin: true })
+      .then((r) => setCompany({ ...EMPTY_COMPANY, ...r.company }))
+      .catch(() => {});
+  };
+  const saveCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyForm) return;
+    setCompanySaving(true);
+    try {
+      const r = await api<{ company: CompanyInfo }>("/admin/erp/company", { method: "PUT", admin: true, json: companyForm });
+      setCompany({ ...EMPTY_COMPANY, ...r.company });
+      setCompanyForm(null);
+      toast.success("Firma rekvizitlari saqlandi");
+    } catch (err: any) {
+      toast.error(err?.message || "Saqlanmadi");
+    } finally {
+      setCompanySaving(false);
+    }
+  };
+
   // Initial tab triggers
   useEffect(() => {
+    loadCompany();
     loadOverview();
     loadAlerts();
     loadSuppliers();
@@ -617,6 +694,16 @@ export default function Erp() {
         toast.success(`Hujjat ${r?.document?.docNumber || ""} o'tkazildi`.replace("  ", " "));
         setShowCreateDocModal(false);
         setDocForm(emptyDocForm("INCOME"));
+        // O'tkazilgan hujjatning nakladnoyi darhol ochiladi: chop etish, PDF yoki Excel
+        if (r?.document?.id) {
+          api<{ doc: ErpDoc }>(`/admin/erp/documents/${r.document.id}`, { admin: true })
+            .then((d) => {
+              setDocCancel({ open: false, reason: "", busy: false });
+              setDocPrintFormat("nakladnaya");
+              setSelectedDocDetails(d.doc);
+            })
+            .catch(() => {});
+        }
         loadDocs();
         loadInventory();
         loadOverview();
@@ -733,6 +820,9 @@ export default function Erp() {
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             <span>Tovar chiqimi / sotuv</span>
+          </button>
+          <button type="button" className="btn btn-erp-secondary" onClick={() => setCompanyForm({ ...company })} title="Nakladnoy va hujjatlarda chiqadigan firma ma'lumotlari">
+            <span>Firma rekvizitlari</span>
           </button>
         </div>
       </div>
@@ -1650,7 +1740,7 @@ export default function Erp() {
               <div className="erp-act-sverka-sheet print-section">
                 <div className="sverka-sheet-head">
                   <h2>AKT SVERKA (O'zaro hisob-kitob solishtirma dalolatnomasi)</h2>
-                  <p>«MEDAX TIBBIY USKUNALAR» va «<strong>{sverkaData.entity.name}</strong>» o'rtasida</p>
+                  <p>{company.name} va «<strong>{sverkaData.entity.name}</strong>» o'rtasida</p>
                   <small>Davr: {formatDate(sverkaData.dateFrom)} — {formatDate(sverkaData.dateTo)}</small>
                 </div>
 
@@ -1689,7 +1779,7 @@ export default function Erp() {
 
                 <div className="sverka-signatures">
                   <div className="sverka-sig-col">
-                    <p><strong>«MEDAX» vakili:</strong></p>
+                    <p><strong>{company.name} vakili:</strong></p>
                     <div className="sig-line">____________________ (M.O'.)</div>
                   </div>
                   <div className="sverka-sig-col">
@@ -1798,7 +1888,7 @@ export default function Erp() {
               <button type="button" className="erp-close-btn" aria-label="Yopish" onClick={() => setShowCreateDocModal(false)}>×</button>
             </div>
 
-            <form onSubmit={handleSaveDocument}>
+            <form onSubmit={handleSaveDocument} onKeyDown={enterToNextField}>
               <div className="erp-modal-body">
                 <div className="doc-type-seg" role="radiogroup" aria-label="Hujjat turi">
                   {DOC_TYPE_CHOICES.map((t) => (
@@ -2095,7 +2185,7 @@ export default function Erp() {
               <h3>Tovar narxlari va qoldiqlarini tahrirlash</h3>
               <button type="button" className="erp-close-btn" onClick={() => setEditingProduct(null)}>×</button>
             </div>
-            <form onSubmit={handleSaveProductQuick}>
+            <form onSubmit={handleSaveProductQuick} onKeyDown={enterToNextField}>
               <div className="erp-modal-body">
                 <p><strong>{editingProduct.name}</strong></p>
                 <div className="erp-form-grid-2">
@@ -2197,7 +2287,7 @@ export default function Erp() {
               <h3>{cashModalType === "INCOME" ? "Kassa kirim orderi" : "Kassa chiqim orderi"}</h3>
               <button type="button" className="erp-close-btn" onClick={() => setShowCashModal(false)}>×</button>
             </div>
-            <form onSubmit={handleSaveCash}>
+            <form onSubmit={handleSaveCash} onKeyDown={enterToNextField}>
               <div className="erp-modal-body">
                 <div className="field">
                   <label>Kategoriya:</label>
@@ -2312,7 +2402,7 @@ export default function Erp() {
               <h3>Yangi Yetkazib beruvchi qo'shish</h3>
               <button type="button" className="erp-close-btn" onClick={() => setShowSupplierModal(false)}>×</button>
             </div>
-            <form onSubmit={handleSaveSupplier}>
+            <form onSubmit={handleSaveSupplier} onKeyDown={enterToNextField}>
               <div className="erp-modal-body">
                 <div className="field">
                   <label>Yetkazib beruvchi ismi yoki vakili *:</label>
@@ -2451,17 +2541,19 @@ export default function Erp() {
                 <div className="erp-invoice-sheet print-section">
                   <div className="invoice-company-header">
                     <div>
-                      <h4 className="invoice-brand-title">«MEDAX» MCHJ</h4>
+                      <h4 className="invoice-brand-title">{company.name}</h4>
                       <p className="invoice-company-sub">
-                        Tibbiy asbob-uskunalar, laboratoriya reaktivlari va sarflov materiallari ulgurji hamda chakana savdosi<br />
-                        O'zbekiston Respublikasi, Namangan sh., Beruniy ko'chasi 2-uy<br />
-                        Tel: +998 (71) 200-00-00, +998 (90) 123-45-67 | Sayt: medax.uz
+                        {company.activity && <>{company.activity}<br /></>}
+                        {rk(company.address)}<br />
+                        Tel: {rk(company.phone)}{company.website ? ` | Sayt: ${company.website}` : ""}
                       </p>
                     </div>
                     <div style={{ textAlign: "right", fontSize: 11, color: "#475569" }}>
-                      <div><strong>H/r:</strong> 2020 8000 7005 1234 5001</div>
-                      <div><strong>Bank:</strong> ATIB "Ipoteka-bank"</div>
-                      <div><strong>MFO:</strong> 00440 | <strong>INN:</strong> 309876543</div>
+                      <div><strong>H/r:</strong> {rk(company.account)}</div>
+                      <div><strong>Bank:</strong> {rk(company.bankName)}</div>
+                      <div><strong>MFO:</strong> {rk(company.mfo)} | <strong>STIR:</strong> {rk(company.inn)}</div>
+                      {company.oked && <div><strong>OKED:</strong> {company.oked}</div>}
+                      {company.vatCode && <div><strong>QQS kodi:</strong> {company.vatCode}</div>}
                     </div>
                   </div>
 
@@ -2490,12 +2582,12 @@ export default function Erp() {
                       <div className="invoice-party-name">
                         {selectedDocDetails.type === "INCOME"
                           ? (selectedDocDetails.supplier?.name || "Ta'minotchi korxona")
-                          : "«MEDAX» MCHJ"}
+                          : company.name}
                       </div>
                       <div className="invoice-party-details">
                         {selectedDocDetails.type === "INCOME"
                           ? `Asosiy yetkazib beruvchi | Ombor: ${selectedDocDetails.warehouse?.name || "Asosiy ombor"}`
-                          : "Namangan sh., Beruniy k-si 2-uy. Tel: +998 71 200-00-00, INN: 309876543"}
+                          : `${rk(company.address)}. Tel: ${rk(company.phone)}, STIR: ${rk(company.inn)}`}
                       </div>
                     </div>
 
@@ -2503,7 +2595,7 @@ export default function Erp() {
                       <h5>Qabul qiluvchi (Xaridor):</h5>
                       <div className="invoice-party-name">
                         {selectedDocDetails.type === "INCOME"
-                          ? "«MEDAX» MCHJ Ombori"
+                          ? `${company.name} ombori`
                           : (selectedDocDetails.customer?.name || selectedDocDetails.clientName || "Xaridor / Klinika")}
                       </div>
                       <div className="invoice-party-details">
@@ -2628,15 +2720,78 @@ export default function Erp() {
               </button>
               <button
                 type="button"
+                className="btn btn-erp-secondary"
+                disabled={exportingExcel}
+                onClick={() => handleExport(`/admin/erp/export/document/${selectedDocDetails.id}`, `nakladnoy-${selectedDocDetails.docNumber}.xlsx`)}
+              >
+                {exportingExcel ? "Yuklanmoqda..." : "Excel (.xlsx)"}
+              </button>
+              <button
+                type="button"
+                className="btn btn-erp-secondary"
+                title="Chop etish oynasida printer o'rniga 'PDF sifatida saqlash' ni tanlang"
+                onClick={() => {
+                  setDocPrintFormat("nakladnaya");
+                  printDocument(`Nakladnoy-${selectedDocDetails.docNumber}`);
+                }}
+              >
+                PDF saqlash
+              </button>
+              <button
+                type="button"
                 className="btn btn-erp-primary"
                 onClick={() => {
                   setDocPrintFormat("nakladnaya");
-                  setTimeout(() => window.print(), 80);
+                  printDocument(`Nakladnoy-${selectedDocDetails.docNumber}`);
                 }}
               >
-                Nakladnoyni chop etish (A4)
+                Chop etish (A4)
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* -------------------------------------------------------------------- */}
+      {/* MODAL: FIRMA REKVIZITLARI                                             */}
+      {/* -------------------------------------------------------------------- */}
+      {companyForm && (
+        <div className="erp-modal-overlay" onClick={() => setCompanyForm(null)}>
+          <div className="erp-modal-window" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+            <div className="erp-modal-header">
+              <h3>Firma rekvizitlari</h3>
+              <button type="button" className="erp-close-btn" onClick={() => setCompanyForm(null)}>×</button>
+            </div>
+            <form onSubmit={saveCompany} onKeyDown={enterToNextField}>
+              <div className="erp-modal-body">
+                <p style={{ margin: "0 0 14px", fontSize: 13, color: "var(--ink2, #64748b)" }}>
+                  Bu ma'lumotlar nakladnoy, Excel nakladnoy, akt sverka va kassa orderlarida chiqadi. Bo'sh qoldirilgan maydon
+                  hujjatda chiziq bo'lib chiqadi (qo'lda yoziladi).
+                </p>
+                <div className="erp-form-grid-2">
+                  {COMPANY_FIELDS.map((fd) => (
+                    <div className="field" key={fd.key} style={fd.full ? { gridColumn: "1 / -1" } : undefined}>
+                      <label htmlFor={`co-${fd.key}`}>{fd.label}</label>
+                      <input
+                        id={`co-${fd.key}`}
+                        type="text"
+                        value={companyForm[fd.key]}
+                        placeholder={fd.placeholder}
+                        onChange={(e) => setCompanyForm({ ...companyForm, [fd.key]: e.target.value })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="erp-modal-footer">
+                <button type="button" className="btn btn-erp-secondary" onClick={() => setCompanyForm(null)}>
+                  Bekor qilish
+                </button>
+                <button type="submit" className="btn btn-erp-primary" disabled={companySaving}>
+                  {companySaving ? "Saqlanmoqda..." : "Saqlash"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -2654,7 +2809,7 @@ export default function Erp() {
             <div className="erp-modal-body">
               <div className="erp-cash-voucher-sheet print-section">
                 <div className="voucher-header">
-                  <div style={{ fontSize: 10, letterSpacing: 1, color: "#0d9488", fontWeight: 800 }}>«MEDAX» MAS'ULIYATI CHEKLANGAN JAMIYATI</div>
+                  <div style={{ fontSize: 10, letterSpacing: 1, color: "#0d9488", fontWeight: 800 }}>{company.name}{company.inn ? ` · STIR ${company.inn}` : ""}</div>
                   <h4 className="voucher-title">
                     {selectedCashReceipt.type === "INCOME"
                       ? "KASSA KIRIM ORDERI KVITANSIYASI (ПКО)"
