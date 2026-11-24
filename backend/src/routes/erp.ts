@@ -406,6 +406,8 @@ erpRouter.get("/inventory", async (req, res) => {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
       { sku: { contains: search, mode: "insensitive" } },
+      { shortName: { contains: search, mode: "insensitive" } },
+      { mxikCode: { contains: search } },
       { batchNumber: { contains: search, mode: "insensitive" } },
     ];
   }
@@ -2090,7 +2092,7 @@ erpRouter.get("/export/document/:id", async (req, res) => {
   if (!Number.isInteger(docId) || docId <= 0) throw new HttpError(400, "ID noto'g'ri");
   const doc = await prisma.erpDocument.findUnique({
     where: { id: docId },
-    include: { supplier: true, customer: true, warehouse: true, items: { include: { product: { select: { sku: true, unit: true } } } } },
+    include: { supplier: true, customer: true, warehouse: true, items: { include: { product: { select: { sku: true, unit: true, mxikCode: true } } } } },
   });
   if (!doc) throw new HttpError(404, "Hujjat topilmadi");
   const company = await getCompany();
@@ -2121,7 +2123,7 @@ erpRouter.get("/export/document/:id", async (req, res) => {
   const ws = wb.addWorksheet("Nakladnoy", {
     pageSetup: { paperSize: 9, orientation: "portrait", fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
   });
-  ws.columns = [{ width: 5 }, { width: 12 }, { width: 40 }, { width: 12 }, { width: 12 }, { width: 8 }, { width: 9 }, { width: 14 }, { width: 16 }];
+  ws.columns = [{ width: 5 }, { width: 19 }, { width: 40 }, { width: 12 }, { width: 12 }, { width: 8 }, { width: 9 }, { width: 14 }, { width: 16 }];
   const bold = { name: "Arial", size: 10, bold: true };
   const normal = { name: "Arial", size: 10 };
 
@@ -2150,7 +2152,7 @@ erpRouter.get("/export/document/:id", async (req, res) => {
   }
 
   const head = ws.getRow(12);
-  head.values = ["№", "Artikul", "Mahsulot nomi", "Partiya", "Muddat", "Birlik", "Miqdor", "Narx (so'm)", "Summa (so'm)"];
+  head.values = ["№", "MXIK kodi", "Mahsulot nomi", "Partiya", "Muddat", "Birlik", "Miqdor", "Narx (so'm)", "Summa (so'm)"];
   head.font = bold;
   head.height = 22;
   head.eachCell((c) => {
@@ -2163,8 +2165,9 @@ erpRouter.get("/export/document/:id", async (req, res) => {
     const price = costBasis ? Number(it.costPrice) || Number(it.sellPrice) || 0 : Number(it.sellPrice) || Number(it.costPrice) || 0;
     const sum = Number(it.totalPrice) || price * it.quantity;
     total += sum;
-    const r = ws.addRow([idx + 1, it.product?.sku || "", it.productName, it.batchNumber || "", it.expDate || "", it.product?.unit || "dona", it.quantity, price, sum]);
+    const r = ws.addRow([idx + 1, it.product?.mxikCode || "", it.productName, it.batchNumber || "", it.expDate || "", it.product?.unit || "dona", it.quantity, price, sum]);
     r.font = normal;
+    r.getCell(2).numFmt = "@";
     r.getCell(3).alignment = { wrapText: true, vertical: "middle" };
     r.getCell(8).numFmt = "#,##0";
     r.getCell(9).numFmt = "#,##0";

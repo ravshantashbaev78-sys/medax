@@ -78,6 +78,10 @@ export interface Product {
   id: number;
   slug: string;
   sku?: string | null;
+  /** Ichki qisqa nom — faqat admin/buxgalteriya */
+  shortName?: string | null;
+  /** MXIK (IKPU) kodi, 17 xonali */
+  mxikCode?: string | null;
   name: string;
   nameRu?: string | null;
   nameEn?: string | null;

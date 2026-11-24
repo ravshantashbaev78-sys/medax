@@ -99,6 +99,13 @@ const productSchema = z.object({
   nameRu: z.string().trim().max(200).nullish(),
   nameEn: z.string().trim().max(200).nullish(),
   sku: z.string().trim().max(60).nullish(),
+  shortName: z.string().trim().max(80).nullish(),
+  // MXIK: faqat raqam, 17 xonadan oshmaydi (bo'sh joy va tire olib tashlanadi)
+  mxikCode: z
+    .string()
+    .nullish()
+    .transform((v) => (v ? v.replace(/[\s-]/g, "") : v))
+    .refine((v) => !v || /^\d{1,17}$/.test(v), "MXIK kodi faqat raqamlardan iborat va 17 xonadan oshmasligi kerak"),
   description: z.string().max(20000).default(""),
   descriptionRu: z.string().max(20000).nullish(),
   descriptionEn: z.string().max(20000).nullish(),
@@ -159,6 +166,8 @@ function productData(d: z.infer<typeof productSchema>) {
     nameRu: d.nameRu || null,
     nameEn: d.nameEn || null,
     sku: d.sku || null,
+    shortName: d.shortName || null,
+    mxikCode: d.mxikCode || null,
     description: d.description,
     descriptionRu: d.descriptionRu || null,
     descriptionEn: d.descriptionEn || null,
@@ -201,6 +210,8 @@ adminRouter.get("/products", async (req, res) => {
       { nameRu: { contains: q.q, mode: "insensitive" } },
       { nameEn: { contains: q.q, mode: "insensitive" } },
       { sku: { contains: q.q, mode: "insensitive" } },
+      { shortName: { contains: q.q, mode: "insensitive" } },
+      { mxikCode: { contains: q.q } },
     ];
   }
   const [total, items] = await Promise.all([
@@ -229,6 +240,8 @@ adminRouter.get("/products/import/template", async (_req, res) => {
     { header: "Narx", key: "price", width: 16 },
     { header: "Soni (Qoldiq)", key: "stock", width: 16 },
     { header: "Artikul", key: "sku", width: 16 },
+    { header: "Ichki nom", key: "shortName", width: 24 },
+    { header: "MXIK kodi", key: "mxik", width: 20 },
     { header: "Tavsif", key: "description", width: 50 },
   ];
   const catNames = (await prisma.category.findMany({ orderBy: { sortOrder: "asc" } })).map((c) => c.name);
@@ -689,6 +702,8 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
   const cStock = col("soni (qoldiq)", "soni", "qoldiq", "stock", "miqdor", "qoldiq (soni)");
   const cSku = col("artikul", "sku");
   const cDesc = col("tavsif", "description");
+  const cShort = col("ichki nom", "qisqa nom", "short name");
+  const cMxik = col("mxik", "mxik kodi", "ikpu");
 
   const allCats = await prisma.category.findMany({ orderBy: { sortOrder: "asc" } });
   const cats = new Map(allCats.map((c) => [c.name.toLowerCase(), c.id]));
@@ -732,6 +747,9 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
       const description = text(row, cDesc);
       const nameRu = text(row, cNameRu);
       const nameEn = text(row, cNameEn);
+      const shortName = text(row, cShort).slice(0, 80);
+      const mxikCode = text(row, cMxik).replace(/[\s-]/g, "");
+      if (mxikCode && !/^\d{1,17}$/.test(mxikCode)) throw new Error("MXIK kodi faqat raqam va 17 xonadan oshmasligi kerak");
 
       const existing = sku ? await prisma.product.findUnique({ where: { sku } }) : null;
       await withUniqueRetry(() => prisma.$transaction(async (tx) => {
@@ -743,6 +761,8 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
               name,
               ...(nameRu ? { nameRu } : {}),
               ...(nameEn ? { nameEn } : {}),
+              ...(shortName ? { shortName } : {}),
+              ...(mxikCode ? { mxikCode } : {}),
               categoryId,
               brandId: brandId ?? undefined,
               ...(country ? { country } : {}),
@@ -758,6 +778,8 @@ adminRouter.post("/products/import", requireAdmin, memoryUpload.single("file"), 
               name,
               nameRu: nameRu || null,
               nameEn: nameEn || null,
+              shortName: shortName || null,
+              mxikCode: mxikCode || null,
               categoryId,
               brandId,
               country: country || null,

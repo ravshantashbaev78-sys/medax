@@ -78,6 +78,10 @@ model Product {
   id              Int               @id @default(autoincrement())
   slug            String            @unique
   sku             String?           @unique
+  /// Ichki (qisqa, jaydari) nom: faqat admin panel va buxgalteriyada ko'rinadi, saytga chiqmaydi
+  shortName       String?
+  /// MXIK (IKPU) — soliq tizimidagi mahsulot/xizmat identifikatsiya kodi, 17 xonali raqam
+  mxikCode        String?
   name            String
   nameRu          String?
   nameEn          String?

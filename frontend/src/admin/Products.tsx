@@ -380,9 +380,9 @@ export function ProductList() {
                   )}
                 </td>
                 <td>
-                  <Link to={`/admin/products/${p.id}`} style={{ fontWeight: 600 }}>{p.name}</Link>
+                  <Link to={`/admin/products/${p.id}`} style={{ fontWeight: 600 }}>{p.shortName || p.name}</Link>
                   <div className="muted" style={{ fontSize: 13 }}>
-                    {p.brand?.name}{p.sku ? ` · ${p.sku}` : ""}
+                    {p.shortName ? `${p.name} · ` : ""}{p.brand?.name}{p.sku ? ` · ${p.sku}` : ""}{p.mxikCode ? ` · MXIK ${p.mxikCode}` : ""}
                   </div>
                 </td>
                 <td>{p.category?.name || "—"}</td>
@@ -598,6 +598,8 @@ const STANDARD_COUNTRIES = [
 
 const empty = {
   name: "",
+  shortName: "",
+  mxikCode: "",
   nameRu: "",
   nameEn: "",
   sku: "",
@@ -750,6 +752,8 @@ export function ProductForm() {
       .then((p) => {
         setF({
           name: p.name,
+          shortName: p.shortName || "",
+          mxikCode: p.mxikCode || "",
           nameRu: p.nameRu || "",
           nameEn: p.nameEn || "",
           sku: p.sku || "",
@@ -1288,6 +1292,38 @@ export function ProductForm() {
                 value={f.name}
                 onChange={(e) => set("name", e.target.value)}
               />
+            </div>
+
+            <div className="field">
+              <label htmlFor="shortName">
+                Ichki (qisqa) nom
+                <span style={{ fontSize: 11, color: "var(--ink2)", marginLeft: 6 }}>(faqat admin va buxgalteriyada)</span>
+              </label>
+              <input
+                id="shortName"
+                type="text"
+                maxLength={80}
+                placeholder="Masalan: shprits 5"
+                value={f.shortName}
+                onChange={(e) => set("shortName", e.target.value)}
+              />
+              <small style={{ display: "block", marginTop: 4, color: "var(--ink2)" }}>Saytda mijozlarga ko'rinmaydi. Hujjatlarda tez topish uchun.</small>
+            </div>
+
+            <div className="field">
+              <label htmlFor="mxikCode">MXIK kodi (IKPU)</label>
+              <input
+                id="mxikCode"
+                type="text"
+                inputMode="numeric"
+                maxLength={17}
+                placeholder="17 xonali raqam"
+                value={f.mxikCode}
+                onChange={(e) => set("mxikCode", e.target.value.replace(/\D/g, "").slice(0, 17))}
+              />
+              <small style={{ display: "block", marginTop: 4, color: f.mxikCode && f.mxikCode.length !== 17 ? "var(--a-warn, #a16207)" : "var(--ink2)" }}>
+                {f.mxikCode ? `${f.mxikCode.length} / 17 raqam${f.mxikCode.length !== 17 ? " — odatda MXIK 17 xonali bo'ladi" : ""}` : "tasnif.soliq.uz dan olinadi. Faqat raqam."}
+              </small>
             </div>
 
             <div className="field">

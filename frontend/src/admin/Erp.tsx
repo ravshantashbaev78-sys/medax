@@ -106,6 +106,8 @@ interface OverviewData {
 interface ErpProduct {
   id: number;
   name: string;
+  shortName?: string | null;
+  mxikCode?: string | null;
   sku: string | null;
   stock: number;
   costPrice: number | null;
@@ -125,6 +127,8 @@ type DocType = "INCOME" | "OUTCOME" | "TRANSFER" | "RETURN_CUSTOMER" | "RETURN_S
 interface DocLine {
   productId: number;
   productName: string;
+  /** Faqat oynada ko'rsatish uchun: ichki qisqa nom */
+  shortName?: string | null;
   /** Hujjat ochilgan paytdagi ombor qoldig'i */
   stock: number;
   quantity: number;
@@ -637,6 +641,7 @@ export default function Erp() {
           {
             productId: prod.id,
             productName: prod.name,
+            shortName: prod.shortName,
             stock: prod.stock,
             quantity: 1,
             costPrice: Math.round(cost),
@@ -1212,8 +1217,8 @@ export default function Erp() {
                     return (
                       <tr key={p.id} className={isOut ? "row-out" : isLow ? "row-low" : ""}>
                         <td className="cell-name">
-                          <strong>{p.name}</strong>
-                          <small className="cell-sku">#{p.id}{p.sku ? ` · ${p.sku}` : ""}</small>
+                          <strong>{p.shortName || p.name}</strong>
+                          <small className="cell-sku">#{p.id}{p.sku ? ` · ${p.sku}` : ""}{p.shortName ? ` · ${p.name}` : ""}</small>
                         </td>
                         <td className="cell-stock" style={{ textAlign: "center" }}>
                           <span className={`erp-stock-badge ${isOut ? "out" : isLow ? "low" : "good"}`}>
@@ -1998,7 +2003,10 @@ export default function Erp() {
                             const short = docMeta.stock === "out" && it.quantity > it.stock;
                             return (
                               <tr key={it.productId} className={short ? "row-short" : undefined}>
-                                <td><strong>{it.productName}</strong></td>
+                                <td>
+                                  <strong>{it.shortName || it.productName}</strong>
+                                  {it.shortName && <small className="cell-sku" style={{ display: "block" }}>{it.productName}</small>}
+                                </td>
                                 <td className="num">
                                   {it.stock}
                                   {docMeta.stock !== "none" && (
@@ -2597,7 +2605,7 @@ export default function Erp() {
                     <thead>
                       <tr>
                         <th style={{ width: 36 }}>№</th>
-                        <th style={{ width: 80 }}>Artikul</th>
+                        <th style={{ width: 128 }}>MXIK kodi</th>
                         <th>Mahsulot nomi</th>
                         <th style={{ width: 90 }}>Partiya</th>
                         <th style={{ width: 85 }}>Muddat</th>
@@ -2611,7 +2619,7 @@ export default function Erp() {
                       {selectedDocDetails.items?.map((it, idx) => (
                         <tr key={idx}>
                           <td style={{ textAlign: "center" }}>{idx + 1}</td>
-                          <td>{it.product?.sku || "—"}</td>
+                          <td style={{ fontVariantNumeric: "tabular-nums", fontSize: 11 }}>{it.product?.mxikCode || "—"}</td>
                           <td><strong>{it.productName || it.product?.name}</strong></td>
                           <td>{it.batchNumber || "—"}</td>
                           <td>{it.expDate || "—"}</td>
@@ -3147,8 +3155,8 @@ function CountPanel({ products, loading, onDone }: { products: ErpProduct[]; loa
                 return (
                   <tr key={p.id} className={diff ? (diff < 0 ? "row-minus" : "row-plus") : v !== "" ? "row-ok" : ""}>
                     <td className="cell-name">
-                      <strong>{p.name}</strong>
-                      <small className="cell-sku">#{p.id}{p.sku ? ` · ${p.sku}` : ""}</small>
+                      <strong>{p.shortName || p.name}</strong>
+                      <small className="cell-sku">#{p.id}{p.sku ? ` · ${p.sku}` : ""}{p.shortName ? ` · ${p.name}` : ""}</small>
                     </td>
                     <td className="num">{p.stock} {p.unit || "dona"}</td>
                     <td>
@@ -3248,7 +3256,7 @@ function ProductPicker({
   const [active, setActive] = useState(0);
   const results = useMemo(() => {
     const q = query.trim();
-    const list = q ? catalog.filter((p) => matchesSearch(`${p.name} ${p.sku || ""}`, q)) : catalog;
+    const list = q ? catalog.filter((p) => matchesSearch(`${p.shortName || ""} ${p.name} ${p.sku || ""} ${p.mxikCode || ""}`, q)) : catalog;
     return list.slice(0, 60);
   }, [catalog, query]);
 
@@ -3310,7 +3318,10 @@ function ProductPicker({
                 }}
                 onMouseEnter={() => setActive(i)}
               >
-                <span className="pp-name">{p.name}</span>
+                <span className="pp-name">
+                  {p.shortName || p.name}
+                  {p.shortName && <small style={{ display: "block", fontWeight: 400, color: "var(--a-text-3)" }}>{p.name}</small>}
+                </span>
                 <span className="pp-meta">
                   {p.sku ? `${p.sku} · ` : ""}qoldiq {p.stock}
                 </span>
