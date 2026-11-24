@@ -457,7 +457,9 @@ erpRouter.post("/inventory/quick-update", async (req, res) => {
       costPrice: z.number().nullish(),
       markupPercent: z.number().nullish(),
       priceFrom: z.number().nullish(),
-      stock: z.number().int().min(0, "Qoldiq manfiy bo'lishi mumkin emas").nullish(),
+      stock: z.number().int().min(0, "Qoldiq manfiy bo'lishi mumkin emas").max(1_000_000_000).nullish(),
+      // Oyna ochilgandagi qoldiq: admin qoldiqni o'zgartirmagan bo'lsa, shu orada buyurtma bilan o'zgargan qoldiq saqlanadi
+      stockBefore: z.number().int().nullish(),
       minStock: z.number().int().min(0).nullish(),
       batchNumber: z.string().nullish(),
       expDate: z.string().nullish(),
@@ -475,8 +477,9 @@ erpRouter.post("/inventory/quick-update", async (req, res) => {
 
   // Qoldiq o'zgarishi hujjat bilan yoziladi (ortiqcha/kamomad), yashirish/ko'rsatish ham shu yerda
   const updated = await withUniqueRetry(() => prisma.$transaction(async (tx) => {
-    if (body.stock !== undefined && body.stock !== null) {
-      await applyStockChanges(tx, [{ productId: body.id, to: body.stock }], "Qoldiqni qo'lda tuzatish");
+    const stockEdited = body.stock !== undefined && body.stock !== null && (body.stockBefore == null || body.stock !== body.stockBefore);
+    if (stockEdited) {
+      await applyStockChanges(tx, [{ productId: body.id, to: body.stock! }], "Qoldiqni qo'lda tuzatish");
     }
     return tx.product.update({
     where: { id: body.id },
@@ -615,6 +618,7 @@ erpRouter.get("/documents", async (req, res) => {
 
 erpRouter.get("/documents/:id", async (req, res) => {
   const docId = Number(req.params.id);
+  if (!Number.isInteger(docId) || docId <= 0) throw new HttpError(400, "ID noto'g'ri");
   const doc = await prisma.erpDocument.findUnique({
     where: { id: docId },
     include: {
@@ -634,6 +638,27 @@ erpRouter.get("/documents/:id", async (req, res) => {
   res.json({ doc });
 });
 
+/**
+ * Sotuv hujjatidan oldin tekshiruv: shu mijozning so'nggi 7 kundagi sayt buyurtmalari qoldiqni allaqachon
+ * kamaytirgan bo'lsa (tasdiqlangan), xuddi shu tovarlar uchun ikkinchi marta "Sotuv" yozilmasin.
+ */
+erpRouter.get("/site-orders-check", async (req, res) => {
+  const customerId = Number(req.query.customerId);
+  const productIds = String(req.query.productIds || "")
+    .split(",")
+    .map(Number)
+    .filter((n) => Number.isInteger(n) && n > 0)
+    .slice(0, 200);
+  if (!customerId || !productIds.length) return void res.json({ orders: [] });
+  const since = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+  const orders = await prisma.order.findMany({
+    where: { customerId, stockDeducted: true, createdAt: { gte: since }, items: { some: { productId: { in: productIds } } } },
+    select: { code: true, status: true, items: { where: { productId: { in: productIds } }, select: { productName: true, quantity: true } } },
+    take: 10,
+  });
+  res.json({ orders });
+});
+
 /* Create new Document */
 const docItemSchema = z.object({
   productId: z.number().int().positive(),
@@ -647,7 +672,10 @@ const docItemSchema = z.object({
 
 const createDocSchema = z.object({
   type: z.enum(["INCOME", "OUTCOME", "TRANSFER", "RETURN_CUSTOMER", "RETURN_SUPPLIER", "WRITE_OFF"]),
-  date: z.string().nullish(),
+  date: z
+    .string()
+    .nullish()
+    .refine((v) => !v || !Number.isNaN(new Date(v).getTime()), "Hujjat sanasi noto'g'ri"),
   supplierId: z.number().int().nullish(),
   customerId: z.number().int().nullish(),
   clientName: z.string().trim().nullish(),
@@ -857,7 +885,7 @@ erpRouter.post("/documents", async (req, res) => {
  * Hujjatni bekor qilish (1C dagi "отмена проведения"): ombor harakati, kontragent qarzi va
  * kassa orderlari teskari yoziladi, hujjat CANCELED holatiga o'tadi. Tarix o'chirilmaydi.
  */
-erpRouter.post("/documents/:id/cancel", async (req, res) => {
+erpRouter.post("/documents/:id/cancel", requireAdmin, async (req, res) => {
   const docId = Number(req.params.id);
   if (!Number.isInteger(docId) || docId <= 0) throw new HttpError(400, "ID noto'g'ri");
   const { reason } = z.object({ reason: z.string().trim().max(300).default("") }).parse(req.body || {});
@@ -879,6 +907,27 @@ erpRouter.post("/documents/:id/cancel", async (req, res) => {
           await decrementStockOrThrow(tx, it.productId, it.quantity, it.productName);
         } else if (doc.type === "OUTCOME" || doc.type === "WRITE_OFF" || doc.type === "RETURN_SUPPLIER") {
           await incrementStock(tx, it.productId, it.quantity);
+        }
+      }
+
+      // 1a. Kirim bekor qilinsa, mahsulot kartasidagi narx va partiya oldingi kirimdagi qiymatga qaytadi
+      if (doc.type === "INCOME") {
+        for (const it of doc.items) {
+          const prev = await tx.erpDocumentItem.findFirst({
+            where: { productId: it.productId, documentId: { not: doc.id }, document: { type: "INCOME", status: "CONFIRMED" } },
+            orderBy: { document: { date: "desc" } },
+          });
+          if (!prev) continue;
+          await tx.product.update({
+            where: { id: it.productId },
+            data: {
+              costPrice: prev.costPrice ?? undefined,
+              priceFrom: prev.sellPrice && Number(prev.sellPrice) > 0 ? prev.sellPrice : undefined,
+              markupPercent: prev.markup ?? undefined,
+              batchNumber: prev.batchNumber ?? undefined,
+              expDate: prev.expDate ?? undefined,
+            },
+          });
         }
       }
 
@@ -1014,7 +1063,7 @@ erpRouter.post("/cash", async (req, res) => {
  * Kassa orderini bekor qilish: o'chirilmaydi, teskari (storno) order yoziladi va kontragent balansi tiklanadi.
  * Hujjatga yoki sayt buyurtmasiga bog'langan orderlar o'z joyidan (hujjat / buyurtma) bekor qilinadi.
  */
-erpRouter.post("/cash/:id/cancel", async (req, res) => {
+erpRouter.post("/cash/:id/cancel", requireAdmin, async (req, res) => {
   const entryId = Number(req.params.id);
   if (!Number.isInteger(entryId) || entryId <= 0) throw new HttpError(400, "ID noto'g'ri");
   const { reason } = z.object({ reason: z.string().trim().max(300).default("") }).parse(req.body || {});
@@ -1088,6 +1137,7 @@ erpRouter.post("/suppliers", async (req, res) => {
 
 erpRouter.put("/suppliers/:id", async (req, res) => {
   const supId = Number(req.params.id);
+  if (!Number.isInteger(supId) || supId <= 0) throw new HttpError(400, "ID noto'g'ri");
   const body = z
     .object({
       name: z.string().trim().min(2),
@@ -1257,27 +1307,28 @@ interface SverkaLine {
  * kredit sifatida yozilib, to'lov ikki marta ko'rinardi). Bekor qilingan hujjatlar kirmaydi.
  */
 async function buildSverka(entityType: "customer" | "supplier", entityId: number, dateFrom: Date, dateTo: Date) {
-  const range = { gte: dateFrom, lte: dateTo };
-  const timeline: SverkaLine[] = [];
+  // Davr boshigacha bo'lgan barcha harakatlar boshlang'ich saldoni beradi (1C: "Сальдо на начало")
+  const upTo = { lte: dateTo };
+  const lines: SverkaLine[] = [];
 
   if (entityType === "supplier") {
     const supplier = await prisma.supplier.findUnique({ where: { id: entityId } });
     if (!supplier) throw new HttpError(404, "Yetkazib beruvchi topilmadi");
     const [docs, cash] = await Promise.all([
-      prisma.erpDocument.findMany({ where: { supplierId: entityId, status: "CONFIRMED", date: range }, orderBy: { date: "asc" } }),
-      prisma.cashEntry.findMany({ where: { supplierId: entityId, date: range }, orderBy: { date: "asc" } }),
+      prisma.erpDocument.findMany({ where: { supplierId: entityId, status: "CONFIRMED", date: upTo }, orderBy: { date: "asc" } }),
+      prisma.cashEntry.findMany({ where: { supplierId: entityId, date: upTo }, orderBy: { date: "asc" } }),
     ]);
     for (const d of docs) {
       const total = Number(d.totalAmount) || 0;
       if (d.type === "INCOME") {
-        timeline.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Tovar kirimi #${d.docNumber}`, debit: 0, credit: total });
+        lines.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Tovar kirimi #${d.docNumber}`, debit: 0, credit: total });
       } else if (d.type === "RETURN_SUPPLIER") {
-        timeline.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Ta'minotchiga qaytarish #${d.docNumber}`, debit: total, credit: 0 });
+        lines.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Ta'minotchiga qaytarish #${d.docNumber}`, debit: total, credit: 0 });
       }
     }
     for (const c of cash) {
       const amt = Number(c.amount) || 0;
-      timeline.push({
+      lines.push({
         date: c.date.toISOString(),
         docNumber: c.entryNumber,
         description: c.description || (c.type === "EXPENSE" ? "Ta'minotchiga to'lov" : "Ta'minotchidan pul qaytdi"),
@@ -1285,9 +1336,8 @@ async function buildSverka(entityType: "customer" | "supplier", entityId: number
         credit: c.type === "INCOME" ? amt : 0,
       });
     }
-    timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-    return {
-      entity: {
+    return splitSverka(
+      {
         type: "supplier" as const,
         id: supplier.id,
         name: supplier.name,
@@ -1297,40 +1347,51 @@ async function buildSverka(entityType: "customer" | "supplier", entityId: number
         inn: supplier.inn,
         balance: Number(supplier.balance),
       },
-      timeline,
-    };
+      lines,
+      dateFrom,
+      // Ta'minotchi: saldo = kredit - debet (biz qarzdormiz, agar musbat)
+      (l) => l.credit - l.debit
+    );
   }
 
   const customer = await prisma.customer.findUnique({ where: { id: entityId } });
   if (!customer) throw new HttpError(404, "Mijoz topilmadi");
   const [docs, cash, orders] = await Promise.all([
-    prisma.erpDocument.findMany({ where: { customerId: entityId, status: "CONFIRMED", date: range }, orderBy: { date: "asc" } }),
-    prisma.cashEntry.findMany({ where: { customerId: entityId, date: range }, orderBy: { date: "asc" } }),
+    prisma.erpDocument.findMany({ where: { customerId: entityId, status: "CONFIRMED", date: upTo }, orderBy: { date: "asc" } }),
+    prisma.cashEntry.findMany({ where: { customerId: entityId, date: upTo }, orderBy: { date: "asc" } }),
     prisma.order.findMany({
-      where: { customerId: entityId, createdAt: range, status: { in: ["CONFIRMED", "READY", "DONE"] } },
+      where: { customerId: entityId, createdAt: upTo, status: { in: ["CONFIRMED", "READY", "DONE"] } },
       orderBy: { createdAt: "asc" },
+      select: { id: true, code: true, createdAt: true, totalAmount: true, isPaid: true },
     }),
   ]);
   for (const d of docs) {
     const total = Number(d.totalAmount) || 0;
     if (d.type === "OUTCOME") {
-      timeline.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Tovar sotuvi #${d.docNumber}`, debit: total, credit: 0 });
+      lines.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Tovar sotuvi #${d.docNumber}`, debit: total, credit: 0 });
     } else if (d.type === "RETURN_CUSTOMER") {
-      timeline.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Mijozdan qaytim #${d.docNumber}`, debit: 0, credit: total });
+      lines.push({ date: d.date.toISOString(), docNumber: d.docNumber, description: `Mijozdan qaytim #${d.docNumber}`, debit: 0, credit: total });
     }
   }
+  // Sayt buyurtmasi do'konda olib ketishda to'lanadi va mijoz qarziga yozilmaydi: sverkada uning summasi
+  // kassaga tushgan pulga teng debet bo'lib chiqadi (to'lov krediti bilan yopiladi). To'lanmaganlari qarz emas.
+  const siteCash = new Map<number, number>();
+  for (const c of cash) {
+    if (c.category !== "SAYT_BUYURTMA") continue;
+    const order = c.orderId ? orders.find((o) => o.id === c.orderId) : orders.find((o) => (c.description || "").startsWith(`Buyurtma ${o.code} `));
+    if (!order) continue;
+    siteCash.set(order.id, (siteCash.get(order.id) || 0) + (c.type === "INCOME" ? 1 : -1) * (Number(c.amount) || 0));
+  }
   for (const o of orders) {
-    timeline.push({
-      date: o.createdAt.toISOString(),
-      docNumber: `#${o.code}`,
-      description: `Sayt buyurtmasi #${o.code}`,
-      debit: Number(o.totalAmount || 0),
-      credit: 0,
-    });
+    const paid = siteCash.get(o.id) || 0;
+    if (paid <= 0) continue;
+    // Bitta qator: tovar berildi (debet) va shu zahoti to'landi (kredit) — saldoga ta'sir qilmaydi
+    lines.push({ date: o.createdAt.toISOString(), docNumber: `#${o.code}`, description: `Sayt buyurtmasi #${o.code} (to'langan)`, debit: paid, credit: paid });
   }
   for (const c of cash) {
+    if (c.category === "SAYT_BUYURTMA") continue; // yuqoridagi buyurtma qatorida hisoblangan
     const amt = Number(c.amount) || 0;
-    timeline.push({
+    lines.push({
       date: c.date.toISOString(),
       docNumber: c.entryNumber,
       description: c.description || (c.type === "INCOME" ? "Mijozdan to'lov qabul qilindi" : "Mijozga pul qaytarildi"),
@@ -1338,9 +1399,8 @@ async function buildSverka(entityType: "customer" | "supplier", entityId: number
       credit: c.type === "INCOME" ? amt : 0,
     });
   }
-  timeline.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  return {
-    entity: {
+  return splitSverka(
+    {
       type: "customer" as const,
       id: customer.id,
       name: customer.name,
@@ -1350,8 +1410,23 @@ async function buildSverka(entityType: "customer" | "supplier", entityId: number
       inn: customer.inn,
       balance: Number(customer.balance),
     },
-    timeline,
-  };
+    lines,
+    dateFrom,
+    // Mijoz: saldo = debet - kredit (mijoz bizga qarzdor, agar musbat)
+    (l) => l.debit - l.credit
+  );
+}
+
+/** Davr boshigacha bo'lgan qatorlar boshlang'ich saldoga yig'iladi, qolganlari davr harakati */
+function splitSverka<T>(entity: T, all: SverkaLine[], dateFrom: Date, sign: (l: SverkaLine) => number) {
+  all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  const before = all.filter((l) => new Date(l.date) < dateFrom);
+  const timeline = all.filter((l) => new Date(l.date) >= dateFrom);
+  const opening = before.reduce((s, l) => s + sign(l), 0);
+  const totalDebit = timeline.reduce((s, l) => s + l.debit, 0);
+  const totalCredit = timeline.reduce((s, l) => s + l.credit, 0);
+  const closing = opening + timeline.reduce((s, l) => s + sign(l), 0);
+  return { entity, timeline, opening, closing, totalDebit, totalCredit };
 }
 
 erpRouter.get("/reports/act-sverka", async (req, res) => {
@@ -1362,10 +1437,8 @@ erpRouter.get("/reports/act-sverka", async (req, res) => {
   const dateFrom = dateParam(req.query.from) || new Date(Date.now() - 60 * 24 * 3600 * 1000);
   const dateTo = dateParam(req.query.to, true) || new Date();
 
-  const { entity, timeline } = await buildSverka(entityType, entityId, dateFrom, dateTo);
-  const totalDebit = timeline.reduce((s, l) => s + l.debit, 0);
-  const totalCredit = timeline.reduce((s, l) => s + l.credit, 0);
-  res.json({ entity, dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString(), timeline, totalDebit, totalCredit });
+  const sv = await buildSverka(entityType, entityId, dateFrom, dateTo);
+  res.json({ ...sv, dateFrom: dateFrom.toISOString(), dateTo: dateTo.toISOString() });
 });
 
 /* -------------------------------------------------------------------------- */
@@ -1979,7 +2052,7 @@ erpRouter.get("/export/cash", async (_req, res) => {
 erpRouter.get("/export/act-sverka", async (req, res) => {
   const type = req.query.type === "customer" ? "customer" : "supplier";
   const entityId = Number(req.query.id);
-  const dateFrom = dateParam(req.query.from) || new Date(Date.now() - 90 * 24 * 3600 * 1000);
+  const dateFrom = dateParam(req.query.from) || new Date(Date.now() - 60 * 24 * 3600 * 1000);
   const dateTo = dateParam(req.query.to, true) || new Date();
 
   if (!entityId) {
@@ -2032,6 +2105,12 @@ erpRouter.get("/export/act-sverka", async (req, res) => {
 
   let totalDebit = 0;
   let totalCredit = 0;
+  // Saldo ustuni: mijoz qarzi debetda, bizning ta'minotchiga qarzimiz kreditda
+  const saldoCells = (v: number): [number | string, number | string] =>
+    type === "customer" ? (v >= 0 ? [v, ""] : ["", -v]) : v >= 0 ? ["", v] : [-v, ""];
+  const openRow = ws.addRow(["JAMI SALDO (davr boshiga):", dateFrom.toISOString().slice(0, 10), "", "Boshlang'ich saldo", ...saldoCells(sv.opening)]);
+  openRow.getCell(5).numFmt = "#,##0";
+  openRow.getCell(6).numFmt = "#,##0";
 
   timeline.forEach((item, idx) => {
     totalDebit += item.debit;
@@ -2060,6 +2139,9 @@ erpRouter.get("/export/act-sverka", async (req, res) => {
   ]);
   totalRow.getCell(5).numFmt = "#,##0";
   totalRow.getCell(6).numFmt = "#,##0";
+  const closeRow = ws.addRow(["JAMI SALDO (davr oxiriga):", dateTo.toISOString().slice(0, 10), "", "Yakuniy saldo", ...saldoCells(sv.closing)]);
+  closeRow.getCell(5).numFmt = "#,##0";
+  closeRow.getCell(6).numFmt = "#,##0";
 
   applyExcelTableStyles(ws, 5, "0D9488");
 

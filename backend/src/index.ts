@@ -131,6 +131,10 @@ app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     return void res.status(400).json({ error: "Kiritilgan son juda katta. Narx va qoldiqni tekshiring." });
   }
   if (code === "P2025") return void res.status(404).json({ error: "Yozuv topilmadi" });
+  // Noto'g'ri turdagi qiymat (masalan, ID o'rniga matn) — server xatosi emas, so'rov xatosi
+  if ((err as any)?.name === "PrismaClientValidationError") {
+    return void res.status(400).json({ error: "Ma'lumot noto'g'ri formatda yuborildi" });
+  }
 
   if ((err as any)?.name === "MulterError") {
     if ((err as any)?.code === "LIMIT_FILE_SIZE") {

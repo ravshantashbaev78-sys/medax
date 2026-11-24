@@ -891,6 +891,15 @@ adminRouter.patch("/orders/:id", async (req, res) => {
         : `"${ORDER_STATUS_UZ[prevOrder.status]}" holatidan "${ORDER_STATUS_UZ[d.status]}" holatiga o'tkazib bo'lmaydi.`
     );
   }
+  // Bir marta topshirilgan buyurtma (keyin xato tufayli "Tayyor" ga qaytarilgan bo'lsa ham) bekor qilinmaydi:
+  // tovar mijozda, qaytsa ERP'da "Mijozdan qaytim" hujjati yoziladi
+  const wasDelivered = prevOrder.status === "DONE" || prevOrder.flags.includes("DELIVERED");
+  if ((d.status === "CANCELED" || d.status === "FAKE") && wasDelivered) {
+    throw new HttpError(
+      400,
+      "Bu buyurtma mijozga topshirilgan. Bekor qilib bo'lmaydi: tovar qaytsa, ERP'da \"Mijozdan qaytim\" hujjatini kiriting."
+    );
+  }
   const finalStatus = d.status || prevOrder.status;
   if (d.isPaid === true && (finalStatus === "CANCELED" || finalStatus === "FAKE")) {
     throw new HttpError(400, "Bekor qilingan buyurtmani to'langan deb belgilab bo'lmaydi.");
@@ -915,6 +924,7 @@ adminRouter.patch("/orders/:id", async (req, res) => {
         ...orderData,
         ...(becomesPaid ? { paidAt: new Date() } : {}),
         ...(becomesRefunded ? { paidAt: null } : {}),
+        ...(d.status === "DONE" && !prevOrder.flags.includes("DELIVERED") ? { flags: { push: "DELIVERED" } } : {}),
       },
       include: { items: true },
     });
@@ -1149,7 +1159,7 @@ adminRouter.get("/customers", async (req, res) => {
       search: z.string().trim().optional(),
       page,
       // ERP ro'yxatlari (hujjat, kassa, sverka) hamma mijozni ko'rishi kerak
-      limit: z.coerce.number().int().min(1).max(500).default(30),
+      limit: z.coerce.number().int().min(1).max(5000).default(30),
     })
     .parse(req.query);
 

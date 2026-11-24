@@ -33,4 +33,6 @@ COPY --from=builder /app/assets ./assets
 
 EXPOSE 4000
 
-CMD ["sh", "-c", "npx prisma db push && node dist/index.js"]
+# Baza sxemasi faqat migratsiyalar orqali o'zgaradi (prisma/migrations). db push ishlatilmaydi:
+# u ustun o'chirilganda ma'lumotni yo'qotishi yoki serverni ishga tushirmay qo'yishi mumkin edi.
+CMD ["sh", "-c", "npx prisma migrate deploy && node dist/index.js"]

@@ -19,7 +19,7 @@ docker compose up -d --build
 # 1) PostgreSQL ishlab turishi kerak. backend/.env.example ni backend/.env ga nusxalang
 cd backend
 npm install
-npx prisma db push
+npx prisma migrate deploy
 npx prisma db execute --file prisma/search.sql --schema prisma/schema.prisma   # tezkor qidiruv indekslari
 npm run seed
 npm run dev            # http://localhost:4000
@@ -92,4 +92,6 @@ docker-compose.yml, .env.example
 2. Domen va HTTPS (Caddy yoki nginx + Let's Encrypt) qo'ying. HTTPS orqasida ham IP to'g'ri olinadi (`trust proxy` yoqilgan).
 3. `SMS_PROVIDER=eskiz` ni sozlang.
 4. Baza va `uploads` hajmini muntazam zaxiralang (`dbdata`, `uploads` Docker volume'lari).
-5. Sxema o'zgartirilganda `prisma db push` o'rniga `prisma migrate` ga o'ting.
+5. Baza sxemasi migratsiyalar bilan boshqariladi. `schema.prisma` o'zgartirilgach, lokal bazada
+   `npx prisma migrate dev --name qisqa_nom` ishlating va hosil bo'lgan `prisma/migrations/...` papkasini commit qiling.
+   Server ishga tushganda `prisma migrate deploy` yangi migratsiyalarni o'zi qo'llaydi.

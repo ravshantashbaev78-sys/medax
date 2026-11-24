@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useOutletContext, useSearchParams } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { useAdminI18n } from "./i18n";
 import { numberToWordsUz, numberToWordsRu } from "./numberToWords";
@@ -44,6 +44,13 @@ const COMPANY_FIELDS: { key: keyof CompanyInfo; label: string; placeholder?: str
 ];
 /** Brauzerlar o'zbekcha oy nomini "M11" deb chiqaradi, shuning uchun o'zimiz yozamiz */
 const UZ_MONTHS = ["yanvar", "fevral", "mart", "aprel", "may", "iyun", "iyul", "avgust", "sentabr", "oktabr", "noyabr", "dekabr"];
+
+/** Saldo kimning foydasiga: mijoz uchun musbat — mijoz qarzdor; ta'minotchi uchun musbat — biz qarzdormiz */
+function saldoNote(v: number, type: "customer" | "supplier"): string {
+  if (Math.abs(v) < 0.5) return "(qarzdorlik yo'q)";
+  if (type === "customer") return v > 0 ? "(mijoz bizga qarzdor)" : "(biz mijozga qarzdormiz)";
+  return v > 0 ? "(biz ta'minotchiga qarzdormiz)" : "(ta'minotchi bizga qarzdor)";
+}
 
 /** Bo'sh rekvizit chop etilganda qo'lda yozish uchun chiziq */
 const rk = (v: string | null | undefined) => (v && v.trim() ? v : "________________");
@@ -270,6 +277,9 @@ const ERP_TABS: ErpTab[] = ["overview", "inventory", "documents", "cash", "suppl
 
 export default function Erp() {
   const { lang } = useAdminI18n();
+  // Hujjat va kassa orderini bekor qilish faqat Ega va Admin uchun (server ham tekshiradi)
+  const me = useOutletContext<{ role?: string } | undefined>();
+  const canCancel = me?.role === "OWNER" || me?.role === "ADMIN";
   // Faol bo'lim URL'da saqlanadi: sahifa yangilanganda yoki havola ulashilganda shu bo'lim ochiladi
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get("tab") as ErpTab | null;
@@ -336,6 +346,9 @@ export default function Erp() {
   const [loadingSverka, setLoadingSverka] = useState(false);
   const [sverkaEntityType, setSverkaEntityType] = useState<"customer" | "supplier">("supplier");
   const [sverkaEntityId, setSverkaEntityId] = useState<number>(0);
+  const isoDay = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+  const [sverkaFrom, setSverkaFrom] = useState<string>(() => isoDay(new Date(new Date().getFullYear(), 0, 1)));
+  const [sverkaTo, setSverkaTo] = useState<string>(() => isoDay(new Date()));
   const [customersList, setCustomersList] = useState<{ id: number; name: string; organization?: string; phone?: string; balance?: number }[]>([]);
 
   /* ------------------------------------------------------------------------ */
@@ -470,7 +483,7 @@ export default function Erp() {
   };
 
   const loadCustomers = () => {
-    api<{ items: any[] }>("/admin/customers?limit=500", { admin: true })
+    api<{ items: any[] }>("/admin/customers?limit=5000", { admin: true })
       .then((r) => setCustomersList(r.items || []))
       .catch(() => {});
   };
@@ -486,7 +499,7 @@ export default function Erp() {
   const loadSverka = () => {
     if (!sverkaEntityId) return;
     setLoadingSverka(true);
-    api<any>(`/admin/erp/reports/act-sverka?type=${sverkaEntityType}&id=${sverkaEntityId}`, { admin: true })
+    api<any>(`/admin/erp/reports/act-sverka?type=${sverkaEntityType}&id=${sverkaEntityId}&from=${sverkaFrom}&to=${sverkaTo}`, { admin: true })
       .then(setSverkaData)
       .catch((err) => toast.error(err.message || "Xatolik"))
       .finally(() => setLoadingSverka(false));
@@ -549,6 +562,7 @@ export default function Erp() {
   /* ------------------------------------------------------------------------ */
   /* Quick Edit Product                                                       */
   /* ------------------------------------------------------------------------ */
+  const [editStockBefore, setEditStockBefore] = useState<number | null>(null);
   const handleSaveProductQuick = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -560,6 +574,7 @@ export default function Erp() {
         markupPercent: Number(editingProduct.markupPercent) || 0,
         priceFrom: Number(editingProduct.priceFrom) || 0,
         stock: Number(editingProduct.stock) || 0,
+        stockBefore: editStockBefore,
         minStock: Math.max(0, Number(editingProduct.minStock) || 0),
         batchNumber: editingProduct.batchNumber || null,
         expDate: editingProduct.expDate || null,
@@ -666,7 +681,7 @@ export default function Erp() {
   const docTotal = docForm.items.reduce((s, it) => s + docLineTotal(it), 0);
   const docShortItems = docMeta.stock === "out" ? docForm.items.filter((it) => it.quantity > it.stock) : [];
 
-  const handleSaveDocument = (e: React.FormEvent) => {
+  const handleSaveDocument = async (e: React.FormEvent) => {
     e.preventDefault();
     if (docForm.items.length === 0) return setDocError("Kamida bitta tovar qo'shing.");
     if (docForm.items.some((i) => !(i.quantity >= 1))) return setDocError("Har bir tovar miqdori kamida 1 bo'lishi kerak.");
@@ -691,6 +706,29 @@ export default function Erp() {
         expDate: i.expDate || undefined,
       })),
     };
+
+    // Sayt buyurtmasi tasdiqlanganda qoldiq o'zi kamaygan: shu mijozga shu tovarlar uchun ikkinchi "Sotuv" yozilmasin
+    if (docForm.type === "OUTCOME" && payload.customerId) {
+      const ids = docForm.items.map((i) => i.productId).join(",");
+      try {
+        const chk = await api<{ orders: { code: string; items: { productName: string; quantity: number }[] }[] }>(
+          `/admin/erp/site-orders-check?customerId=${payload.customerId}&productIds=${ids}`,
+          { admin: true }
+        );
+        if (chk.orders.length) {
+          const list = chk.orders.map((o) => `#${o.code}: ${o.items.map((i) => `${i.productName} × ${i.quantity}`).join(", ")}`).join("\n");
+          if (
+            !window.confirm(
+              `Diqqat: bu mijozning saytdagi buyurtmalari ombordan allaqachon chiqarilgan:\n\n${list}\n\nAgar bu o'sha sotuv bo'lsa, hujjat yozmang (tovar ikki marta chiqib ketadi). Baribir o'tkazilsinmi?`
+            )
+          ) {
+            return;
+          }
+        }
+      } catch {
+        /* tekshiruv ishlamasa, saqlashga to'sqinlik qilmaymiz */
+      }
+    }
 
     setDocSaving(true);
     setDocError("");
@@ -1253,7 +1291,10 @@ export default function Erp() {
                             className="erp-btn-icon"
                             title="Narx va qoldiqni tahrirlash"
                             aria-label="Tezkor tahrirlash"
-                            onClick={() => setEditingProduct(p)}
+                            onClick={() => {
+                              setEditStockBefore(p.stock);
+                              setEditingProduct(p);
+                            }}
                           >
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
                           </button>
@@ -1505,7 +1546,7 @@ export default function Erp() {
                         >
                           Kvitansiya
                         </button>
-                        {!c.canceledAt && !c.stornoOfId && !c.document && c.category !== "SAYT_BUYURTMA" && (
+                        {canCancel && !c.canceledAt && !c.stornoOfId && !c.document && c.category !== "SAYT_BUYURTMA" && (
                           <button
                             type="button"
                             className="btn-link"
@@ -1710,11 +1751,20 @@ export default function Erp() {
                 </select>
               </div>
 
+              <div className="field-group">
+                <label>Davr boshi:</label>
+                <input type="date" value={sverkaFrom} max={sverkaTo} onChange={(e) => { setSverkaFrom(e.target.value); setSverkaData(null); }} />
+              </div>
+              <div className="field-group">
+                <label>Davr oxiri:</label>
+                <input type="date" value={sverkaTo} min={sverkaFrom} onChange={(e) => { setSverkaTo(e.target.value); setSverkaData(null); }} />
+              </div>
+
               <button
                 type="button"
                 className="btn btn-erp-primary"
                 onClick={loadSverka}
-                disabled={!sverkaEntityId || loadingSverka}
+                disabled={!sverkaEntityId || loadingSverka || !sverkaFrom || !sverkaTo}
               >
                 {loadingSverka ? "Shakllantirilmoqda…" : "Shakllantirish"}
               </button>
@@ -1725,7 +1775,7 @@ export default function Erp() {
                     type="button"
                     className="btn btn-erp-secondary"
                     disabled={exportingExcel}
-                    onClick={() => handleExport(`/admin/erp/export/act-sverka?type=${sverkaEntityType}&id=${sverkaEntityId}`, `medax-akt-sverka-${new Date().toISOString().slice(0, 10)}.xlsx`)}
+                    onClick={() => handleExport(`/admin/erp/export/act-sverka?type=${sverkaEntityType}&id=${sverkaEntityId}&from=${sverkaFrom}&to=${sverkaTo}`, `medax-akt-sverka-${new Date().toISOString().slice(0, 10)}.xlsx`)}
                   >
                     Excel (.xlsx)
                   </button>
@@ -1750,7 +1800,9 @@ export default function Erp() {
                 </div>
 
                 <div className="sverka-balance-box">
-                  <div>Hozirgi yakuniy saldo (balans): <strong>{formatMoney(sverkaData.entity.balance)} so'm</strong></div>
+                  <div>Davr boshiga saldo: <strong>{formatMoney(Math.abs(sverkaData.opening || 0))} so'm</strong> {saldoNote(sverkaData.opening || 0, sverkaData.entity.type)}</div>
+                  <div>Davr oxiriga saldo: <strong>{formatMoney(Math.abs(sverkaData.closing || 0))} so'm</strong> {saldoNote(sverkaData.closing || 0, sverkaData.entity.type)}</div>
+                  <small style={{ color: "#64748b" }}>Hozirgi balans (barcha davr): {formatMoney(sverkaData.entity.balance)} so'm</small>
                 </div>
 
                 <table className="erp-table sverka-table">
@@ -2700,7 +2752,7 @@ export default function Erp() {
               </div>
             )}
             <div className="erp-modal-footer">
-              {selectedDocDetails.status !== "CANCELED" && !docCancel.open && (
+              {canCancel && selectedDocDetails.status !== "CANCELED" && !docCancel.open && (
                 <button
                   type="button"
                   className="btn btn-erp-secondary"
